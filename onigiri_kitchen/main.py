@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.3.2"
+VERSION = "1.4.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -42,6 +42,8 @@ DEFAULT_CONF: Dict[str, Any] = {
     "shortcut": "Ctrl+Shift+K",
     "show_home_widget_without_onigiri": True,
     "celebrate_deck_finish": True,
+    "pause_focus_when_idle": True,
+    "idle_pause_minutes": 1,
 }
 
 state = KitchenState(ADDON_DIR)
@@ -92,6 +94,12 @@ def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
         else:
             tooltip(msg, period=4000)
         _eval_kitchen(f"OK.onFocusDone({json.dumps(info)})")
+    elif kind == "idle_paused":
+        mins = info.get("minutes", 1)
+        tooltip(
+            f"集中 Focus paused: no reviews for {mins:g} min.<br>It resumes when you answer your next card.",
+            period=5000,
+        )
     elif kind == "break_done":
         if _dialog is not None:
             _eval_kitchen("OK.onBreakDone()")
@@ -609,6 +617,9 @@ def setup() -> None:
     gui_hooks.webview_did_receive_js_message.append(on_js_message)
     gui_hooks.main_window_did_init.append(_add_menu)
     gui_hooks.state_will_change.append(on_state_will_change)
+    # Seeing a question/answer counts as activity for the focus timer's idle pause.
+    gui_hooks.reviewer_did_show_question.append(lambda card: pomo.touch())
+    gui_hooks.reviewer_did_show_answer.append(lambda card: pomo.touch())
     # After all add-ons (including Onigiri) have set up their own congrats page.
     gui_hooks.main_window_did_init.append(_install_celebration)
     # Must be registered at load time so Onigiri can pick it up.

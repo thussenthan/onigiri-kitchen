@@ -81,7 +81,7 @@
     const time = chip.querySelector('.okc-time');
     const toggle = chip.querySelector('[data-act="toggle"]');
     if (p.phase === 'focus') {
-      label.textContent = '集中';
+      label.textContent = p.idle ? '休止' : '集中';
       time.textContent = fmt(remaining(p));
     } else if (p.phase === 'break') {
       label.textContent = p.longBreak ? '祭り' : '休憩';
@@ -92,6 +92,7 @@
     }
     toggle.innerHTML = p.phase === 'idle' || p.paused ? '&#x25B6;&#xFE0E;' : '&#x23F8;&#xFE0E;';
     chip.title =
+      p.phase === 'focus' && p.idle ? 'Focus paused while you were away. Answer a card to resume.' :
       p.phase === 'focus' ? 'Focus session' :
       p.phase === 'break' ? 'Break: your restaurant is open' : 'Onigiri Kitchen';
     const frac = p.total ? 1 - remaining(p) / p.total : 0;

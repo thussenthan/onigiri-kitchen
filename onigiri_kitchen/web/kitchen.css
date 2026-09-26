@@ -487,7 +487,7 @@ button { font: inherit; color: inherit; }
 }
 .ok-form input[type="range"] { width: 140px; accent-color: var(--shu); }
 .ok-form .ok-check { justify-content: flex-start; font-size: 12.5px; color: var(--ink-2); }
-.ok-form .ok-check input { accent-color: var(--shu); width: 15px; height: 15px; margin: 0; }
+.ok-form .ok-check input[type="checkbox"] { accent-color: var(--shu); width: 15px; height: 15px; margin: 0; flex: none; }
 .ok-form-btns { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
 .ok-ghost {
   border: none;
@@ -824,3 +824,5 @@ body { background-image: none !important; font-family: var(--sans); }
 .ok-grid-head span { margin-left: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
 .ok-item.ok-animal canvas { background: linear-gradient(180deg, #8a5a34 0 62%, #cdbb7e 62%); }
 .ok-perk { color: var(--shu) !important; font-weight: 600; }
+
+.ok-form .ok-check .ok-inline-num { width: 38px; height: auto; padding: 2px 4px; margin: 0 2px; font-size: 12px; }

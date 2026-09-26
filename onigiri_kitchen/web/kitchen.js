@@ -2524,7 +2524,9 @@
     const waiting = S.guestsWaiting || 0;
     const per = conf.reviews_per_guest || 10;
     const inside = customers.length;
-    if (timer.phase === 'focus') {
+    if (timer.phase === 'focus' && timer.idle) {
+      el.innerHTML = `<span class="jp">休止</span>Focus paused while you were away. It resumes when you answer a card.`;
+    } else if (timer.phase === 'focus') {
       el.innerHTML = `<span class="jp">準備中</span>Focus session running. Guests are lining up while you study.`;
     } else if (waiting > 0) {
       el.innerHTML = `<span class="jp">行列</span>${waiting} guest${waiting === 1 ? '' : 's'} waiting outside · ${inside} inside` + (rush ? ' · serving at 4×' : '');
@@ -2635,7 +2637,9 @@
     const clock = $('ok-clock');
     const main = $('ok-t-main');
     if (timer.phase === 'focus') {
-      phase.textContent = '集中 · Focus' + (timer.cardGoal ? ` · ${timer.focusCards}/${timer.cardGoal}` : '');
+      phase.textContent = timer.idle
+        ? '休止 · Paused while idle'
+        : '集中 · Focus' + (timer.cardGoal ? ` · ${timer.focusCards}/${timer.cardGoal}` : '');
       clock.textContent = fmt(remaining());
     } else if (timer.phase === 'break') {
       phase.textContent = timer.longBreak ? '祭り · Long break' : '休憩 · Break';

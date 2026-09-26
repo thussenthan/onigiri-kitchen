@@ -32,6 +32,9 @@ class Pomodoro:
         self.rounds = 0  # focus sessions finished in the current cycle
         self.long_break = False
         self.focus_cards = 0
+        # Idle pause: focus only counts down while you're actually reviewing.
+        self.last_activity = time.time()
+        self.idle_paused = False
         self._timer = QTimer(mw)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
@@ -49,6 +52,16 @@ class Pomodoro:
         except (TypeError, ValueError):
             return 4
 
+    def _idle_limit(self) -> Optional[float]:
+        """Seconds without review activity before focus pauses (None = off)."""
+        c = self._conf()
+        if not c.get("pause_focus_when_idle", True):
+            return None
+        try:
+            return max(30.0, float(c.get("idle_pause_minutes", 1)) * 60)
+        except (TypeError, ValueError):
+            return 60.0
+
     def _card_goal(self) -> int:
         try:
             return max(0, int(self._conf().get("focus_card_goal", 0)))
@@ -59,6 +72,8 @@ class Pomodoro:
     def start_focus(self) -> None:
         self._begin(FOCUS, self._minutes("focus_minutes", 25) * 60)
         self.focus_cards = 0
+        self.last_activity = time.time()
+        self.idle_paused = False
         self._emit()
 
     def start_break(self) -> None:
@@ -75,6 +90,8 @@ class Pomodoro:
             self._emit()
 
     def resume(self) -> None:
+        self.idle_paused = False
+        self.last_activity = time.time()
         if self.paused_remaining is not None:
             self.ends_at = time.time() + self.paused_remaining
             self.paused_remaining = None
@@ -91,6 +108,7 @@ class Pomodoro:
             self.start_focus()
 
     def reset(self) -> None:
+        self.idle_paused = False
         self._timer.stop()
         self.phase = IDLE
         self.ends_at = None
@@ -106,7 +124,14 @@ class Pomodoro:
             self.total += minutes * 60
             self._emit()
 
+    def touch(self) -> None:
+        """Review activity (a question or answer shown). Resumes an idle pause."""
+        self.last_activity = time.time()
+        if self.phase == FOCUS and self.idle_paused:
+            self.resume()
+
     def on_review(self) -> None:
+        self.touch()
         if self.phase != FOCUS or self.ends_at is None:
             return
         self.focus_cards += 1
@@ -123,6 +148,19 @@ class Pomodoro:
         self._timer.start()
 
     def _tick(self) -> None:
+        if self.phase == FOCUS and self.ends_at is not None:
+            limit = self._idle_limit()
+            now = time.time()
+            if limit and now - self.last_activity > limit:
+                # Pause, and give back the idle stretch: remaining time is what
+                # was left at the last moment you were reviewing.
+                self.paused_remaining = max(0.0, self.ends_at - self.last_activity)
+                self.ends_at = None
+                self.idle_paused = True
+                self._timer.stop()
+                self._emit()
+                self._on_event("idle_paused", {"minutes": round(limit / 60, 1)})
+                return
         if self.ends_at is None or time.time() < self.ends_at:
             return
         if self.phase == FOCUS:
@@ -169,6 +207,7 @@ class Pomodoro:
             "remaining": int(remaining * 1000),
             "total": int(self.total * 1000),
             "paused": self.paused_remaining is not None,
+            "idle": self.idle_paused,
             "rounds": self.rounds,
             "cycle": self._cycle(),
             "longBreak": self.long_break,

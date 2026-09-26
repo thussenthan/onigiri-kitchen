@@ -23,7 +23,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   still waiting then takes takeout and still leaves a tip.
 - **Pomodoro timer.** One dango per focus session. When a break starts, the restaurant opens. When the
   break ends, you get a gentle nudge back to your cards. Long breaks are festival nights with fireworks.
-  A small dango timer sits in the corner of Anki's main screens.
+  A small dango timer sits in the corner of Anki's main screens. Focus only counts while you're actually reviewing:
+  after 1 minute without activity it pauses (and gives that time back), then resumes on your next card.
 - **Tama, the shop cat.** A virtual pet with needs (tummy, love, energy) that your studying fills.
   She grows with total study days (never streaks), develops a personality from your habits, learns tricks
   and brings you gifts. **She can't get sick, run away or die.** Days off just make her sleepy.
