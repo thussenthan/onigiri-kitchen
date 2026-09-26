@@ -1829,8 +1829,17 @@
     }
   }
 
+  // Tips vary a little (same averages as state.py tip_for): regular ~3 with a
+  // rare generous 8, sour plum 5-8, golden 10-15.
+  function baseTip(kind) {
+    if (kind === 'golden') return 10 + Math.floor(Math.random() * 6);
+    if (kind === 'leech') return 5 + Math.floor(Math.random() * 4);
+    const r = Math.random() * 100;
+    return r < 35 ? 2 : r < 80 ? 3 : r < 95 ? 4 : 8;
+  }
   function tipFor(c) {
-    let amt = c.guest.kind === 'golden' ? 12 : c.guest.kind === 'leech' ? 6 : 3;
+    let amt = baseTip(c.guest.kind);
+    c.generous = c.guest.kind !== 'golden' && c.guest.kind !== 'leech' && amt === 8;
     if (c.guest.kind === 'golden' && has('tanuki')) amt *= 2;
     if (c.guest.kind === 'leech' && has('kitsune')) amt *= 2;
     if (has('maneki')) amt += 1;
@@ -1840,7 +1849,12 @@
 
   function payFor(c) {
     const amount = tipFor(c);
-    coins.push({ x: c.x + 5, y: 143, amount, t: 0, fly: null });
+    coins.push({ x: c.x + 5, y: 143, amount, t: 0, fly: null, big: !!c.generous });
+    if (c.generous) {
+      toast(`心付け! A generous guest left ${amount} mon`);
+      OKSound.coin();
+      for (let i = 0; i < 8; i++) particles.push({ x: c.x + 5 + rand(-4, 4), y: 140 + rand(-3, 3), vx: rand(-10, 10), vy: -rand(8, 18), life: 0.9, c: '#fff1a8', type: 'spark' });
+    }
     send('pay', JSON.stringify({ amount, deck: c.guest.deck || null }), (snap) => {
       if (snap && typeof snap.mon === 'number') {
         S = Object.assign(S, snap);
@@ -1969,6 +1983,7 @@
       P(x, y, C.goldDk);
       if (shine) P(x - 1, y - 1, '#fff6cc');
       if (cn.amount >= 6) { ellipse(x + 2, y + 1, 2, 1, C.goldDk); P(x + 2, y + 1, C.gold); }
+      if (cn.big) { ellipse(x - 2, y + 1, 2, 1, C.goldDk); P(x - 2, y + 1, C.gold); if (Math.floor(time * 6) % 2) P(x + 1, y - 3, '#fff6cc'); }
       if (!cn.fly) regions.push({ x: x - 4, y: y - 4, w: 9, h: 8, label: `<b>文</b> ${cn.amount} mon tip\nClick to collect`, click: () => collectCoin(cn) });
     }
   }

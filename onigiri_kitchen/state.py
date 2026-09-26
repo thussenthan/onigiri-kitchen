@@ -10,6 +10,7 @@ import copy
 import datetime
 import json
 import os
+import random
 import re
 import time
 from typing import Any, Dict, List, Optional
@@ -48,7 +49,7 @@ CATALOG: List[Dict[str, Any]] = [
      "desc": "A Shigaraki tanuki for good fortune. Golden guests tip double."},
 ]
 # Animal companions: big milestone purchases that live in the restaurant.
-# A review earns about 0.35 mon on average (a 3-mon guest per 10 reviews,
+# A review earns about 0.35 mon on average (a ~3-mon guest per 10 reviews,
 # plus golden/sour-plum guests), so prices are set so the rabbit takes about
 # 4k reviews and the whole set (37,000 mon) takes about 3 months at 1,200
 # reviews a day, and under a year at 300 a day.
@@ -307,9 +308,17 @@ class KitchenState:
         return item_id in self.data["owned"] and item_id not in self.data["hidden"]
 
     def tip_for(self, guest: Dict[str, Any]) -> int:
-        """Same tip rules as the animated service in kitchen.js (tipFor)."""
+        """Same tip rules as the animated service in kitchen.js (tipFor).
+
+        Tips vary a little (averages: regular ~3, sour plum 6.5, golden 12.5),
+        with a rare generous regular who leaves 8."""
         kind = guest.get("kind")
-        amount = 12 if kind == "golden" else 6 if kind == "leech" else 3
+        if kind == "golden":
+            amount = random.randint(10, 15)
+        elif kind == "leech":
+            amount = random.randint(5, 8)
+        else:
+            amount = random.choices([2, 3, 4, 8], weights=[35, 45, 15, 5])[0]
         if kind == "golden" and self.shown("tanuki"):
             amount *= 2
         if kind == "leech" and self.shown("kitsune"):
