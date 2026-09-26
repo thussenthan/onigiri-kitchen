@@ -327,6 +327,8 @@ class KitchenState:
             amount += 1
         if self.shown("shiba"):
             amount += 1
+        if self.pet.happy():
+            amount += 1  # happy-cat bonus: Tama beckons guests in
         return amount
 
     def apply_companion_perks(self) -> None:
@@ -380,8 +382,20 @@ class KitchenState:
         if gift:
             if gift["id"] == "kosen":
                 self.data["mon"] += 5
+            if gift["id"] == "koban":
+                self.data["mon"] += 25
+            if gift.get("setBonus"):
+                # all 12 keepsakes: one-time mon + the treasure shelf
+                self.data["mon"] += int(gift["setBonus"])
+                if "takaramono" not in self.data["owned"]:
+                    self.data["owned"].append("takaramono")
             self.save_soon()
         return gift
+
+    def pet_style(self, key: str, value: Any) -> Dict[str, Any]:
+        self.pet.set_style(key, value)
+        self.save_soon()
+        return self.pet.snapshot()
 
     def pet_rename(self, name: str) -> Dict[str, Any]:
         self.pet.rename(name)

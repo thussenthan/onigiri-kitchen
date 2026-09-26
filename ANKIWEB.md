@@ -28,7 +28,7 @@ You study, guests arrive. You take a break, you get to enjoy them.
 - **Guests come from studying.** Every 10 reviews in a deck brings a guest from that deck, and each deck has its own look. Getting a leech right sends a grumpy sour-plum guest who cheers up once fed.
 - **Study in one big batch.** No limit on waiting guests. After a big session, serve everyone at 4× speed or collect every tip at once. Reviews from your phone count too once synced.
 - **Pomodoro timer.** One dango per focus session. It only counts while you're reviewing (it pauses after a minute idle). The restaurant opens when your break starts, and nudges you back when it ends. Long breaks are festival nights with fireworks.
-- **Tama, the shop cat.** A gentle virtual pet. Studying feeds her, and she grows with total study days (never streaks), develops a personality, learns tricks and brings you gifts. She can't get sick, run away or die.
+- **Tama, the shop cat.** A gentle virtual pet. Studying feeds her, and she grows with total study days (never streaks), develops a personality, learns tricks and brings you gifts. Caring for her unlocks accessories, a happy-cat tip bonus, rare keepsakes and a treasure shelf. She can't get sick, run away or die.
 - **Decor.** Guests tip in mon. Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish and more.
 - **Animal companions:** milestone buys that move in, each with a perk. A rabbit, a black cat, a shiba, a fox, a tanuki and a crane.
 - **Confetti** when you finish a deck (紙吹雪 on the "Congratulations" screen).

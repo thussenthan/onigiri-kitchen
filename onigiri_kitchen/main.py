@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -202,6 +202,13 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     state.roll_day()
     state.sync_today(todays_reviews_by_deck(), conf().get("reviews_per_guest", 10))
     away = state.pet.seen()
+    # Anyone who already had all 12 keepsakes gets the set bonus once.
+    set_bonus_now = False
+    if state.pet.check_set_bonus():
+        state.data["mon"] += petmod.SET_BONUS_MON
+        if "takaramono" not in state.data["owned"]:
+            state.data["owned"].append("takaramono")
+        set_bonus_now = True
     state.save_soon()
     return {
         "reason": reason,
@@ -209,6 +216,10 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
         "petAway": away,
         "petStages": petmod.STAGES,
         "petGifts": petmod.GIFTS,
+        "petRareGifts": petmod.RARE_GIFTS,
+        "petMilestones": {k: {"kind": v[0], "need": v[1]} for k, v in petmod.MILESTONES.items()},
+        "petsPerDay": petmod.PETS_PER_DAY,
+        "setBonusNow": set_bonus_now,
         "onigiri": onigiri_link.read_progress(),
         "state": state.snapshot(),
         "takeout": state.pop_takeout(),
@@ -383,6 +394,12 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         return {"gift": gift, "pet": state.pet.snapshot(), "state": state.snapshot()}
     if cmd == "petname":
         return state.pet_rename(arg)
+    if cmd == "petstyle":
+        try:
+            info = json.loads(arg or "{}")
+        except ValueError:
+            info = {}
+        return state.pet_style(str(info.get("key", "")), info.get("value"))
     if cmd == "bump":
         state.bump(arg)
         return None
@@ -574,6 +591,21 @@ def after_finished_screen(overview: Any, *args: Any, **kwargs: Any) -> None:
         print(f"Onigiri Kitchen: confetti failed: {e}")
 
 
+def test_confetti() -> None:
+    """Tools menu: play the celebration over the current main screen, to check
+    it shows up (e.g. on Onigiri's congrats page) without finishing a deck."""
+    c = conf()
+    opts = {"deck": "Test", "sound": bool(c.get("sound", True)), "volume": float(c.get("volume", 0.5))}
+    try:
+        theme = onigiri_link.read_theme()
+        if theme:
+            opts["accent"] = theme["light"].get("--accent-color")
+    except Exception:
+        pass
+    script = _read_web("sound.js") + "\n" + _read_web("celebrate.js") + f"\nOKCelebrate({json.dumps(opts)});"
+    mw.web.eval(script)
+
+
 def _install_celebration() -> None:
     from anki.hooks import wrap
 
@@ -602,6 +634,10 @@ def _add_menu() -> None:
         open_action.setShortcut(QKeySequence(shortcut))
     open_action.triggered.connect(lambda: open_kitchen())
     menu.addAction(open_action)
+
+    test_action = QAction("Onigiri Kitchen: Test Confetti", mw)
+    test_action.triggered.connect(test_confetti)
+    menu.addAction(test_action)
 
     focus_action = QAction("Onigiri Kitchen: Start Focus Timer", mw)
     focus_action.triggered.connect(lambda: pomo.start_focus())

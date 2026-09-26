@@ -826,3 +826,48 @@ body { background-image: none !important; font-family: var(--sans); }
 .ok-perk { color: var(--shu) !important; font-weight: 600; }
 
 .ok-form .ok-check .ok-inline-num { width: 38px; height: auto; padding: 2px 4px; margin: 0 2px; font-size: 12px; }
+
+/* ------------------------------------------------ Tama care rewards */
+.ok-pet-happy {
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink-2);
+  border: 1px dashed var(--line);
+}
+.ok-pet-happy .jp { color: var(--ink-3); margin-right: 4px; }
+.ok-pet-happy.on { border-style: solid; border-color: #e0a13a; background: color-mix(in srgb, #e8c25a 14%, var(--card)); color: var(--ink); }
+.ok-pet-happy.on .jp { color: #c98a1a; }
+.ok-pet-acc { display: flex; flex-direction: column; gap: 8px; }
+.ok-acc-row { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 5px; align-items: baseline; }
+.ok-acc-row > b { color: var(--shu); font-size: 13.5px; }
+.ok-acc-row > span { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.ok-acc-row > div { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.ok-acc-lock { font-size: 11.5px; color: var(--ink-3); padding: 4px 10px; border-radius: 999px; border: 1px dashed var(--line); }
+.ok-acc-lock em { font-style: normal; font-weight: 700; margin-left: 4px; color: var(--ink-2); }
+.ok-acc-note, .ok-pet-setnote { font-size: 11px; color: var(--ink-3); }
+.ok-pet-setnote .jp { color: var(--shu); margin-right: 4px; }
+.ok-gift-rare { border-color: #e0b54a !important; background: color-mix(in srgb, #e8c25a 12%, var(--card)) !important; }
+.ok-gift-rare.unknown b { color: #c99a2a; }
+.ok-pet-rare { grid-template-columns: repeat(6, 1fr); }
+.ok-rare-head .jp { color: #c99a2a !important; }
+.ok-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ok-chip i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.ok-chip:hover { border-color: var(--shu); }
+.ok-chip.on { border-color: var(--shu); background: color-mix(in srgb, var(--shu) 16%, var(--card)); }
+/* panels: the header keeps its size, the body scrolls */
+.ok-panel-head { flex: none; }

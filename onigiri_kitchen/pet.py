@@ -57,6 +57,29 @@ FORTUNES = [
 
 GIFT_COOLDOWN = 2 * 3600
 
+# Rare golden keepsakes: only possible when Tama is very happy (love 90+).
+# A bonus on top of the 12 regular ones (not needed for the set bonus).
+RARE_GIFTS: List[Dict[str, str]] = [
+    {"id": "omamori", "jp": "招き猫お守り", "name": "Lucky cat charm", "desc": "A golden maneki-neko charm. Rare!", "rare": "1"},
+    {"id": "koban", "jp": "小判", "name": "Gold koban", "desc": "An old gold coin. Worth 25 mon!", "rare": "1"},
+    {"id": "kanzashi", "jp": "簪", "name": "Kanzashi", "desc": "A delicate hairpin with a tiny sakura. Rare!", "rare": "1"},
+]
+RARE_CHANCE = 0.2
+SET_BONUS_MON = 500
+
+# Care milestones unlock accessories. Petting counts at most PETS_PER_DAY
+# times a day toward these (so they reward daily care, not clicking).
+PETS_PER_DAY = 20
+MILESTONES = {
+    "collar": ("pets", 50),
+    "bandana": ("pets", 200),
+    "bell": ("pets", 500),
+    "fancy_bed": ("fish", 25),
+    "kotatsu": ("fish", 100),
+}
+COLLAR_COLORS = ["red", "indigo", "matcha", "sakura"]
+HAPPY_AT = 70
+
 
 def defaults() -> Dict[str, Any]:
     now = int(time.time())
@@ -77,6 +100,11 @@ def defaults() -> Dict[str, Any]:
         "last_gift": 0,
         "last_brush": 0,
         "times_petted": 0,
+        "pet_points": 0,  # pets counted toward milestones (max PETS_PER_DAY a day)
+        "pets_today": {"date": "", "count": 0},
+        "fish_fed": 0,
+        "set_bonus": False,
+        "style": {"collar": "red", "bandana": False, "bell": False, "bed": "zabuton"},
     }
 
 
@@ -164,6 +192,13 @@ class Pet:
         if kind == "pet":
             self._add("love", 5)
             self.d["times_petted"] = int(self.d.get("times_petted", 0)) + 1
+            today = datetime.now().strftime("%Y-%m-%d")
+            pt = self.d.setdefault("pets_today", {"date": "", "count": 0})
+            if pt.get("date") != today:
+                pt.update(date=today, count=0)
+            if pt["count"] < PETS_PER_DAY:
+                pt["count"] += 1
+                self.d["pet_points"] = int(self.d.get("pet_points", 0)) + 1
         elif kind == "brush":
             fresh = now - float(self.d.get("last_brush", 0)) > 300
             self._add("love", 10 if fresh else 2)
@@ -176,6 +211,7 @@ class Pet:
                 ok, msg = False, "She's full! Maybe later."
             else:
                 self.d["fish"] = int(self.d["fish"]) - 1
+                self.d["fish_fed"] = int(self.d.get("fish_fed", 0)) + 1
                 self._add("tummy", 18)
                 self._add("love", 3)
         elif kind == "play":
@@ -212,14 +248,52 @@ class Pet:
         month = datetime.now().month
         pool = [g for g in GIFTS if not (g["id"] == "momiji" and month not in (9, 10, 11))
                 and not (g["id"] == "hanabira" and month not in (3, 4, 5))]
-        gift = dict(random.choice(pool))
+        if float(self.d.get("love", 0)) >= 90 and random.random() < RARE_CHANCE:
+            gift = dict(random.choice(RARE_GIFTS))
+        else:
+            gift = dict(random.choice(pool))
         gifts = self.d.setdefault("gifts", {})
         gifts[gift["id"]] = int(gifts.get(gift["id"], 0)) + 1
         self.d["last_gift"] = int(now)
         if gift["id"] == "omikuji":
             jp, text = random.choice(FORTUNES)
             gift["fortune"] = {"jp": jp, "text": text}
+        if self.check_set_bonus():
+            gift["setBonus"] = SET_BONUS_MON
         return gift
+
+    # ------------------------------------------------------------ rewards
+    def happy(self) -> bool:
+        """Happy-cat bonus: all three needs at HAPPY_AT or more."""
+        return all(float(self.d.get(k, 0)) >= HAPPY_AT for k in ("tummy", "love", "energy"))
+
+    def check_set_bonus(self) -> bool:
+        """True the first time all 12 regular keepsakes have been found."""
+        if self.d.get("set_bonus"):
+            return False
+        gifts = self.d.get("gifts", {})
+        if all(gifts.get(g["id"]) for g in GIFTS):
+            self.d["set_bonus"] = True
+            return True
+        return False
+
+    def unlocks(self) -> Dict[str, bool]:
+        have = {"pets": int(self.d.get("pet_points", 0)), "fish": int(self.d.get("fish_fed", 0))}
+        return {key: have[kind] >= need for key, (kind, need) in MILESTONES.items()}
+
+    def set_style(self, key: str, value: Any) -> Dict[str, Any]:
+        un = self.unlocks()
+        style = self.d.setdefault("style", {"collar": "red", "bandana": False, "bell": False, "bed": "zabuton"})
+        if key == "collar" and un["collar"] and value in COLLAR_COLORS:
+            style["collar"] = value
+        elif key == "bandana" and un["bandana"]:
+            style["bandana"] = bool(value)
+        elif key == "bell" and un["bell"]:
+            style["bell"] = bool(value)
+        elif key == "bed" and value in ("zabuton", "fancy", "kotatsu"):
+            if value == "zabuton" or (value == "fancy" and un["fancy_bed"]) or (value == "kotatsu" and un["kotatsu"]):
+                style["bed"] = value
+        return dict(style)
 
     def seen(self) -> int:
         """Mark that you visited; returns seconds since the previous visit."""
@@ -249,4 +323,12 @@ class Pet:
             "fish": int(self.d.get("fish", 0)),
             "gifts": dict(self.d.get("gifts", {})),
             "timesPetted": int(self.d.get("times_petted", 0)),
+            "happy": self.happy(),
+            "petPoints": int(self.d.get("pet_points", 0)),
+            "petsToday": int((self.d.get("pets_today") or {}).get("count", 0))
+            if (self.d.get("pets_today") or {}).get("date") == datetime.now().strftime("%Y-%m-%d") else 0,
+            "fishFed": int(self.d.get("fish_fed", 0)),
+            "unlocks": self.unlocks(),
+            "style": dict(self.d.get("style") or {}),
+            "setBonus": bool(self.d.get("set_bonus")),
         }

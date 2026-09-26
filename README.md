@@ -28,6 +28,9 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **Tama, the shop cat.** A virtual pet with needs (tummy, love, energy) that your studying fills.
   She grows with total study days (never streaks), develops a personality from your habits, learns tricks
   and brings you gifts. **She can't get sick, run away or die.** Days off just make her sleepy.
+  Caring for her pays off: keep all three needs at 70+ and she beckons guests in (+1 tip). Daily petting
+  and feeding unlock accessories (collar colours, a bandana, a golden bell, a fancy cushion, a kotatsu).
+  Finding all 12 keepsakes gives +500 mon and a treasure shelf, and a very happy Tama sometimes brings rare golden ones.
 - **Decor.** Guests tip in 文 (*mon*). Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish, radio
   and more, some unlocked by your Onigiri restaurant level.
 - **Animal companions.** Big milestone purchases that move into the restaurant, each with a perk: a rabbit,

@@ -58,6 +58,9 @@ Tama is a gentle virtual pet. Open her panel with the **猫 Tama** button.
 - **Gifts:** a happy, well-fed Tama sometimes brings you something for your keepsake box,
   like a paper crane, a marble, an old coin or a fortune slip.
 - During focus sessions she naps on the timer in the corner.
+- **Rewards for caring:** all three needs at 70+ → she beckons guests in (+1 tip). Pet her (up to 20
+  counted a day) and feed her fish to unlock collar colours, a bandana, a golden bell, a fancy cushion and a
+  kotatsu. All 12 keepsakes → +500 mon and a treasure shelf. Love 90+ → a chance of rare golden keepsakes.
 
 Settings live in the timer panel in the kitchen (⚙) and in **Tools → Add-ons → Onigiri Kitchen → Config**.
 

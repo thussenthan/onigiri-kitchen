@@ -11,13 +11,14 @@ if (q.has('ff')) window.OK_DEBUG_FF = parseFloat(q.get('ff'));
 const decks = ['Pharm::Antibiotics','Anatomy::Heart','Biochem','Japanese::N4 Vocab','Micro::Bacteria'];
 const guests = [];
 for (let i=0;i<parseInt(q.get('guests')||'9');i++) guests.push({deck: decks[i%decks.length], kind: i===2?'leech':(i===0?'golden':'regular'), reviews:10});
-const mock = { mon: 140, owned: ((q.get('owned')||'bonsai,furin,kakejiku,maneki,daruma,kingyo,sakura,radio,matsuri,tanuki') + (q.has('animals') ? ',usagi,kuro,shiba,kitsune,tanuki_friend,tsuru' : '')).split(',').filter(Boolean), hidden: [] };
+const mock = { mon: 140, owned: ((q.get('owned')||'bonsai,furin,kakejiku,maneki,daruma,kingyo,sakura,radio,matsuri,tanuki') + (q.has('allgifts') ? ',takaramono' : '') + (q.has('animals') ? ',usagi,kuro,shiba,kitsune,tanuki_friend,tsuru' : '')).split(',').filter(Boolean), hidden: [] };
 let phase = q.get('phase') || 'idle';
 function pomo(){ const now=Date.now(); const idle=q.has('idle'); return {phase, endsAt: (phase==='idle'||idle)?null: now+ 4*60000, remaining: idle ? 14*60000 : 0, total: 25*60000, paused: idle, idle, rounds: 2, cycle: 4, longBreak: q.has('long'), focusCards: 37, cardGoal:0, now}; }
 const stage = parseInt(q.get('stage')||'2');
-const petState = {name: q.get('petname')||'Tama', tummy: parseFloat(q.get('tummy')||'62'), love: 70, energy: parseFloat(q.get('energy')||'70'), stage, stageJp: STAGES[stage].jp, stageName: STAGES[stage].name, studyDays: [1,5,14,30][stage], nextStageDays: stage<3?STAGES[stage+1].days:null, trait: q.get('trait')||'classic', traitInfo: TRAITS[q.get('trait')||'classic'], fish: 4, gifts: {donguri:2, orizuru:1, kosen:1}, timesPetted: 3};
+const petState = {name: q.get('petname')||'Tama', tummy: parseFloat(q.get('tummy')||'62'), love: 70, energy: parseFloat(q.get('energy')||'70'), stage, stageJp: STAGES[stage].jp, stageName: STAGES[stage].name, studyDays: [1,5,14,30][stage], nextStageDays: stage<3?STAGES[stage+1].days:null, trait: q.get('trait')||'classic', traitInfo: TRAITS[q.get('trait')||'classic'], fish: 4, gifts: q.has('allgifts') ? Object.fromEntries(GIFTS.map(g=>[g.id,1]).concat([['omamori',1]])) : {donguri:2, orizuru:1, kosen:1}, timesPetted: 3, happy: q.has('happy'), petPoints: q.has('unlock') ? 520 : 37, petsToday: 12, fishFed: q.has('unlock') ? 104 : 9, unlocks: q.has('unlock') ? {collar:true,bandana:true,bell:true,fancy_bed:true,kotatsu:true} : {collar:false,bandana:false,bell:false,fancy_bed:false,kotatsu:false}, style: {collar: q.get('collar')||'red', bandana: q.has('bandana'), bell: q.has('bell'), bed: q.get('bed')||'zabuton'}, setBonus: q.has('allgifts')};
+if (q.has('happy')) { petState.tummy = 85; petState.love = 92; petState.energy = 80; }
 window.OK_INIT = {
-  pet: petState, petAway: parseInt(q.get('away')||'0'), petStages: STAGES, petGifts: GIFTS,
+  pet: petState, petRareGifts: [{"id": "omamori", "jp": "招き猫お守り", "name": "Lucky cat charm", "desc": "A golden maneki-neko charm. Rare!", "rare": "1"}, {"id": "koban", "jp": "小判", "name": "Gold koban", "desc": "An old gold coin. Worth 25 mon!", "rare": "1"}, {"id": "kanzashi", "jp": "簪", "name": "Kanzashi", "desc": "A delicate hairpin with a tiny sakura. Rare!", "rare": "1"}], petMilestones: {"collar": {"kind": "pets", "need": 50}, "bandana": {"kind": "pets", "need": 200}, "bell": {"kind": "pets", "need": 500}, "fancy_bed": {"kind": "fish", "need": 25}, "kotatsu": {"kind": "fish", "need": 100}}, petsPerDay: 20, petAway: parseInt(q.get('away')||'0'), petStages: STAGES, petGifts: GIFTS,
   reason: q.get('reason')||'',
   onigiri: {found:true, name: q.get('name')||'Onigiri Kitchen', level: parseInt(q.get('level')||'24'), xpInto: 1219, xpNext: 2450, themeColor: '#'+(q.get('color')||'D49083')},
   state: {mon: mock.mon, owned: mock.owned, hidden: [], guestsWaiting: guests.length, servedTotal: 0, today:{date:'2026-09-25', reviews:142, focus_done:2}, firstSeen:'2026-09-01', tutorialDone: !q.has('tour')},
@@ -35,6 +36,7 @@ window.pycmd = function(msg, cb){
   else if (cmd==='conf') r = Object.assign(window.OK_INIT.conf, JSON.parse(arg));
   else if (cmd==='pet') { if (arg==='feed') petState.fish--; petState.love=Math.min(100,petState.love+5); r={ok:true,msg:'',pet:petState}; }
   else if (cmd==='petgift') { const gft = q.has('gift') ? Object.assign({}, GIFTS.find(x=>x.id===q.get('gift'))||GIFTS[11]) : null; if (gft && gft.id==='omikuji') gft.fortune={jp:'大吉',text:'Great blessing. Your cards will stick today.'}; r={gift:gft, pet:petState}; }
+  else if (cmd==='petstyle') { const o=JSON.parse(arg); petState.style[o.key]=o.value; r=petState; }
   else if (cmd==='petname') { petState.name=arg; r=petState; }
   else if (cmd==='serveall') { const n=guests.length; guests.length=0; mock.mon+=n*3; r={count:n, mon:n*3, kinds:{regular:n}, decks:{a:1,b:1}, state:{mon:mock.mon, guestsWaiting:0}, pet: petState}; }
   else if (cmd==='toggle') { const h=mock.hidden; const i=h.indexOf(arg); if(i>=0) h.splice(i,1); else h.push(arg); r={mon:mock.mon, owned:mock.owned, hidden:h, guestsWaiting: guests.length}; }
