@@ -1379,7 +1379,12 @@
   }
 
   function petAction(kind) {
-    if (kind === 'play') { startPlay(); return; }
+    if (kind === 'play') {
+      // the same button turns the feather toy off again
+      if (feather) { endPlay(); $('ok-pet').hidden = true; return; }
+      startPlay();
+      return;
+    }
     send('pet', kind, (res) => {
       if (!res) return;
       if (res.pet) { pet = res.pet; renderPetPanel(); }
@@ -1397,15 +1402,15 @@
       if (!res.ok) { toast(res.msg); return; }
       $('ok-pet').hidden = true;
       feather = { x: tama.x + 20, y: 160, t: 20 };
-      $('ok-play-done').hidden = false;
-      toast('遊ぼう! Wave the feather with your mouse. Esc or right-click to stop');
+      renderPlayButton();
+      toast('遊ぼう! Wave the feather with your mouse. Press Esc to stop');
       OKSound.pluck(7);
     });
   }
   function endPlay() {
     if (!feather) return;
     feather = null;
-    $('ok-play-done').hidden = true;
+    renderPlayButton();
     tamaSet('sit', 3);
     spawnHearts(tama.x, 156, 2);
     OKSound.meow();
@@ -1553,6 +1558,7 @@
       : '<b class="jp">招き猫モード</b> Keep all three needs at 70+ and she\'ll beckon guests in for <b>+1 tip</b> each.';
     renderAccessories();
     $('ok-pet-fish').textContent = pet.fish;
+    renderPlayButton();
     const trickBtn = document.querySelector('[data-pet="trick"]');
     const trickNames = ['', 'Paw wave', 'Beckon', 'Roll over'];
     trickBtn.querySelector('small').textContent = pet.stage >= 1 ? trickNames[Math.min(3, pet.stage)] : 'At 若猫';
@@ -1604,6 +1610,16 @@
       }
       rare.appendChild(cell);
     }
+  }
+
+  // 遊ぶ ⇄ やめる: the feather toy button is a toggle
+  function renderPlayButton() {
+    const b = document.querySelector('[data-pet="play"]');
+    if (!b) return;
+    b.classList.toggle('on', !!feather);
+    b.innerHTML = feather
+      ? '<b class="jp">やめる</b><small>Stop playing</small>'
+      : '<b class="jp">遊ぶ</b><small>Feather toy</small>';
   }
 
   // 身だしなみ: accessories unlocked by care milestones
@@ -2642,7 +2658,6 @@
   });
   // right-click ends the feather toy; the button does too
   view.addEventListener('contextmenu', (e) => { if (feather) { e.preventDefault(); endPlay(); } });
-  $('ok-play-done').addEventListener('click', endPlay);
   view.addEventListener('mouseleave', () => { hover = null; $('ok-tip').hidden = true; });
   view.addEventListener('click', (e) => {
     if (feather) { tama.hop = 6; OKSound.pop(); return; }
