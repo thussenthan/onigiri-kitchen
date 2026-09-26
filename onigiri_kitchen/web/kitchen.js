@@ -974,8 +974,8 @@
   );
   const PET_STAGES = INIT.petStages || [];
   const PET_GIFTS = INIT.petGifts || [];
-  const STAGE_SCALE = [0.62, 0.8, 1, 1.08];
-  const FLOOR_Y = 177; // Tama's feet on the front strip of tatami
+  const STAGE_SCALE = [0.72, 0.84, 1, 1.08];
+  const FLOOR_Y = 174; // Tama's feet on the front strip of tatami
   const BED_X = 17;
   const BOWL_X = 38;
   const SUN_X = 64;
@@ -1011,16 +1011,16 @@
       for (let y = 160; y < 180; y++) g.fillRect(SUN_X - 16 + Math.round((y - 160) * 0.6), y, 34, 1);
     }
     // zabuton bed
-    R(BED_X - 11, 174, 23, 4, '#8e3b46');
-    R(BED_X - 11, 174, 23, 1, '#ad5561');
-    P(BED_X - 11, 174, '#6b2a33'); P(BED_X + 11, 174, '#6b2a33');
-    P(BED_X, 175, '#e0a13a');
+    R(BED_X - 11, FLOOR_Y - 3, 23, 4, '#8e3b46');
+    R(BED_X - 11, FLOOR_Y - 3, 23, 1, '#ad5561');
+    P(BED_X - 11, FLOOR_Y - 3, '#6b2a33'); P(BED_X + 11, FLOOR_Y - 3, '#6b2a33');
+    P(BED_X, FLOOR_Y - 2, '#e0a13a');
     // food bowl
-    R(BOWL_X - 4, 175, 9, 3, '#3b6ea5');
-    R(BOWL_X - 3, 175, 7, 1, '#dff2f7');
-    R(BOWL_X - 4, 175, 9, 1, '#5a8cc4');
-    if (tama.state === 'eat') R(BOWL_X - 2, 174, 5, 1, '#e8b8a0');
-    regions.push({ x: BOWL_X - 5, y: 172, w: 11, h: 7, label: `<b>ごはん皿</b> ${esc(pet.name)}'s food dish\n${pet.fish} fish saved · tap to feed`, click: () => petAction('feed') });
+    R(BOWL_X - 4, FLOOR_Y - 2, 9, 3, '#3b6ea5');
+    R(BOWL_X - 3, FLOOR_Y - 2, 7, 1, '#dff2f7');
+    R(BOWL_X - 4, FLOOR_Y - 2, 9, 1, '#5a8cc4');
+    if (tama.state === 'eat') R(BOWL_X - 2, FLOOR_Y - 3, 5, 1, '#e8b8a0');
+    regions.push({ x: BOWL_X - 5, y: FLOOR_Y - 5, w: 11, h: 7, label: `<b>ごはん皿</b> ${esc(pet.name)}'s food dish\n${pet.fish} fish saved · tap to feed`, click: () => petAction('feed') });
   }
 
   function esc(s) {
@@ -1119,7 +1119,7 @@
 
   function catSleep(cx, by) {
     const col = catColors();
-    const s = k();
+    const s = Math.max(0.85, k());
     const rx = Math.round(8 * s) + (pet.trait === 'chubby' ? 1 : 0);
     const ry = Math.max(2, Math.round(4 * s));
     const breath = Math.floor(time * 0.8) % 2;
@@ -1280,7 +1280,7 @@
       return;
     }
     if (tama.state === 'eat' && Math.floor(tama.t * 2) !== Math.floor((tama.t - dt) * 2)) {
-      particles.push({ x: BOWL_X + rand(-2, 2), y: 173, vx: rand(-5, 5), vy: -rand(5, 9), life: 0.4, c: '#e8b8a0', type: 'crumb' });
+      particles.push({ x: BOWL_X + rand(-2, 2), y: FLOOR_Y - 4, vx: rand(-5, 5), vy: -rand(5, 9), life: 0.4, c: '#e8b8a0', type: 'crumb' });
     }
     if (tama.state === 'sleep' && timer.phase === 'break' && tama.t > 4 && Math.random() < dt * 0.15) {
       // breaks are play time: she tends to wake up
@@ -1390,9 +1390,9 @@
   function drawFloorGifts() {
     for (const fg of floorGifts) {
       const bob = Math.round(Math.sin(time * 3 + fg.x) * 1);
-      drawGiftSprite(fg.gift.id, fg.x - 3, 170 + bob);
-      if (Math.floor(time * 4) % 4 === 0) P(fg.x + 3, 168 + bob, '#fff6cc');
-      regions.push({ x: fg.x - 5, y: 166, w: 11, h: 12, label: `<b>${fg.gift.jp}</b> A gift from ${esc(pet.name)}\nTap to pick it up`, click: () => collectGift(fg) });
+      drawGiftSprite(fg.gift.id, fg.x - 3, FLOOR_Y - 7 + bob);
+      if (Math.floor(time * 4) % 4 === 0) P(fg.x + 3, FLOOR_Y - 9 + bob, '#fff6cc');
+      regions.push({ x: fg.x - 5, y: FLOOR_Y - 11, w: 11, h: 12, label: `<b>${fg.gift.jp}</b> A gift from ${esc(pet.name)}\nTap to pick it up`, click: () => collectGift(fg) });
     }
   }
   function collectGift(fg) {
