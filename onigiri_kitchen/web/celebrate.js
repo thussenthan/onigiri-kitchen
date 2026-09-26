@@ -91,7 +91,7 @@
 
     function burst(x, y, dir, n) {
       for (let i = 0; i < n; i++) {
-        const angle = (-Math.PI / 2) + dir * rand(0.15, 0.75);
+        const angle = (-Math.PI / 2) + dir * rand(0.12, 0.85);
         // launch speed that carries pieces to roughly 55–90% of the window height
         const speed = Math.sqrt(2 * 0.32 * H * rand(0.55, 0.9));
         const r = Math.random();
@@ -153,10 +153,10 @@
       const t = (now - start) / 1000;
       for (const p of parts) {
         p.vy += 0.32 * dt;
-        p.vx *= Math.pow(0.985, dt);
+        p.vx *= Math.pow(0.988, dt);
         p.vy = Math.min(p.vy, p.term || (p.kind === 'petal' ? 2.2 : 3.4));
         p.wob += (p.wobSpeed || 0.08) * dt;
-        p.x += (p.vx + Math.sin(p.wob) * (p.kind === 'petal' ? 1.2 : 0.6)) * dt;
+        p.x += (p.vx + Math.sin(p.wob) * (p.kind === 'petal' ? 1.2 : 0.75)) * dt;
         p.y += p.vy * dt;
         p.rot += p.vr * dt;
       }
