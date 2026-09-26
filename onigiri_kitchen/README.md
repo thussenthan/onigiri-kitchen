@@ -31,7 +31,7 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
 
 ## Tama, the shop cat 🐾
 
-Tama is a gentle Tamagotchi-style pet. Open her panel with the **猫 Tama** button.
+Tama is a gentle virtual pet. Open her panel with the **猫 Tama** button.
 
 - **Needs:** お腹 tummy, 愛情 love and 元気 energy. She eats scraps while you review,
   gets a fish for every guest you serve, and perks up after focus sessions. Pet her,

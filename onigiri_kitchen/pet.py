@@ -1,4 +1,4 @@
-"""Tama, the shop cat: a gentle Tamagotchi-style pet.
+"""Tama, the shop cat: a gentle virtual pet.
 
 Her needs rise when you study and play, and drift down slowly while you're
 away, but only to a floor. She never gets sick, runs off, or holds a grudge.

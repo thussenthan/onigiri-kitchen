@@ -965,7 +965,7 @@
   }
 
   // ----------------------------------------------------------------- Tama
-  // The shop cat is a gentle Tamagotchi: needs come from Python (pet.py),
+  // The shop cat is a gentle virtual pet: needs come from Python (pet.py),
   // behaviour and drawing live here.
   let pet = Object.assign(
     { name: 'Tama', tummy: 60, love: 60, energy: 60, stage: 0, stageJp: '子猫', stageName: 'Kitten', trait: 'classic', fish: 0, gifts: {}, studyDays: 0 },
