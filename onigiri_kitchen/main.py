@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.2.2"
+VERSION = "1.3.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -41,6 +41,7 @@ DEFAULT_CONF: Dict[str, Any] = {
     "volume": 0.5,
     "shortcut": "Ctrl+Shift+K",
     "show_home_widget_without_onigiri": True,
+    "celebrate_deck_finish": True,
 }
 
 state = KitchenState(ADDON_DIR)
@@ -522,6 +523,57 @@ def on_js_message(handled: tuple, message: str, context: Any) -> tuple:
     return handled
 
 
+# ------------------------------------------------ 紙吹雪 deck-finished confetti
+_celebrate_next = False
+
+
+def on_state_will_change(new_state: str, old_state: str) -> None:
+    # Only celebrate when the congrats screen follows a review session, not
+    # when you open a deck that's already finished.
+    global _celebrate_next
+    _celebrate_next = old_state == "review" and new_state == "overview"
+
+
+def after_finished_screen(overview: Any, *args: Any, **kwargs: Any) -> None:
+    """Runs after Anki (or Onigiri) shows 'Congratulations, you finished'."""
+    global _celebrate_next
+    if not _celebrate_next:
+        return
+    _celebrate_next = False
+    c = conf()
+    # 鶴 crane perk: every finished deck brings a golden guest
+    if state.shown("tsuru"):
+        state.add_guest({"deck": None, "kind": "golden", "reviews": 0})
+        state.save_soon()
+    if not c.get("celebrate_deck_finish", True):
+        return
+    try:
+        deck = mw.col.decks.current()["name"].split("::")[-1]
+    except Exception:
+        deck = ""
+    accent = None
+    try:
+        theme = onigiri_link.read_theme()
+        if theme:
+            accent = theme["light"].get("--accent-color")
+    except Exception:
+        pass
+    opts = {"deck": deck, "accent": accent, "sound": bool(c.get("sound", True)), "volume": float(c.get("volume", 0.5))}
+    script = _read_web("sound.js") + "\n" + _read_web("celebrate.js") + f"\nOKCelebrate({json.dumps(opts, ensure_ascii=False)});"
+    try:
+        overview.web.eval(script)
+    except Exception as e:
+        print(f"Onigiri Kitchen: confetti failed: {e}")
+
+
+def _install_celebration() -> None:
+    from anki.hooks import wrap
+
+    if hasattr(Overview, "_show_finished_screen"):
+        # "after" keeps Anki's (or Onigiri's) finished screen as-is and adds confetti on top.
+        Overview._show_finished_screen = wrap(Overview._show_finished_screen, after_finished_screen, "after")
+
+
 # --------------------------------------------------------------------- setup
 def on_profile_open() -> None:
     state.load()
@@ -556,5 +608,8 @@ def setup() -> None:
     gui_hooks.webview_will_set_content.append(on_webview_content)
     gui_hooks.webview_did_receive_js_message.append(on_js_message)
     gui_hooks.main_window_did_init.append(_add_menu)
+    gui_hooks.state_will_change.append(on_state_will_change)
+    # After all add-ons (including Onigiri) have set up their own congrats page.
+    gui_hooks.main_window_did_init.append(_install_celebration)
     # Must be registered at load time so Onigiri can pick it up.
     gui_hooks.deck_browser_will_render_content.append(kitchen_widget)

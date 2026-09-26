@@ -14,3 +14,4 @@ Most of these can also be changed from the timer panel inside the kitchen (the d
 - `sound` / `volume`: soft koto sounds, chimes and meows (0.0–1.0).
 - `shortcut`: keyboard shortcut for Tools → Onigiri Kitchen (restart Anki after changing it).
 - `show_home_widget_without_onigiri`: without Onigiri, show the kitchen widget under the deck list on Anki's main screen. With Onigiri, place the widget with Onigiri's own layout editor instead (Onigiri settings → main menu layout; it's listed as "Onigiri Kitchen · おにぎり食堂").
+- `celebrate_deck_finish`: confetti and a little fanfare when you finish a deck (the "Congratulations" screen right after reviewing). It's skipped if your system has "reduce motion" turned on.

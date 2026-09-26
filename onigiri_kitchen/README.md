@@ -30,6 +30,12 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
   the menu tags play koto notes, the window calls a sparrow, and the lanterns switch
   on and off. The window follows your real clock and the season.
 
+## Companions & confetti
+
+Save up mon for animal companions (rabbit, black cat, shiba, fox, tanuki, crane). They move into the
+restaurant and each has a perk. Finishing a deck right after reviewing sets off 紙吹雪 confetti (turn it off with
+`celebrate_deck_finish` in the config).
+
 ## Home-screen widget
 
 With Onigiri, add **Onigiri Kitchen · おにぎり食堂** to your main menu from Onigiri's layout editor.

@@ -13,5 +13,6 @@
     "sound": true,
     "volume": 0.5,
     "shortcut": "Ctrl+Shift+K",
-    "show_home_widget_without_onigiri": true
+    "show_home_widget_without_onigiri": true,
+    "celebrate_deck_finish": true
 }

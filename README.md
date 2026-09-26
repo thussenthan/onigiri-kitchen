@@ -29,6 +29,9 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   and brings you gifts. **She can't get sick, run away or die.** Days off just make her sleepy.
 - **Decor.** Guests tip in 文 (*mon*). Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish, radio
   and more, some unlocked by your Onigiri restaurant level.
+- **Animal companions.** Big milestone purchases that move into the restaurant, each with a perk: a rabbit,
+  a black cat (Tama's best friend), a shiba, a fox, a tanuki and a red-crowned crane.
+- **紙吹雪 confetti** when you finish a deck, with a little fanfare on the "Congratulations" screen.
 - **Home-screen widget.** A small live pixel scene with guests waiting, mon, Tama's mood and today's progress,
   plus a Visit button. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
   your decks on Anki's main screen (you can turn it off in the add-on config).
@@ -38,9 +41,22 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - Mostly idle and fully optional: the chef, the cat, the menu tags (they play koto notes), the window, the
   lanterns and most decor all do something when clicked.
 
-| Night & festival | Tama | Decor |
+| Night & festival | Tama | Companions & decor |
 |---|---|---|
-| ![Night](docs/night.png) | ![Tama](docs/tama.png) | ![Decor](docs/decor.png) |
+| ![Night](docs/night.png) | ![Tama](docs/tama.png) | ![Companions and decor](docs/decor.png) |
+
+![Confetti when you finish a deck](docs/confetti.png)
+
+### Companions
+
+| Animal | Price | Needs | Perk |
+|---|---|---|---|
+| 兎 Rabbit | 300 文 | — | +5 mon for every finished focus session |
+| 黒猫 Black cat | 450 文 | Lv 3 | Tama's love never drops below 40 |
+| 柴犬 Shiba | 600 文 | Lv 5 | +1 tip from every guest |
+| 狐 Fox | 900 文 | Lv 10 | Sour-plum (leech) guests tip double |
+| 狸 Tanuki | 1,200 文 | Lv 15 | End-of-day takeout tips are doubled |
+| 鶴 Crane | 2,000 文 | Lv 20 | Every deck you finish brings a golden guest |
 
 ## Install
 

@@ -88,6 +88,7 @@ class Pet:
     def __init__(self, data: Dict[str, Any]) -> None:
         # `data` is the "pet" dict inside the kitchen save file.
         self.d = data
+        self.love_floor: Optional[float] = None  # raised by the black cat companion
 
     # ------------------------------------------------------------- needs
     def tick(self) -> None:
@@ -95,9 +96,13 @@ class Pet:
         hours = max(0.0, (now - float(self.d.get("updated", now))) / 3600.0)
         if hours > 0:
             for key, (rate, floor) in DECAY.items():
+                if key == "love" and self.love_floor:
+                    floor = max(floor, self.love_floor)
                 value = float(self.d.get(key, 60))
                 if value > floor:
                     self.d[key] = max(floor, value - rate * hours)
+        if self.love_floor and float(self.d.get("love", 60)) < self.love_floor:
+            self.d["love"] = float(self.love_floor)
         self.d["updated"] = int(now)
 
     def _add(self, key: str, amount: float) -> None:

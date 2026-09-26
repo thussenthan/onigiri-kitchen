@@ -47,6 +47,30 @@ CATALOG: List[Dict[str, Any]] = [
     {"id": "tanuki", "name": "Tanuki statue", "jp": "信楽狸", "level": 20, "price": 120,
      "desc": "A Shigaraki tanuki for good fortune. Golden guests tip double."},
 ]
+# Animal companions: big milestone purchases that live in the restaurant.
+# Each has a small perk (applied in tip_for / focus_completed / roll_day /
+# pet love floor, and the golden guest per finished deck in main.py).
+ANIMALS: List[Dict[str, Any]] = [
+    {"id": "usagi", "kind": "animal", "name": "Rabbit", "jp": "兎", "level": 0, "price": 300,
+     "desc": "A fluffy white rabbit who hops about the tatami.",
+     "perk": "+5 mon for every finished focus session (she pounds celebration mochi)."},
+    {"id": "kuro", "kind": "animal", "name": "Black cat", "jp": "黒猫", "level": 3, "price": 450,
+     "desc": "Tama's best friend. They nap together.",
+     "perk": "Tama's love never drops below 40."},
+    {"id": "shiba", "kind": "animal", "name": "Shiba", "jp": "柴犬", "level": 5, "price": 600,
+     "desc": "A cheerful shiba inu who greets everyone at the door.",
+     "perk": "+1 tip from every guest."},
+    {"id": "kitsune", "kind": "animal", "name": "Fox", "jp": "狐", "level": 10, "price": 900,
+     "desc": "A clever kitsune with a snow-tipped tail.",
+     "perk": "Sour-plum (leech) guests tip double."},
+    {"id": "tanuki_friend", "kind": "animal", "name": "Tanuki", "jp": "狸", "level": 15, "price": 1200,
+     "desc": "A round, mischievous tanuki who drums on its belly.",
+     "perk": "End-of-day takeout tips are doubled."},
+    {"id": "tsuru", "kind": "animal", "name": "Crane", "jp": "鶴", "level": 20, "price": 2000,
+     "desc": "An elegant red-crowned crane, a symbol of luck and long life.",
+     "perk": "Every deck you finish brings a golden guest."},
+]
+CATALOG += ANIMALS
 CATALOG_BY_ID = {item["id"]: item for item in CATALOG}
 
 
@@ -113,6 +137,7 @@ class KitchenState:
             print(f"Onigiri Kitchen: could not read save file, starting fresh: {e}")
         self.data = data
         self.pet = petmod.Pet(self.data["pet"])
+        self.apply_companion_perks()
         self.roll_day()
 
     def save(self) -> None:
@@ -143,6 +168,8 @@ class KitchenState:
         leftover = self.data.get("guests") or []
         if leftover and self.data["today"].get("date"):
             tips = sum(self.tip_for(g) for g in leftover)
+            if self.shown("tanuki_friend"):
+                tips *= 2
             self.data["mon"] += tips
             self.data["takeout"]["count"] += len(leftover)
             self.data["takeout"]["mon"] += tips
@@ -226,6 +253,7 @@ class KitchenState:
             return {"ok": False, "msg": "Not enough mon yet. Keep serving guests!"}
         self.data["mon"] -= item["price"]
         self.data["owned"].append(item_id)
+        self.apply_companion_perks()
         self.save()
         return {"ok": True, "msg": f"{item['jp']} {item['name']} added!"}
 
@@ -235,6 +263,7 @@ class KitchenState:
             hidden.remove(item_id)
         elif item_id in self.data["owned"]:
             hidden.append(item_id)
+        self.apply_companion_perks()
         self.save_soon()
 
     def sync_today(self, db_counts: Dict[str, int], reviews_per_guest: int) -> int:
@@ -270,16 +299,26 @@ class KitchenState:
         return added
 
     # --------------------------------------------------------- catch-up
+    def shown(self, item_id: str) -> bool:
+        return item_id in self.data["owned"] and item_id not in self.data["hidden"]
+
     def tip_for(self, guest: Dict[str, Any]) -> int:
-        """Same tip rules as the animated service in kitchen.js."""
-        shown = [i for i in self.data["owned"] if i not in self.data["hidden"]]
+        """Same tip rules as the animated service in kitchen.js (tipFor)."""
         kind = guest.get("kind")
         amount = 12 if kind == "golden" else 6 if kind == "leech" else 3
-        if kind == "golden" and "tanuki" in shown:
+        if kind == "golden" and self.shown("tanuki"):
             amount *= 2
-        if "maneki" in shown:
+        if kind == "leech" and self.shown("kitsune"):
+            amount *= 2
+        if self.shown("maneki"):
+            amount += 1
+        if self.shown("shiba"):
             amount += 1
         return amount
+
+    def apply_companion_perks(self) -> None:
+        """Perks that live outside tips (kept in sync whenever ownership changes)."""
+        self.pet.love_floor = 40 if self.shown("kuro") else None
 
     def serve_all(self) -> Dict[str, Any]:
         """Serve every waiting guest at once (after a big study session)."""
@@ -311,6 +350,8 @@ class KitchenState:
         self.roll_day()
         self.data["today"]["focus_done"] += 1
         self.pet.on_focus_done()
+        if self.shown("usagi"):
+            self.data["mon"] += 5
         self.add_guest({"deck": None, "kind": "golden", "reviews": 0})
         self.save_soon()
 

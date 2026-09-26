@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Confetti preview</title>
+<style>
+body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,system-ui;
+  background:var(--bg);color:var(--fg);--bg:#f3f3f3;--fg:#212121;--border:#e0e0e0;--canvas-inset:#fff;--accent-color:#007aff}
+.card{background:var(--canvas-inset);border:1px solid var(--border);border-radius:20px;padding:40px 60px;text-align:center}
+h1{margin:0 0 8px;font-size:26px}
+</style>
+<script src="../onigiri_kitchen/web/celebrate.js"></script></head>
+<body><div class="card"><h1>Congratulations!</h1><div>You have finished this deck for now.</div></div>
+<script>
+const t = parseFloat(new URLSearchParams(location.search).get('t') || '1.1');
+OKCelebrate({deck: 'Exam 3', accent: '#007aff', sound: false, preview: t});
+</script></body></html>

@@ -30,6 +30,8 @@ You study, guests arrive. You take a break, you get to enjoy them.
 - **Pomodoro timer.** One dango per focus session. The restaurant opens when your break starts, and nudges you back when it ends. Long breaks are festival nights with fireworks.
 - **Tama, the shop cat.** A gentle virtual pet. Studying feeds her, and she grows with total study days (never streaks), develops a personality, learns tricks and brings you gifts. She can't get sick, run away or die.
 - **Decor.** Guests tip in mon. Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish and more.
+- **Animal companions:** milestone buys that move in, each with a perk. A rabbit, a black cat, a shiba, a fox, a tanuki and a crane.
+- **Confetti** when you finish a deck (紙吹雪 on the "Congratulations" screen).
 - **Home-screen widget:** add it to your Onigiri main menu from Onigiri's layout editor (or see it under your decks without Onigiri).
 - **A guided tour** the first time you open it, and a **目安箱 suggestion box** for ideas and bug reports.
 - **Matches your Onigiri theme:** your colours, font and dark mode.

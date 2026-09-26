@@ -1512,6 +1512,223 @@
     return true;
   }
 
+  // ------------------------------------------------------ 仲間 companions
+  // Animals you can buy as milestones. Each is drawn from small rectangles,
+  // mirrored by facing direction. (cx, by) is the bottom centre.
+  function mr(cx, by, dir) {
+    return (dx, dy, w, h, c) => R(dir > 0 ? cx + dx : cx - dx - w + 1, by + dy, w, h, c);
+  }
+
+  const ANIMAL_ART = {
+    usagi(cx, by, dir, pose, f) {
+      const r = mr(cx, by, dir);
+      const W = '#fbf7ee';
+      const S = '#e2dccd';
+      const Pk = '#f3aaa0';
+      const K = '#2a2320';
+      if (pose === 'rest') {
+        r(-5, -5, 10, 5, W); r(-4, -6, 8, 1, W); r(-5, -1, 10, 1, S); r(-6, -4, 1, 2, W);
+        r(2, -9, 5, 4, W); r(3, -10, 3, 1, W);
+        r(-1, -11, 4, 1, W); r(-2, -10, 3, 1, W); r(0, -11, 2, 1, Pk);
+        r(5, -8, 1, 1, K); r(7, -7, 1, 1, Pk);
+        return;
+      }
+      const lift = pose === 'react' ? 3 : f ? 2 : 0;
+      r(-5, -6 - lift, 9, 4, W); r(-4, -7 - lift, 7, 1, W); r(-5, -3 - lift, 8, 1, S);
+      r(-7, -6 - lift, 2, 2, W); r(-7, -5 - lift, 1, 1, S);
+      r(2, -10 - lift, 5, 4, W); r(3, -11 - lift, 3, 1, W);
+      r(3, -16 - lift, 1, 5, W); r(5, -15 - lift, 1, 4, W); r(3, -15 - lift, 1, 3, Pk);
+      r(5, -9 - lift, 1, 1, K); r(7, -8 - lift, 1, 1, Pk);
+      if (lift) r(-3, -3, 5, 1, S);
+      else { r(-4, -2, 2, 2, W); r(1, -2, 2, 2, W); }
+    },
+    kuro(cx, by, dir, pose, f) {
+      const r = mr(cx, by, dir);
+      const B = '#2b2b33';
+      const B2 = '#1c1c22';
+      const Y = '#f2d15a';
+      if (pose === 'rest') {
+        r(-6, -5, 11, 5, B); r(-5, -6, 9, 1, B); r(3, -7, 5, 4, B);
+        r(3, -9, 1, 2, B); r(6, -9, 1, 2, B);
+        r(4, -5, 1, 1, '#5a5a66'); r(6, -5, 1, 1, '#5a5a66');
+        r(-7, -2, 6, 1, B2);
+        return;
+      }
+      const hop = pose === 'react' ? 2 : 0;
+      r(-5, -7 - hop, 10, 4, B);
+      r(-4, -3 - hop, 1, 3, B2); r(-2, -3 - hop, 1, f ? 2 : 3, B); r(2, -3 - hop, 1, f ? 3 : 2, B); r(4, -3 - hop, 1, 3, B2);
+      r(4, -10 - hop, 5, 4, B); r(4, -12 - hop, 1, 2, B); r(7, -12 - hop, 1, 2, B);
+      r(7, -9 - hop, 1, 1, Y); r(9, -8 - hop, 1, 1, '#f3aaa0');
+      const sway = Math.round(Math.sin(time * 3));
+      r(-7, -11 - hop + sway, 1, 5, B); r(-6, -7 - hop, 1, 1, B);
+    },
+    shiba(cx, by, dir, pose, f) {
+      const r = mr(cx, by, dir);
+      const O = '#d9853b';
+      const O2 = '#b96a2a';
+      const C = '#f6e6c8';
+      const K = '#2a2320';
+      if (pose === 'rest') {
+        r(-3, -9, 7, 9, O); r(1, -9, 3, 7, C); r(2, -2, 2, 2, C);
+        r(1, -14, 6, 5, O); r(5, -11, 3, 2, C); r(7, -11, 1, 1, K); r(4, -13, 1, 1, K);
+        r(1, -16, 2, 2, O); r(4, -16, 2, 2, O);
+        r(-5, -3, 3, 2, O); r(-6, -4, 1, 1, C);
+        return;
+      }
+      const hop = pose === 'react' ? 2 : 0;
+      r(-6, -8 - hop, 11, 4, O); r(-5, -4 - hop, 9, 1, C);
+      r(-5, -4 - hop, 2, f ? 3 : 4, O2); r(3, -4 - hop, 2, f ? 4 : 3, O);
+      r(3, -8 - hop, 2, 4, C);
+      r(4, -12 - hop, 5, 5, O); r(8, -9 - hop, 3, 2, C); r(10, -9 - hop, 1, 1, K); r(7, -11 - hop, 1, 1, K);
+      r(5, -9 - hop, 3, 2, C);
+      r(4, -14 - hop, 2, 2, O); r(7, -14 - hop, 2, 2, O);
+      r(-8, -11 - hop, 3, 1, O); r(-9, -10 - hop, 1, 2, O); r(-8, -9 - hop, 2, 1, C); r(-6, -10 - hop, 1, 1, O);
+    },
+    kitsune(cx, by, dir, pose, f) {
+      const r = mr(cx, by, dir);
+      const O = '#e07b39';
+      const W = '#fbf1e6';
+      const K = '#2a2320';
+      const D = '#3b2a22';
+      if (pose === 'rest') {
+        r(-5, -6, 10, 6, O); r(-6, -3, 12, 3, O); r(4, -3, 3, 3, W);
+        r(2, -9, 5, 4, O); r(6, -7, 2, 2, W); r(2, -11, 2, 2, O); r(5, -11, 2, 2, O);
+        r(4, -8, 1, 1, K);
+        return;
+      }
+      const hop = pose === 'react' ? 2 : 0;
+      r(-6, -8 - hop, 11, 4, O); r(-4, -4 - hop, 8, 1, W);
+      r(-5, -4 - hop, 1, 4, D); r(-3, -4 - hop, 1, f ? 3 : 4, D); r(2, -4 - hop, 1, f ? 4 : 3, D); r(4, -4 - hop, 1, 4, D);
+      r(4, -11 - hop, 5, 4, O); r(8, -9 - hop, 3, 2, W); r(10, -9 - hop, 1, 1, K); r(6, -10 - hop, 1, 1, K);
+      r(4, -14 - hop, 2, 3, O); r(7, -14 - hop, 2, 3, O); r(4, -14 - hop, 1, 1, D); r(8, -14 - hop, 1, 1, D);
+      const sway = Math.round(Math.sin(time * 2.5));
+      r(-11, -10 - hop + sway, 5, 3, O); r(-12, -9 - hop + sway, 1, 2, O); r(-14, -9 - hop + sway, 2, 2, W);
+    },
+    tanuki_friend(cx, by, dir, pose, f) {
+      const r = mr(cx, by, dir);
+      const Br = '#8a6a4a';
+      const Dk = '#3e2717';
+      const Cr = '#e8d4b0';
+      const L = '#fbf7ee';
+      if (pose === 'rest' || pose === 'react') {
+        const drum = pose === 'react' && Math.floor(time * 8) % 2;
+        r(-5, -11, 10, 11, Br); r(-4, -12, 8, 1, Br); r(-3, -8, 6, 6, Cr);
+        r(-3, -16, 7, 5, Br); r(-3, -14, 7, 2, Dk); r(-2, -14, 1, 1, L); r(2, -14, 1, 1, L);
+        r(0, -12, 1, 1, Dk); r(-3, -17, 1, 1, Dk); r(3, -17, 1, 1, Dk);
+        r(-5, -8 - (drum ? 1 : 0), 1, 3, Dk); r(4, -8 - (drum ? 0 : 1), 1, 3, Dk);
+        r(-4, -1, 2, 1, Dk); r(2, -1, 2, 1, Dk);
+        return;
+      }
+      r(-6, -9, 11, 6, Br); r(-5, -10, 9, 1, Br); r(-2, -7, 5, 3, Cr);
+      r(-5, -3, 2, f ? 2 : 3, Dk); r(2, -3, 2, f ? 3 : 2, Dk);
+      r(4, -12, 5, 5, Br); r(5, -10, 4, 2, Dk); r(7, -10, 1, 1, L); r(8, -9, 2, 1, Cr); r(9, -9, 1, 1, Dk);
+      r(4, -13, 1, 1, Dk); r(7, -13, 1, 1, Dk);
+      r(-9, -8, 3, 3, Br); r(-9, -7, 3, 1, Dk);
+    },
+    tsuru(cx, by, dir, pose, f) {
+      const r = mr(cx, by, dir);
+      const W = '#fbfbf8';
+      const K = '#1e1e22';
+      const Rd = '#d93a2e';
+      const G = '#8b8b8b';
+      const Bk = '#c9b28a';
+      const lift = pose === 'react' ? 2 : 0;
+      if (pose === 'walk' && f) { r(0, -8, 1, 8, G); r(2, -6, 1, 2, G); r(3, -8, 1, 3, G); }
+      else { r(0, -8 - lift, 1, 8, G); r(2, -8 - lift, 1, 8, G); }
+      r(-4, -14 - lift, 9, 6, W); r(-3, -15 - lift, 7, 1, W);
+      r(-6, -13 - lift, 3, 4, K); r(-7, -11 - lift, 1, 2, K);
+      r(3, -21 - lift, 2, 7, K);
+      r(3, -24 - lift, 3, 3, W); r(4, -25 - lift, 2, 1, Rd); r(5, -23 - lift, 1, 1, K); r(6, -23 - lift, 3, 1, Bk);
+      if (pose === 'react') {
+        r(-10, -19, 7, 3, W); r(4, -19, 7, 3, W); r(-11, -18, 2, 2, K); r(10, -18, 2, 2, K);
+      }
+    },
+  };
+
+  const ANIMAL_SPEED = { usagi: 20, kuro: 16, shiba: 22, kitsune: 24, tanuki_friend: 10, tsuru: 8 };
+  const residents = [];
+
+  function syncResidents() {
+    const want = catalog.filter((c) => c.kind === 'animal' && has(c.id)).map((c) => c.id);
+    for (let i = residents.length - 1; i >= 0; i--) if (!want.includes(residents[i].id)) residents.splice(i, 1);
+    want.forEach((id, i) => {
+      if (residents.some((a) => a.id === id)) return;
+      residents.push({
+        id,
+        x: id === 'tsuru' ? 296 : 70 + ((i * 47) % 200),
+        dir: Math.random() < 0.5 ? 1 : -1,
+        pose: 'rest',
+        t: 0,
+        dur: rand(2, 6),
+        target: null,
+      });
+    });
+  }
+
+  function animalInfo(id) {
+    return catalog.find((c) => c.id === id) || { jp: '', name: id, perk: '' };
+  }
+
+  function updateResidents(dt) {
+    for (const a of residents) {
+      a.t += dt;
+      if (a.pose === 'walk') {
+        const speed = ANIMAL_SPEED[a.id] || 14;
+        const dx = a.target - a.x;
+        a.dir = dx >= 0 ? 1 : -1;
+        if (Math.abs(dx) <= speed * dt) { a.x = a.target; a.pose = 'rest'; a.t = 0; a.dur = rand(4, 10); }
+        else a.x += a.dir * speed * dt;
+        continue;
+      }
+      if (a.t < a.dur) continue;
+      // decide what to do next
+      if (timer.phase === 'focus' || darkness(hourNow()) > 0.3 && Math.random() < 0.5) {
+        a.pose = 'rest'; a.t = 0; a.dur = rand(10, 25);
+        continue;
+      }
+      let target;
+      if (a.id === 'tsuru') target = rand(276, 306);
+      else if (a.id === 'kuro' && tama.state === 'sleep' && Math.random() < 0.6) target = clamp(tama.x + 16, 12, 300);
+      else target = rand(52, 300);
+      a.target = target;
+      a.pose = 'walk';
+      a.t = 0;
+    }
+  }
+
+  function residentGreet() {
+    // the shiba trots to the door when a guest arrives
+    const s = residents.find((a) => a.id === 'shiba');
+    if (s && s.pose !== 'react' && Math.random() < 0.7) { s.target = 262; s.pose = 'walk'; s.t = 0; }
+  }
+
+  function reactResident(a) {
+    a.pose = 'react';
+    a.t = 0;
+    a.dur = 1.3;
+    spawnHearts(a.x, FLOOR_Y - 22, 1);
+    if (a.id === 'usagi') OKSound.pluck(9);
+    else if (a.id === 'kuro') OKSound.meow();
+    else if (a.id === 'shiba') { OKSound.pop(); setTimeout(() => OKSound.pop(), 140); }
+    else if (a.id === 'kitsune') OKSound.koto(880, 0, 0.3);
+    else if (a.id === 'tanuki_friend') { OKSound.koto(98, 0, 0.35); OKSound.koto(98, 0.18, 0.35); }
+    else if (a.id === 'tsuru') OKSound.chime();
+  }
+
+  function drawResidents() {
+    const walkFrame = Math.floor(time * (6)) % 2;
+    for (const a of residents) {
+      const art = ANIMAL_ART[a.id];
+      if (!art) continue;
+      const pose = a.pose === 'react' && a.t > a.dur ? 'rest' : a.pose;
+      if (a.pose === 'react' && a.t > a.dur) { a.pose = 'rest'; a.t = 0; a.dur = rand(3, 8); }
+      art(Math.round(a.x), FLOOR_Y, a.dir, pose, walkFrame);
+      const info = animalInfo(a.id);
+      const h = a.id === 'tsuru' ? 27 : a.id === 'usagi' ? 17 : 17;
+      regions.push({ x: a.x - 10, y: FLOOR_Y - h, w: 20, h, label: `<b>${info.jp}</b> ${info.name}\n${info.perk}`, click: () => reactResident(a) });
+    }
+  }
+
   // -------------------------------------------------------------- tables
   const TABLES = [[40, 56], [118, 56], [198, 36]];
   function drawTables() {
@@ -1557,6 +1774,7 @@
     seat.guest = c;
     customers.push(c);
     norenSway = 1;
+    residentGreet();
     if (!feather && (tama.state === 'sit' || tama.state === 'watch') && Math.random() < 0.3) tamaGo(262, () => { tama.dir = -1; tamaSet('sit', 4); });
     OKSound.pluck(0);
     return true;
@@ -1614,7 +1832,9 @@
   function tipFor(c) {
     let amt = c.guest.kind === 'golden' ? 12 : c.guest.kind === 'leech' ? 6 : 3;
     if (c.guest.kind === 'golden' && has('tanuki')) amt *= 2;
+    if (c.guest.kind === 'leech' && has('kitsune')) amt *= 2;
     if (has('maneki')) amt += 1;
+    if (has('shiba')) amt += 1;
     return amt;
   }
 
@@ -2050,6 +2270,7 @@
 
     // Tama
     updateTama(dt);
+    updateResidents(dt);
     giftTimer -= dt;
     if (giftTimer <= 0) { giftTimer = 600; checkGift(); }
 
@@ -2140,6 +2361,7 @@
     drawCoins();
     drawTamaFloor();
     drawFloorGifts();
+    drawResidents();
     drawTama();
     drawParticles();
     drawLighting(h);
@@ -2520,7 +2742,19 @@
     const grid = $('ok-decor-grid');
     grid.innerHTML = '';
     const level = onigiri.level || 0;
-    for (const item of catalog) {
+    const animals = catalog.filter((c) => c.kind === 'animal');
+    const decor = catalog.filter((c) => c.kind !== 'animal');
+    const heading = (jp, en, sub) => {
+      const h = document.createElement('div');
+      h.className = 'ok-grid-head';
+      h.innerHTML = `<b class="jp">${jp}</b> ${en}<span>${sub}</span>`;
+      grid.appendChild(h);
+    };
+    const ordered = [];
+    if (animals.length) ordered.push({ head: ['仲間', 'Companions', 'Milestone friends who move in, each with a perk'] }, ...animals);
+    ordered.push({ head: ['飾り', 'Decor', 'Little touches for your restaurant'] }, ...decor);
+    for (const item of ordered) {
+      if (item.head) { heading(...item.head); continue; }
       const owned = S.owned.includes(item.id);
       const locked = !owned && level < item.level;
       const card = document.createElement('div');
@@ -2531,7 +2765,9 @@
       const body = document.createElement('div');
       body.innerHTML =
         `<div class="ok-item-name"><span class="jp">${item.jp}</span><span>${item.name}</span></div>` +
-        `<p>${item.desc}</p>`;
+        `<p>${item.desc}</p>` +
+        (item.perk ? `<p class="ok-perk">✦ ${item.perk}</p>` : '');
+      card.className += item.kind === 'animal' ? ' ok-animal' : '';
       card.appendChild(body);
       const foot = document.createElement('div');
       foot.className = 'ok-item-foot';
@@ -2541,7 +2777,7 @@
         const b = document.createElement('button');
         b.className = 'ok-owned';
         b.textContent = shown ? 'Hide' : 'Show';
-        b.onclick = () => send('toggle', item.id, (snap) => { if (snap) S = Object.assign(S, snap); renderDecor(); });
+        b.onclick = () => send('toggle', item.id, (snap) => { if (snap) S = Object.assign(S, snap); syncResidents(); renderDecor(); });
         foot.appendChild(b);
       } else if (locked) {
         foot.innerHTML = `<span class="ok-price">${MON_SVG}${item.price}</span><span class="ok-lock">🔒 Lv ${item.level}</span>`;
@@ -2558,6 +2794,12 @@
             renderHeader();
             OKSound.fanfare();
             spawnHearts(160, 90, 3);
+            if (item.kind === 'animal') {
+              syncResidents();
+              const a = residents.find((x) => x.id === item.id);
+              if (a) { a.x = DOOR_X; a.target = 160; a.pose = 'walk'; }
+              say([`${item.jp}が仲間になった!`, `${item.name} moved in!`], { x: 160, y: 150 });
+            }
           }
           toast(r.msg);
           renderDecor();
@@ -2570,6 +2812,16 @@
   }
 
   function drawIcon(canvas, id) {
+    if (ANIMAL_ART[id]) {
+      canvas.width = 44;
+      canvas.height = 30;
+      const ctx = canvas.getContext('2d');
+      const prev = gRef;
+      gRef = ctx;
+      ANIMAL_ART[id](id === 'tsuru' ? 22 : 21, 28, 1, 'walk', 0);
+      gRef = prev;
+      return;
+    }
     const d = DECOR[id];
     const pad = 4;
     const cw = id === 'matsuri' ? 60 : Math.max(d.w, d.h * 1.6) + pad * 2;
@@ -2639,10 +2891,11 @@
   // ------------------------------------------------------------ tutorial
   const TOUR = [
     { jp: 'ようこそ', title: 'Welcome to your restaurant!', text: 'This little onigiri shop runs by itself. Watch it, or click around, since almost everything does something.' },
+    { jp: '音', title: 'Sound on: highly recommended!', text: 'The kitchen is best with sound: soft koto notes, wind chimes, Tama\'s meows and little celebration fanfares. Keep sound on for the full experience. It\'s on by default, and this button switches it any time.', dom: '#ok-b-sound' },
     { jp: 'お客さん', title: 'Guests come from studying', text: 'Every 10 reviews in a deck sends a guest from that deck. They wait outside the door until you visit, so nothing is lost if you study for a long time.', scene: () => ({ x: 254, y: 18, w: 48, h: 112 }) },
     { jp: '大将', title: 'The chef', text: 'Guests are served automatically. Tap the chef to prep onigiri for the tray so guests are served straight away.', scene: () => ({ x: 104, y: 72, w: 76, h: 34 }) },
     { jp: '文', title: 'Tips', text: 'Happy guests leave mon (文). Tap coins to collect them, or they collect themselves. Spend mon on decor.', dom: '.ok-purse' },
-    { jp: '飾り', title: 'Decor', text: 'Buy decorations with your mon. Some pieces unlock at higher Onigiri restaurant levels.', dom: '#ok-b-decor' },
+    { jp: '飾り', title: 'Decor', text: 'Spend mon on decor and animal companions: big milestone buys that move in and bring a perk. Some unlock at higher Onigiri levels.', dom: '#ok-b-decor' },
     { jp: 'タマ', title: 'Tama, the shop cat', text: 'A gentle virtual pet. She eats scraps while you review, gets a fish for every guest, and grows as you study. She can\'t get sick or run away.', scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
     { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session.', dom: '#ok-timer' },
     { jp: '大入り', title: 'Big study sessions', text: 'Prefer to study in one go? Go ahead. When you come back, you can serve everyone at 4× speed or collect every tip at once.', dom: '#ok-status' },
@@ -2822,6 +3075,7 @@
   // ----------------------------------------------------------------- boot
   OKSound.configure({ sound: conf.sound !== false, volume: conf.volume != null ? conf.volume : 0.5 });
   paintBackground();
+  syncResidents();
   renderSeigaiha();
   renderHeader();
   renderTimer();

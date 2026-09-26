@@ -86,7 +86,8 @@ page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Kitchen previ
 <script>if (q.get('night')) document.documentElement.className='nightMode';</script>
 </head><body>{body}
 <script>if (q.get('night')) document.body.className='nightMode';
-window.addEventListener('load',()=>setTimeout(()=>{{ if(q.get('panel')) document.getElementById(q.get('panel')).click(); }},50));</script>
+window.addEventListener('load',()=>setTimeout(()=>{{ if(q.get('panel')) document.getElementById(q.get('panel')).click();
+  for (let i = 1; i < parseInt(q.get('tourstep') || '1'); i++) document.getElementById('ok-tour-next').click(); }},900));</script>
 </body></html>"""
 open(os.path.join(ROOT, "dev", "anki_order.html"), "w", encoding="utf-8").write(page)
 print("wrote dev/anki_order.html")

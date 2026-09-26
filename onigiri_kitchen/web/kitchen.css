@@ -809,3 +809,18 @@ body { background-image: none !important; font-family: var(--sans); }
 .ok-spacer { flex: 1; }
 .ok-tour-btns .ok-foot-btn { padding: 7px 14px; }
 .ok-tour-btns .ok-foot-btn[disabled] { opacity: 0.4; cursor: default; }
+
+/* ------------------------------------------------ companions in the shop */
+.ok-grid-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 6px 2px 0;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+.ok-grid-head .jp { color: var(--shu); font-size: 15px; }
+.ok-grid-head span { margin-left: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
+.ok-item.ok-animal canvas { background: linear-gradient(180deg, #8a5a34 0 62%, #cdbb7e 62%); }
+.ok-perk { color: var(--shu) !important; font-weight: 600; }
