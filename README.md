@@ -30,6 +30,9 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **Decor & style.** Guests tip in 文 (*mon*). Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish,
   radio and more, some unlocked by your Onigiri restaurant level. If you own several Onigiri restaurants, you can
   combine one's colours with an evolution design (for example, Macaron Maison blue with evolution stars).
+- **Home-screen widget.** A small live pixel scene with guests waiting, mon, Tama's mood and the timer, plus
+  Visit and Focus buttons. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
+  your decks on Anki's main screen (you can turn it off in the add-on config).
 - **A guided tour** the first time you open it, which you can replay from ⚙.
 - **目安箱 suggestion box** on the wall (and in ⚙) for feature ideas and bug reports.
 - **Matches your Onigiri theme.** It uses your Onigiri colours, font and dark mode automatically.
@@ -53,6 +56,16 @@ Onigiri is recommended but optional. Without it, the kitchen uses its own washi-
 **Opening the kitchen:** click the restaurant picture on Onigiri's main screen (Shift-click keeps Onigiri's
 own expand view), click the shop-front icon next to Onigiri's buttons, click the corner dango timer, or use
 **Tools → Onigiri Kitchen** (Ctrl+Shift+K).
+
+## Home-screen widget
+
+![The widget in Onigiri's grid at different sizes](docs/widget.png)
+
+- **With Onigiri:** open Onigiri's settings, go to the main menu layout editor, find **Onigiri Kitchen · おにぎり食堂**
+  in the add-on widgets list, and drag it onto your grid. Resize it however you like. It adapts from 1×1 up to
+  2×2 and wider.
+- **Without Onigiri:** it appears under your deck list automatically. Set `show_home_widget_without_onigiri` to
+  `false` in **Tools → Add-ons → Onigiri Kitchen → Config** to hide it.
 
 ## Your data
 

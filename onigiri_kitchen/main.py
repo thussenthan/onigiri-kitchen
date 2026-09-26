@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -40,6 +40,7 @@ DEFAULT_CONF: Dict[str, Any] = {
     "sound": True,
     "volume": 0.5,
     "shortcut": "Ctrl+Shift+K",
+    "show_home_widget_without_onigiri": True,
 }
 
 state = KitchenState(ADDON_DIR)
@@ -427,6 +428,74 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
     return None
 
 
+# --------------------------------------------------- Onigiri home-screen widget
+def _style_color(progress: Dict[str, Any]) -> str:
+    """The kitchen's colour (same rule as styleColor() in kitchen.js)."""
+    chosen = (state.data.get("style") or {}).get("color")
+    for c in progress.get("colorThemes", []):
+        if chosen and c["id"] == chosen:
+            return c["theme"]
+    return progress.get("themeColor") or onigiri_link.DEFAULT_THEME_COLOR
+
+
+def _style_evo_tier(progress: Dict[str, Any]) -> int:
+    chosen = (state.data.get("style") or {}).get("evolution")
+    evos = progress.get("evolutions", [])
+    if chosen == "none" or not evos:
+        return 0
+    for e in evos:
+        if e["id"] == chosen:
+            return e["tier"]
+    for e in evos:
+        if e["id"] == progress.get("themeId"):
+            return e["tier"]
+    return evos[-1]["tier"]
+
+
+def widget_payload() -> Dict[str, Any]:
+    state.sync_today(todays_reviews_by_deck(), conf().get("reviews_per_guest", 10))
+    progress = onigiri_link.read_progress()
+    per = max(1, int(conf().get("reviews_per_guest", 10)))
+    pending = state.data.get("pending") or {}
+    best = max(pending.values()) if pending else 0
+    return {
+        "guests": len(state.data.get("guests", [])),
+        "nextIn": max(1, per - int(best)),
+        "reviews": int(state.data["today"].get("reviews", 0)),
+        "mon": int(state.data.get("mon", 0)),
+        "pet": state.pet.snapshot(),
+        "theme": _style_color(progress),
+        "evoTier": _style_evo_tier(progress),
+        "timer": timer_payload(),
+    }
+
+
+def kitchen_widget(deck_browser: Any, content: Any) -> None:
+    """With Onigiri: Onigiri collects this and lists it in its layout editor, so
+    users place it on their home grid (or leave it archived).
+    Without Onigiri: it shows under the deck list on Anki's main screen,
+    unless turned off in the config."""
+    plain = not onigiri_link.find_onigiri_package()
+    if plain and not conf().get("show_home_widget_without_onigiri", True):
+        return
+    try:
+        data = json.dumps(widget_payload(), ensure_ascii=False).replace("</", "<\\/")
+    except Exception as e:
+        print(f"Onigiri Kitchen: widget failed: {e}")
+        return
+    content.stats += (
+        f'<div class="okw{" okw-plain" if plain else ""}" role="button" tabindex="0" title="Open Onigiri Kitchen">'
+        f'<script type="application/json" class="okw-data">{data}</script>'
+        '<div class="okw-in"><canvas class="okw-scene" width="64" height="40"></canvas>'
+        '<div class="okw-info"></div></div></div>'
+    )
+
+
+# Onigiri's layout editor shows the text before the first "." as the widget's
+# name; for AnkiWeb installs the real module is just a number, so name it here.
+kitchen_widget.__module__ = "Onigiri Kitchen · おにぎり食堂.widget"
+
+
 # ------------------------------------------------------ main-screen injection
 def _read_web(name: str) -> str:
     try:
@@ -457,6 +526,11 @@ def on_webview_content(web_content: Any, context: Any) -> None:
         f"<script>{_read_web('sound.js')}</script>"
         f"<script>{_read_web('chip.js')}</script>"
     )
+    if is_deck_browser:
+        web_content.head += (
+            f"<style>{_read_web('widget.css')}</style>"
+            f"<script>{_read_web('widget.js')}</script>"
+        )
 
 
 def on_js_message(handled: tuple, message: str, context: Any) -> tuple:
@@ -505,3 +579,5 @@ def setup() -> None:
     gui_hooks.webview_will_set_content.append(on_webview_content)
     gui_hooks.webview_did_receive_js_message.append(on_js_message)
     gui_hooks.main_window_did_init.append(_add_menu)
+    # Must be registered at load time so Onigiri can pick it up.
+    gui_hooks.deck_browser_will_render_content.append(kitchen_widget)

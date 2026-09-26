@@ -1,0 +1,247 @@
+/* Onigiri Kitchen - home-screen widget (Onigiri grid, or plain Anki's main
+   screen). A tiny live pixel scene plus status and quick actions. */
+(function () {
+  if (window.OKWidget) return;
+
+  const W = 64;
+  const H = 40;
+
+  function send(cmd) {
+    if (typeof pycmd === 'function') pycmd('okitchen:' + cmd);
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+  function fmt(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  function shade(hex, amt) {
+    let h = String(hex || '#d49083').replace('#', '');
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    const n = parseInt(h.slice(0, 6), 16);
+    const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => (amt >= 0 ? v + (255 - v) * amt : v * (1 + amt)));
+    return '#' + ch.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+  }
+
+  function mood(p) {
+    if (!p) return '';
+    if (p.energy < 35) return 'sleepy';
+    if (p.tummy < 40) return 'hungry';
+    if (p.love > 80) return 'adores you';
+    return 'content';
+  }
+
+  function remaining(t) {
+    if (!t) return 0;
+    if (t.endsAt && !t.paused) return t.endsAt - Date.now();
+    return t.remaining || 0;
+  }
+
+  // ------------------------------------------------------------- scene
+  // The canvas is always 40px tall; its width follows the widget's shape so
+  // the scene fills any size (more wall on wide widgets) without cropping.
+  function fitCanvas(canvas) {
+    const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const want = Math.max(40, Math.min(200, Math.round((H * r.width) / r.height)));
+    if (canvas.width !== want) canvas.width = want;
+  }
+
+  function drawScene(ctx, d, time) {
+    const W = ctx.canvas.width;
+    const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+    const hour = new Date().getHours() + new Date().getMinutes() / 60;
+    const night = hour < 6 || hour >= 19.5;
+    const theme = d.theme || '#d49083';
+
+    // wall & floor
+    for (let x = 0; x < W; x += 8) {
+      R(x, 0, 8, 29, (x / 8) % 2 ? '#7f5230' : '#865733');
+      R(x, 0, 1, 29, '#5e3c22');
+    }
+    R(0, 0, W, 2, '#3e2717');
+    R(0, 29, W, 11, '#cdbb7e');
+    R(0, 29, W, 1, '#3e2717');
+    for (let y = 31; y < H; y += 2) R(0, y, W, 1, '#c1ae70');
+
+    // doorway with the noren in the kitchen's colour
+    const dx = Math.max(22, W - 26);
+    R(dx - 2, 5, 22, 2, '#3e2717');
+    R(dx - 2, 7, 2, 22, '#3e2717');
+    R(dx + 18, 7, 2, 22, '#3e2717');
+    R(dx, 7, 18, 22, night ? '#262a44' : '#f3e3c0');
+    R(dx, 24, 18, 5, night ? '#3a3440' : '#b8a88e');
+    // guests waiting (up to 3 peeking in)
+    const waiting = Math.min(3, d.guests || 0);
+    for (let i = 0; i < waiting; i++) {
+      const gx = dx + 2 + i * 5;
+      const gy = 20 - (Math.floor(time * 2 + i) % 2);
+      R(gx + 1, gy, 1, 1, '#fbf7ee');
+      R(gx, gy + 1, 3, 1, '#fbf7ee');
+      R(gx - 1 + 1, gy + 2, 3, 1, '#fbf7ee');
+      R(gx, gy + 3, 3, 2, '#2f4a3c');
+    }
+    const sway = Math.round(Math.sin(time * 2) * 0.6);
+    for (let p = 0; p < 3; p++) R(dx + 1 + p * 6 + (p === 1 ? sway : 0), 7, 5, 8, theme);
+    R(dx, 7, 18, 1, shade(theme, -0.3));
+    R(dx + 8, 10, 2, 2, '#fbf7ee');
+    // evolution stars over the door
+    for (let i = 0; i < Math.min(5, d.evoTier || 0); i++) R(dx + 3 + i * 3, 3, 1, 1, '#e8c25a');
+
+    // red lantern
+    const lit = night;
+    const lx = dx - 7;
+    R(lx + 2, 4, 1, 3, '#2b1c12');
+    R(lx, 7, 5, 7, lit ? '#e0604b' : '#c8412f');
+    R(lx + 1, 6, 3, 1, '#3e2717');
+    R(lx + 1, 14, 3, 1, '#3e2717');
+    if (lit) {
+      ctx.fillStyle = 'rgba(255,170,80,0.18)';
+      ctx.beginPath();
+      ctx.arc(lx + 2.5, 10.5, 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // wide widgets get a window with the sky
+    if (W >= 84) {
+      const wx = 4;
+      R(wx, 6, 18, 14, '#3e2717');
+      R(wx + 1, 7, 16, 12, night ? '#1b2044' : '#9fd0ea');
+      if (!night) R(wx + 3, 13, 12, 6, '#6a6fa8');
+      if (!night) R(wx + 7, 11, 4, 2, '#fbfbff');
+      if (night) R(wx + 12, 9, 2, 2, '#f7efd0');
+      R(wx + 9, 7, 1, 12, '#5a3a22');
+    }
+
+    // Tama
+    const p = d.pet || {};
+    const phase = (d.timer && d.timer.pomo && d.timer.pomo.phase) || 'idle';
+    const sleepy = p.energy < 35 || phase === 'focus' || hour >= 23.5 || hour < 5.5;
+    const tx = W >= 84 ? Math.round(W * 0.42) : Math.min(14, dx - 10);
+    if (sleepy) {
+      R(tx - 5, 33, 11, 4, '#fbf7ee');
+      R(tx - 4, 33, 3, 2, '#e0a13a');
+      R(tx + 2, 34, 3, 2, '#3b3030');
+      R(tx + 4, 31, 4, 3, '#fbf7ee');
+      R(tx + 4, 30, 1, 1, '#fbf7ee');
+      R(tx + 7, 30, 1, 1, '#fbf7ee');
+      R(tx - 6, 36, 5, 1, '#3b3030');
+      if (Math.floor(time) % 3 === 0) R(tx + 9, 27 - (time % 1) * 3, 2, 1, '#8b7b69');
+    } else {
+      const tail = Math.round(Math.sin(time * 3));
+      R(tx - 3, 31, 7, 6, '#fbf7ee');
+      R(tx - 3, 33, 3, 3, '#e0a13a');
+      R(tx - 3, 26, 7, 5, '#fbf7ee');
+      R(tx - 3, 25, 1, 1, '#fbf7ee');
+      R(tx + 3, 25, 1, 1, '#3b3030');
+      R(tx - 2, 28, 1, 1, '#2a2320');
+      R(tx + 2, 28, 1, 1, '#2a2320');
+      R(tx, 29, 1, 1, '#f3aaa0');
+      if ((p.stage || 0) >= 1) R(tx - 2, 31, 5, 1, '#c8412f');
+      R(tx + 4, 33 + tail, 1, 3, '#3b3030');
+    }
+
+    if (night) {
+      ctx.fillStyle = 'rgba(22,14,40,0.22)';
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // -------------------------------------------------------------- info
+  function renderInfo(el, d) {
+    const info = el.querySelector('.okw-info');
+    const t = (d.timer && d.timer.pomo) || { phase: 'idle' };
+    const phase = t.phase;
+    const big = d.guests > 0
+      ? `<b>${d.guests}</b> guest${d.guests === 1 ? '' : 's'} waiting`
+      : `Next guest in <b>${d.nextIn}</b> review${d.nextIn === 1 ? '' : 's'}`;
+    const label = phase === 'focus' ? '集中' : phase === 'break' ? (t.longBreak ? '祭り' : '休憩') : '待機';
+    const clock = phase === 'idle' ? '' : fmt(remaining(t));
+    const toggle = phase === 'idle' ? '▶ Focus' : t.paused ? '▶ Resume' : '❚❚ Pause';
+    const p = d.pet || {};
+    info.innerHTML =
+      `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
+      `<div class="okw-big">${big}</div>` +
+      `<div class="okw-sub"><span>文 ${d.mon}</span><span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span></div>` +
+      `<div class="okw-row">` +
+      `<span class="okw-timer" data-phase="${phase}"><span class="okw-jp">${label}</span>${clock}</span>` +
+      `<span class="okw-spacer"></span>` +
+      `<button class="okw-btn" data-act="timer">${toggle}</button>` +
+      `<button class="okw-btn okw-primary" data-act="open">Visit</button>` +
+      `</div>`;
+    info.querySelectorAll('.okw-btn').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (b.dataset.act === 'open') send('open');
+      else send('timer:' + (phase === 'idle' ? 'start' : t.paused ? 'resume' : 'pause'));
+    }));
+  }
+
+  // -------------------------------------------------------------- boot
+  const widgets = [];
+
+  function boot(el) {
+    if (el.dataset.okwBooted) return;
+    el.dataset.okwBooted = '1';
+    let d;
+    try {
+      d = JSON.parse(el.querySelector('.okw-data').textContent);
+    } catch (e) {
+      return;
+    }
+    const canvas = el.querySelector('.okw-scene');
+    const ctx = canvas.getContext('2d');
+    const w = { el, d, ctx };
+    widgets.push(w);
+    fitCanvas(canvas);
+    drawScene(ctx, d, performance.now() / 1000);
+    el.addEventListener('click', () => send('open'));
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); send('open'); } });
+    renderInfo(el, d);
+  }
+
+  function scan() {
+    document.querySelectorAll('.okw').forEach(boot);
+  }
+
+  let last = 0;
+  function frame(now) {
+    if (now - last > 125 && !document.hidden) {
+      last = now;
+      for (const w of widgets) {
+        if (!w.el.isConnected) continue;
+        fitCanvas(w.ctx.canvas);
+        drawScene(w.ctx, w.d, now / 1000);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // live timer updates pushed through the chip (see chip.js)
+  document.addEventListener('okitchen-timer', (e) => {
+    for (const w of widgets) {
+      w.d.timer = e.detail;
+      if (w.el.isConnected) renderInfo(w.el, w.d);
+    }
+  });
+  setInterval(() => {
+    for (const w of widgets) {
+      const t = w.d.timer && w.d.timer.pomo;
+      if (t && t.phase !== 'idle' && w.el.isConnected) {
+        const clock = w.el.querySelector('.okw-timer');
+        if (clock) clock.lastChild.textContent = fmt(remaining(t));
+      }
+    }
+  }, 1000);
+
+  window.OKWidget = { scan };
+
+  function start() {
+    scan();
+    try {
+      new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+    } catch (e) {}
+    requestAnimationFrame(frame);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();

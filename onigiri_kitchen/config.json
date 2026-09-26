@@ -12,5 +12,6 @@
     "reviews_per_guest": 10,
     "sound": true,
     "volume": 0.5,
-    "shortcut": "Ctrl+Shift+K"
+    "shortcut": "Ctrl+Shift+K",
+    "show_home_widget_without_onigiri": true
 }

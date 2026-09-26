@@ -30,6 +30,11 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
   the menu tags play koto notes, the window calls a sparrow, and the lanterns switch
   on and off. The window follows your real clock and the season.
 
+## Home-screen widget
+
+With Onigiri, add **Onigiri Kitchen · おにぎり食堂** to your main menu from Onigiri's layout editor.
+Without Onigiri, the widget shows under your decks (toggle `show_home_widget_without_onigiri` in the config).
+
 ## Tama, the shop cat 🐾
 
 Tama is a gentle virtual pet. Open her panel with the **猫 Tama** button.

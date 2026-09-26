@@ -157,6 +157,8 @@
       data = next;
       chimeOnChange();
       render();
+      // let the home-screen widget follow the timer too
+      try { document.dispatchEvent(new CustomEvent('okitchen-timer', { detail: next })); } catch (e) {}
     },
   };
 

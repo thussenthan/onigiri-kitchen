@@ -1,0 +1,119 @@
+/* Onigiri Kitchen - home-screen widget. Uses Onigiri's page variables when
+   present (so it matches the other widgets), washi colours otherwise. */
+.okw {
+  container-type: size;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 110px;
+  box-sizing: border-box;
+  padding: 10px;
+  border-radius: 15px;
+  background: var(--canvas-inset, #f5efe4);
+  border: 1px solid var(--border, #e0d4bf);
+  color: var(--fg, #2b2622);
+  font-family: var(--font-main, -apple-system), -apple-system, system-ui, "Hiragino Sans", sans-serif;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.15s ease;
+}
+.okw:hover { transform: translateY(-1px); }
+.okw-in { display: flex; align-items: stretch; gap: 12px; height: 100%; }
+.nightMode .okw, .night_mode .okw, .night-mode .okw {
+  background: var(--canvas-inset, #2a2522);
+  border-color: var(--border, #463b31);
+  color: var(--fg, #efe6d6);
+}
+.okw-scene {
+  flex: 0 0 auto;
+  height: 100%;
+  aspect-ratio: 64 / 40;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.okw-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+.okw-top {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-subtle, #8b7b69);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.okw-jp {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  font-weight: 800;
+  color: var(--accent-color, #c8412f);
+  margin-right: 5px;
+  text-transform: none;
+}
+.okw-big { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.okw-big b { font-size: 20px; font-weight: 800; }
+.okw-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 12px;
+  color: var(--fg-subtle, #8b7b69);
+}
+.okw-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.okw-spacer { flex: 1; }
+.okw-timer { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.okw-timer[data-phase="break"] .okw-jp { color: #6f9a5c; }
+.okw-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e0d4bf);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: inherit;
+}
+.okw-btn:hover { border-color: var(--accent-color, #c8412f); color: var(--accent-color, #c8412f); }
+.okw-primary { background: var(--accent-color, #c8412f); border-color: transparent; color: #fff; }
+.okw-primary:hover { filter: brightness(1.07); color: #fff; }
+
+/* Narrow (1 column): the scene fills the card, info sits on top of it */
+@container (max-width: 300px) {
+  .okw-scene { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; }
+  .okw-info {
+    position: relative;
+    margin: -10px;
+    padding: 10px;
+    justify-content: flex-end;
+    color: #fff;
+    background: linear-gradient(180deg, transparent 20%, rgba(20, 12, 6, 0.72));
+  }
+  .okw-top, .okw-sub { color: rgba(255, 246, 230, 0.85); }
+  .okw-sub span:last-child, .okw-timer { display: none; }
+  .okw-big { font-size: 13px; }
+  .okw-big b { font-size: 16px; }
+  .okw-btn { border-color: rgba(255, 255, 255, 0.45); padding: 3px 8px; }
+  .okw-btn[data-act="timer"] { display: none; }
+}
+/* Tall (2+ rows): scene on top, info below */
+@container (min-height: 170px) and (min-width: 300px) {
+  .okw-in { flex-direction: column; gap: 8px; }
+  .okw-scene { flex: 1 1 0; min-height: 0; width: 100%; height: auto; aspect-ratio: auto; }
+  .okw-info { flex: 0 0 auto; }
+}
+/* Single row: drop the small title so everything fits */
+@container (max-height: 100px) {
+  .okw-top { display: none; }
+}
+/* Plain Anki (no Onigiri): a card under the deck list */
+.okw-plain { max-width: 480px; height: 130px; margin: 18px auto 0; }

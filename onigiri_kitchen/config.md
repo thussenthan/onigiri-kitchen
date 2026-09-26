@@ -13,3 +13,4 @@ Most of these can also be changed from the timer panel inside the kitchen (the d
 - `reviews_per_guest`: how many reviews in a deck bring one guest to your restaurant.
 - `sound` / `volume`: soft koto sounds, chimes and meows (0.0–1.0).
 - `shortcut`: keyboard shortcut for Tools → Onigiri Kitchen (restart Anki after changing it).
+- `show_home_widget_without_onigiri`: without Onigiri, show the kitchen widget under the deck list on Anki's main screen. With Onigiri, place the widget with Onigiri's own layout editor instead (Onigiri settings → main menu layout; it's listed as "Onigiri Kitchen · おにぎり食堂").
