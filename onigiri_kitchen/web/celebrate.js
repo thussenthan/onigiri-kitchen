@@ -24,7 +24,7 @@
         if (started) elapsed = (Date.now() - started) / 1000;
         else sessionStorage.setItem(key, String(Date.now()));
       } catch (e) {}
-      if (elapsed > 6.5) return;
+      if (elapsed > 30) return;
     }
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const old = document.getElementById('ok-celebrate');
@@ -102,7 +102,7 @@
           rot: rand(0, Math.PI * 2),
           vr: rand(-0.25, 0.25),
           wob: rand(0, Math.PI * 2),
-          kind: r < 0.18 ? 'petal' : r < 0.24 ? 'onigiri' : 'paper',
+          kind: r < 0.06 ? 'onigiri' : 'paper',
           c: pick(colors),
           w: rand(6, 11),
           h: rand(9, 16),
@@ -113,18 +113,23 @@
     // two cannons from the bottom corners, then a gentle shower from the top
     burst(W * 0.08, H + 10, 1, 90);
     burst(W * 0.92, H + 10, -1, 90);
-    function shower() {
-      for (let i = 0; i < 70; i++) {
+    // sakura petals only, drifting down from the top in gentle waves
+    function petalWave(n) {
+      for (let i = 0; i < n; i++) {
         parts.push({
-          x: rand(0, W), y: rand(-60, -10), vx: rand(-1, 1), vy: rand(1, 3),
-          rot: rand(0, 6.28), vr: rand(-0.15, 0.15), wob: rand(0, 6.28),
-          kind: Math.random() < 0.3 ? 'petal' : 'paper', c: pick(colors), w: rand(6, 10), h: rand(8, 14), life: 1,
+          // spread out vertically, each with its own gentle fall speed
+          x: rand(-20, W + 20), y: rand(-H * 0.5, -10), vx: rand(-0.8, 0.8), vy: rand(0.3, 1.2),
+          term: rand(0.9, 2.1), wobSpeed: rand(0.04, 0.1),
+          rot: rand(0, 6.28), vr: rand(-0.08, 0.08), wob: rand(0, 6.28),
+          kind: 'petal', c: '#f2a9c0', w: rand(6, 10), h: rand(8, 12), life: 1,
         });
       }
     }
     // (scheduled relative to when this celebration first started)
-    if (elapsed >= 0.45) shower();
-    else setTimeout(shower, 450 - elapsed * 1000);
+    [[0.45, 45], [1.2, 35], [2.0, 30]].forEach(([at, n]) => {
+      if (elapsed >= at) petalWave(n);
+      else setTimeout(() => petalWave(n), (at - elapsed) * 1000);
+    });
 
     function drawOnigiri(p) {
       const s = p.w * 1.2;
@@ -149,15 +154,16 @@
       for (const p of parts) {
         p.vy += 0.32 * dt;
         p.vx *= Math.pow(0.985, dt);
-        p.vy = Math.min(p.vy, p.kind === 'petal' ? 2.2 : 3.4);
-        p.wob += 0.08 * dt;
+        p.vy = Math.min(p.vy, p.term || (p.kind === 'petal' ? 2.2 : 3.4));
+        p.wob += (p.wobSpeed || 0.08) * dt;
         p.x += (p.vx + Math.sin(p.wob) * (p.kind === 'petal' ? 1.2 : 0.6)) * dt;
         p.y += p.vy * dt;
         p.rot += p.vr * dt;
-        if (t > 3.6) p.life -= 0.02 * dt;
       }
       render();
-      if (t >= 7 && !done) { done = true; window.removeEventListener('resize', size); root.remove(); }
+      // finished once every piece has fallen off the screen (safety limit 30s)
+      const onScreen = parts.some((p) => p.y < H + 40 && p.x > -60 && p.x < W + 60);
+      if (!done && ((t > 2.2 && !onScreen) || t > 30)) { done = true; window.removeEventListener('resize', size); root.remove(); }
     }
     function render() {
       ctx.clearRect(0, 0, W, H);
@@ -194,7 +200,7 @@
     }
     // continuing after a page redraw: catch the animation up to where it was
     if (elapsed > 0) {
-      for (let i = 0; i < Math.min(elapsed, 7) * 60; i++) step(last + 16.67);
+      for (let i = 0; i < Math.min(elapsed, 30) * 60; i++) step(last + 16.67);
       // re-align the clock with real time after catching up
       last = performance.now();
       start = last - elapsed * 1000;

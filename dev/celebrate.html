@@ -9,5 +9,7 @@ h1{margin:0 0 8px;font-size:26px}
 <body><div class="card"><h1>Congratulations!</h1><div>You have finished this deck for now.</div></div>
 <script>
 const t = parseFloat(new URLSearchParams(location.search).get('t') || '1.1');
-OKCelebrate({deck: 'Exam 3', accent: '#007aff', sound: false, preview: t});
+const el = parseFloat(new URLSearchParams(location.search).get('el') || '0');
+if (el) sessionStorage.setItem('okCelebrate:shot', String(Date.now() - el * 1000));
+OKCelebrate({deck: 'Exam 3', accent: '#007aff', sound: false, preview: t, id: el ? 'shot' : undefined});
 </script></body></html>
