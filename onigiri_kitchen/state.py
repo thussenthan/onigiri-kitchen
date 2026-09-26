@@ -194,30 +194,38 @@ class KitchenState:
             guests.append(guest)
         return True
 
-    def add_review(self, deck: str, leech_success: bool, reviews_per_guest: int) -> bool:
-        """Count one review. Returns True if it brought a new guest."""
+    def add_review(self, deck: str, leech_success: bool, reviews_per_guest: int,
+                   db_counts: Optional[Dict[str, int]] = None) -> bool:
+        """A card was just answered. Anki's review log (`db_counts`, today's
+        reviews per deck) is the source of truth for counting; this only adds
+        what the log can't tell us (leech guests). Returns True if a guest arrived."""
         self.roll_day()
-        self.pet_grew = self.pet.on_review(self.data["today"]["date"], leech_success)
+        self.pet_grew = None
         today = self.data["today"]
-        today["reviews"] += 1
-        by_deck = today.get("by_deck")
-        if isinstance(by_deck, dict):
-            by_deck[deck] = by_deck.get(deck, 0) + 1
-        pending = self.data["pending"]
-        pending[deck] = pending.get(deck, 0) + 1
         new_guest = False
-
-        if leech_success and today["leech_guests"] < MAX_LEECH_GUESTS_PER_DAY:
-            today["leech_guests"] += 1
-            self.add_guest({"deck": deck, "kind": "leech", "reviews": 1})
-            new_guest = True
-
-        n = max(1, int(reviews_per_guest))
-        if pending[deck] >= n:
-            pending[deck] -= n
-            self.add_guest({"deck": deck, "kind": "regular", "reviews": n})
-            new_guest = True
-
+        if leech_success:
+            self.pet.d["leeches"] = int(self.pet.d.get("leeches", 0)) + 1
+            if today["leech_guests"] < MAX_LEECH_GUESTS_PER_DAY:
+                today["leech_guests"] += 1
+                self.add_guest({"deck": deck, "kind": "leech", "reviews": 1})
+                new_guest = True
+        if db_counts is not None:
+            if self.sync_today(db_counts, reviews_per_guest) > 0:
+                new_guest = True
+        else:
+            # Couldn't read the review log: count this one answer directly.
+            self.pet_grew = self.pet.on_review(today["date"], False)
+            today["reviews"] += 1
+            by_deck = today.get("by_deck")
+            if isinstance(by_deck, dict):
+                by_deck[deck] = by_deck.get(deck, 0) + 1
+            pending = self.data["pending"]
+            pending[deck] = pending.get(deck, 0) + 1
+            n = max(1, int(reviews_per_guest))
+            if pending[deck] >= n:
+                pending[deck] -= n
+                self.add_guest({"deck": deck, "kind": "regular", "reviews": n})
+                new_guest = True
         self.save_soon()
         return new_guest
 
@@ -272,36 +280,63 @@ class KitchenState:
         self.save_soon()
 
     def sync_today(self, db_counts: Dict[str, int], reviews_per_guest: int) -> int:
-        """Match today's guests to Anki's review log (catches reviews done on
-        other devices, or before the add-on was installed). Returns new guests."""
+        """Match today's reviews and guests to Anki's review log, which is the
+        source of truth: it includes reviews from other devices (once synced)
+        and drops reviews you undid. Returns the change in waiting guests."""
         self.roll_day()
         today = self.data["today"]
         if not isinstance(today.get("by_deck"), dict):
             # Save from an older version: start tracking from here without
             # double-counting the reviews it already saw today.
-            today["by_deck"] = dict(db_counts)
+            today["by_deck"] = {d: int(c) for d, c in db_counts.items()}
+            today["reviews"] = sum(today["by_deck"].values())
             self.save_soon()
             return 0
         by_deck = today["by_deck"]
         n = max(1, int(reviews_per_guest))
         before = len(self.data["guests"])
-        for deck, count in db_counts.items():
-            missing = int(count) - int(by_deck.get(deck, 0))
-            if missing <= 0:
+        pending = self.data["pending"]
+        changed = False
+        for deck in set(db_counts) | set(by_deck):
+            count = int(db_counts.get(deck, 0))
+            diff = count - int(by_deck.get(deck, 0))
+            if diff == 0:
                 continue
-            by_deck[deck] = int(count)
-            today["reviews"] += missing
-            for _ in range(missing):
-                self.pet.on_review(today["date"], False)
-            pending = self.data["pending"]
-            pending[deck] = pending.get(deck, 0) + missing
-            while pending[deck] >= n:
-                pending[deck] -= n
-                self.add_guest({"deck": deck, "kind": "regular", "reviews": n})
-        added = len(self.data["guests"]) - before
-        if added:
+            changed = True
+            if count:
+                by_deck[deck] = count
+            else:
+                by_deck.pop(deck, None)
+            pending[deck] = pending.get(deck, 0) + diff
+            if diff > 0:
+                for _ in range(diff):
+                    grew = self.pet.on_review(today["date"], False)
+                    if grew is not None:
+                        self.pet_grew = grew
+                while pending[deck] >= n:
+                    pending[deck] -= n
+                    self.add_guest({"deck": deck, "kind": "regular", "reviews": n})
+            else:
+                # Reviews were undone: if that un-earns a guest who hasn't been
+                # seated yet, they leave the queue. Nothing else is taken away.
+                while pending[deck] < 0:
+                    idx = next((i for i in range(len(self.data["guests"]) - 1, -1, -1)
+                                if self.data["guests"][i].get("deck") == deck
+                                and self.data["guests"][i].get("kind") == "regular"), None)
+                    if idx is None:
+                        pending[deck] = 0
+                        break
+                    self.data["guests"].pop(idx)
+                    pending[deck] += n
+            if pending.get(deck) == 0:
+                pending.pop(deck, None)
+        total = sum(int(c) for c in db_counts.values())
+        if today.get("reviews") != total:
+            today["reviews"] = total
+            changed = True
+        if changed:
             self.save_soon()
-        return added
+        return len(self.data["guests"]) - before
 
     # --------------------------------------------------------- catch-up
     def shown(self, item_id: str) -> bool:

@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.5.4"
+VERSION = "1.5.5"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -162,7 +162,7 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
             leech_success = card.note().has_tag("leech")
         except Exception:
             leech_success = False
-    new_guest = state.add_review(deck, leech_success, conf().get("reviews_per_guest", 10))
+    new_guest = state.add_review(deck, leech_success, conf().get("reviews_per_guest", 10), todays_reviews_by_deck())
     pomo.on_review()
     grew = getattr(state, "pet_grew", None)
     if grew is not None:
@@ -175,8 +175,21 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
 
 
 # -------------------------------------------------------------------- window
-def todays_reviews_by_deck() -> Dict[str, int]:
-    """Today's reviews per deck from Anki's review log (respects the day rollover)."""
+def _sync_with_log() -> None:
+    counts = todays_reviews_by_deck()
+    if counts is not None:
+        state.sync_today(counts, conf().get("reviews_per_guest", 10))
+
+
+def on_undo(*_args: Any) -> None:
+    # An undone review disappears from Anki's log, so re-count from it.
+    _sync_with_log()
+    _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
+
+
+def todays_reviews_by_deck() -> Optional[Dict[str, int]]:
+    """Today's reviews per deck from Anki's review log (respects the day
+    rollover). None if the log couldn't be read (callers then skip syncing)."""
     try:
         start = (mw.col.sched.day_cutoff - 86400) * 1000
         rows = mw.col.db.all(
@@ -187,7 +200,7 @@ def todays_reviews_by_deck() -> Dict[str, int]:
         )
     except Exception as e:
         print(f"Onigiri Kitchen: couldn't read today's reviews: {e}")
-        return {}
+        return None
     out: Dict[str, int] = {}
     for did, count in rows:
         try:
@@ -200,7 +213,7 @@ def todays_reviews_by_deck() -> Dict[str, int]:
 
 def init_payload(reason: str = "") -> Dict[str, Any]:
     state.roll_day()
-    state.sync_today(todays_reviews_by_deck(), conf().get("reviews_per_guest", 10))
+    _sync_with_log()
     away = state.pet.seen()
     # Anyone who already had all 12 keepsakes gets the set bonus once.
     set_bonus_now = False
@@ -456,7 +469,7 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
 
 # --------------------------------------------------- Onigiri home-screen widget
 def widget_payload() -> Dict[str, Any]:
-    state.sync_today(todays_reviews_by_deck(), conf().get("reviews_per_guest", 10))
+    _sync_with_log()
     progress = onigiri_link.read_progress()
     per = max(1, int(conf().get("reviews_per_guest", 10)))
     pending = state.data.get("pending") or {}
@@ -717,6 +730,8 @@ def setup() -> None:
     gui_hooks.webview_did_receive_js_message.append(on_js_message)
     gui_hooks.main_window_did_init.append(_add_menu)
     gui_hooks.state_will_change.append(on_state_will_change)
+    if hasattr(gui_hooks, "state_did_undo"):
+        gui_hooks.state_did_undo.append(on_undo)
     # Seeing a question/answer counts as activity for the focus timer's idle pause.
     gui_hooks.reviewer_did_show_question.append(lambda card: pomo.touch())
     gui_hooks.reviewer_did_show_answer.append(lambda card: pomo.touch())

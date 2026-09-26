@@ -59,7 +59,7 @@ class _Hook(list):
 HOOKS = [
     "profile_did_open", "profile_will_close", "reviewer_did_answer_card", "webview_will_set_content",
     "webview_did_receive_js_message", "main_window_did_init", "deck_browser_will_render_content",
-    "state_will_change", "reviewer_did_show_question", "reviewer_did_show_answer",
+    "state_will_change", "reviewer_did_show_question", "reviewer_did_show_answer", "state_did_undo",
 ]
 
 
