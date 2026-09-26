@@ -1397,12 +1397,15 @@
       if (!res.ok) { toast(res.msg); return; }
       $('ok-pet').hidden = true;
       feather = { x: tama.x + 20, y: 160, t: 20 };
-      toast('遊ぼう! Move your mouse to wave the feather toy');
+      $('ok-play-done').hidden = false;
+      toast('遊ぼう! Wave the feather with your mouse. Esc or right-click to stop');
       OKSound.pluck(7);
     });
   }
   function endPlay() {
+    if (!feather) return;
     feather = null;
+    $('ok-play-done').hidden = true;
     tamaSet('sit', 3);
     spawnHearts(tama.x, 156, 2);
     OKSound.meow();
@@ -2637,6 +2640,9 @@
       tip.hidden = true;
     }
   });
+  // right-click ends the feather toy; the button does too
+  view.addEventListener('contextmenu', (e) => { if (feather) { e.preventDefault(); endPlay(); } });
+  $('ok-play-done').addEventListener('click', endPlay);
   view.addEventListener('mouseleave', () => { hover = null; $('ok-tip').hidden = true; });
   view.addEventListener('click', (e) => {
     if (feather) { tama.hop = 6; OKSound.pop(); return; }
@@ -2882,6 +2888,7 @@
       if (e.key === 'ArrowRight' || e.key === 'Enter') { tourGo(tourIdx + 1); e.preventDefault(); return; }
       if (e.key === 'ArrowLeft') { tourGo(tourIdx - 1); e.preventDefault(); return; }
     }
+    if (e.key === 'Escape' && feather) { endPlay(); e.preventDefault(); e.stopPropagation(); return; }
     if (e.key === 'Escape') {
       const open = document.querySelector('.ok-panel:not([hidden]), .ok-modal:not([hidden])');
       if (open) { open.hidden = true; e.preventDefault(); e.stopPropagation(); }
