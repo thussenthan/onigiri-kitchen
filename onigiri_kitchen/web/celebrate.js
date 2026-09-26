@@ -13,6 +13,19 @@
 
   window.OKCelebrate = function (opts) {
     opts = opts || {};
+    // The same celebration can be re-sent when Anki redraws the congrats page.
+    // Remember when it started (per id) so a redraw continues it rather than
+    // restarting, and skip it if it has already finished.
+    let elapsed = 0;
+    if (opts.id) {
+      try {
+        const key = 'okCelebrate:' + opts.id;
+        const started = parseFloat(sessionStorage.getItem(key) || '0');
+        if (started) elapsed = (Date.now() - started) / 1000;
+        else sessionStorage.setItem(key, String(Date.now()));
+      } catch (e) {}
+      if (elapsed > 6.5) return;
+    }
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const old = document.getElementById('ok-celebrate');
     if (old) old.remove();
@@ -40,6 +53,10 @@
     requestAnimationFrame(() => { banner.style.opacity = '1'; banner.style.transform = 'translate(-50%,0)'; });
     setTimeout(() => { banner.style.opacity = '0'; banner.style.transform = 'translate(-50%,-10px)'; }, 3400);
 
+    if (elapsed > 0.8) {
+      banner.style.display = 'none';
+      opts.sound = false;
+    }
     if (opts.sound && window.OKSound) {
       try { OKSound.configure({ sound: true, volume: opts.volume != null ? opts.volume : 0.5 }); OKSound.fanfare(); } catch (e) {}
     }
@@ -96,7 +113,7 @@
     // two cannons from the bottom corners, then a gentle shower from the top
     burst(W * 0.08, H + 10, 1, 90);
     burst(W * 0.92, H + 10, -1, 90);
-    setTimeout(() => {
+    function shower() {
       for (let i = 0; i < 70; i++) {
         parts.push({
           x: rand(0, W), y: rand(-60, -10), vx: rand(-1, 1), vy: rand(1, 3),
@@ -104,7 +121,10 @@
           kind: Math.random() < 0.3 ? 'petal' : 'paper', c: pick(colors), w: rand(6, 10), h: rand(8, 14), life: 1,
         });
       }
-    }, 450);
+    }
+    // (scheduled relative to when this celebration first started)
+    if (elapsed >= 0.45) shower();
+    else setTimeout(shower, 450 - elapsed * 1000);
 
     function drawOnigiri(p) {
       const s = p.w * 1.2;
@@ -120,7 +140,7 @@
     }
 
     let last = performance.now();
-    const start = last;
+    let start = last;
     let done = false;
     function step(now) {
       const dt = Math.min(2.5, (now - last) / 16.67);
@@ -171,6 +191,13 @@
     if (opts.preview) {
       for (let i = 0; i < opts.preview * 60; i++) step(last + 16.67);
       return;
+    }
+    // continuing after a page redraw: catch the animation up to where it was
+    if (elapsed > 0) {
+      for (let i = 0; i < Math.min(elapsed, 7) * 60; i++) step(last + 16.67);
+      // re-align the clock with real time after catching up
+      last = performance.now();
+      start = last - elapsed * 1000;
     }
     requestAnimationFrame(frame);
   };

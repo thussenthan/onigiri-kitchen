@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -556,6 +556,10 @@ def on_js_message(handled: tuple, message: str, context: Any) -> tuple:
 # ------------------------------------------------ 紙吹雪 deck-finished confetti
 _celebrate_next = False
 _finishing: Optional[Dict[str, Any]] = None  # set while the finished screen is being drawn
+# Anki redraws the congrats screen a couple of times right after a review
+# session ends; the celebration stays armed briefly so it survives redraws.
+_celebration: Optional[Dict[str, Any]] = None  # {"opts", "until", "id"}
+CELEBRATION_WINDOW = 4.0
 
 
 def debug_log(msg: str) -> None:
@@ -613,16 +617,26 @@ def _celebration_opts() -> Dict[str, Any]:
 
 def around_finished_screen(overview: Any, _old: Any) -> Any:
     """Wraps Anki's (or Onigiri's) 'Congratulations, you finished' screen."""
-    global _celebrate_next, _finishing
+    global _celebrate_next, _finishing, _celebration
+    import time as _time
+
     celebrate = _celebrate_next
     _celebrate_next = False
-    debug_log(f"finished screen shown (after reviewing: {celebrate})")
-    if celebrate and state.shown("tsuru"):
-        # 鶴 crane perk: every finished deck brings a golden guest
-        state.add_guest({"deck": None, "kind": "golden", "reviews": 0})
-        state.save_soon()
-    if celebrate and conf().get("celebrate_deck_finish", True):
-        _finishing = {"opts": _celebration_opts(), "injected": False}
+    now = _time.time()
+    if celebrate:
+        if state.shown("tsuru"):
+            # 鶴 crane perk: every finished deck brings a golden guest
+            state.add_guest({"deck": None, "kind": "golden", "reviews": 0})
+            state.save_soon()
+        if conf().get("celebrate_deck_finish", True):
+            _celebration = {"opts": _celebration_opts(), "until": now + CELEBRATION_WINDOW, "id": str(int(now * 1000))}
+    active = _celebration is not None and now <= _celebration["until"]
+    if _celebration is not None and not active:
+        _celebration = None
+    debug_log(f"finished screen shown (after reviewing: {celebrate}, celebration armed: {active})")
+    if active:
+        opts = dict(_celebration["opts"], id=_celebration["id"])
+        _finishing = {"opts": opts, "injected": False}
     try:
         return _old(overview)
     finally:
