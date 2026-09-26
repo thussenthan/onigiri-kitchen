@@ -111,8 +111,10 @@
       }
     }
     // two cannons from the bottom corners, then a gentle shower from the top
-    burst(W * 0.08, H + 10, 1, 90);
-    burst(W * 0.92, H + 10, -1, 90);
+    // a little variety every time: ±15% pieces per cannon, cannons shifted by up to ±3% of the width
+    const vary = (n) => Math.round(n * rand(0.85, 1.15));
+    burst(W * (0.08 + rand(-0.03, 0.03)), H + 10, 1, vary(90));
+    burst(W * (0.92 + rand(-0.03, 0.03)), H + 10, -1, vary(90));
     // sakura petals only, drifting down from the top in gentle waves
     function petalWave(n) {
       for (let i = 0; i < n; i++) {
@@ -126,7 +128,8 @@
       }
     }
     // (scheduled relative to when this celebration first started)
-    [[0.45, 45], [1.2, 35], [2.0, 30]].forEach(([at, n]) => {
+    // petal waves: counts ±15% and start times jittered by up to ±0.15 s
+    [[0.45, 45], [1.2, 35], [2.0, 30]].map(([at, n]) => [Math.max(0.25, at + rand(-0.15, 0.15)), vary(n)]).forEach(([at, n]) => {
       if (elapsed >= at) petalWave(n);
       else setTimeout(() => petalWave(n), (at - elapsed) * 1000);
     });
