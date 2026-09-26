@@ -24,6 +24,19 @@ theme = ""
 if "--plain" not in os.sys.argv:
     theme = (f'<style id="ok-onigiri-theme">:root{{{block(SAMPLE["light"])}}}'
              f'.nightMode,.night_mode,.night-mode{{{block(SAMPLE["dark"])}}}</style>')
+    # With Onigiri installed, the sign uses Onigiri's wooden banner. Borrow it
+    # from a local Onigiri install for the preview (dev/assets is gitignored,
+    # so Onigiri's image is never committed to this repo).
+    import shutil
+    wood_src = os.path.expanduser(
+        "~/Library/Application Support/Anki2/addons21/1011095603/system_files/"
+        "gamification_images/restaurant_folder/wooden_bg.png")
+    if os.path.exists(wood_src):
+        os.makedirs(os.path.join(ROOT, "dev", "assets"), exist_ok=True)
+        shutil.copyfile(wood_src, os.path.join(ROOT, "dev", "assets", "wooden_bg.png"))
+        theme += "<style>:root{--oni-wood:url('/dev/assets/wooden_bg.png');}</style>"
+    else:
+        print("note: Onigiri not found locally, so the sign uses the plain fallback")
 
 pre = open(os.path.join(ROOT, "dev", "preview.html"), encoding="utf-8").read()
 init = pre[pre.index("<script>") + 8:pre.index("</script>")]

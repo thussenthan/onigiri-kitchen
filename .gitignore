@@ -8,3 +8,4 @@ onigiri_kitchen/user_files/*.tmp
 onigiri_kitchen/meta.json
 .claude/
 dev/anki_order.html
+dev/assets/
