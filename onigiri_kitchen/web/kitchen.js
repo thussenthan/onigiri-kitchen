@@ -120,24 +120,7 @@
   let conf = Object.assign({}, INIT.conf || {});
   let timer = (INIT.timer && INIT.timer.pomo) || { phase: 'idle' };
   let dispMon = S.mon;
-  // Kitchen style: colour from one owned Onigiri restaurant + decoration from
-  // one owned evolution, so e.g. Macaron Maison blue can combine with an
-  // evolution's stars. Defaults follow what Onigiri has equipped.
-  function styleColor() {
-    const st = S.style || {};
-    const t = st.color && (onigiri.colorThemes || []).find((c) => c.id === st.color);
-    return (t && t.theme) || onigiri.themeColor || '#D49083';
-  }
-  function styleEvo() {
-    const st = S.style || {};
-    const evos = onigiri.evolutions || [];
-    if (st.evolution === 'none') return null;
-    const picked = st.evolution && evos.find((e) => e.id === st.evolution);
-    if (picked) return picked;
-    return evos.find((e) => e.id === onigiri.themeId) || evos[evos.length - 1] || null;
-  }
-  let theme = styleColor();
-  let evo = styleEvo();
+  const theme = onigiri.themeColor || '#D49083';
   document.documentElement.style.setProperty('--theme', theme);
   let rush = false;
 
@@ -667,9 +650,6 @@
         const off = Math.round((r / 30) * sway);
         R(px + off, y + r, pw - 1, 1, r < 2 ? shade(nc, -0.25) : nc);
       }
-    }
-    if (evo && (evo.tier || 0) >= 5) {
-      for (let p = 0; p < panels; p++) R(x + 1 + p * pw, y + 29, pw - 1, 1, C.gold);
     }
     // emblem: white circle with an onigiri
     ellipse(x + w / 2, y + 16, 6, 6, '#fbf7ee');
@@ -1981,25 +1961,6 @@
     regions.push({ x: x - 1, y: y - 3, w: 17, h: 18, label: '<b>目安箱</b> Suggestion box\nShare an idea or report a bug', click: feedbackModal });
   }
 
-  // Evolution decoration: a star plaque over the door, gold trim at Legendary.
-  function drawEvolution() {
-    if (!evo) return;
-    const tier = evo.tier || 1;
-    const stars = Math.min(5, tier);
-    const w = stars * 5 + 5;
-    const x = 277 - Math.round(w / 2);
-    const y = 8;
-    R(x, y, w, 8, C.woodDk);
-    R(x + 1, y + 1, w - 2, 6, tier >= 5 ? '#3a2a14' : '#5a3a22');
-    for (let i = 0; i < stars; i++) {
-      const sx = x + 3 + i * 5;
-      const col = tier >= 5 ? '#ffd86a' : C.gold;
-      P(sx + 1, y + 2, col); R(sx, y + 3, 3, 1, col); P(sx, y + 4, col); P(sx + 2, y + 4, col);
-    }
-    if (tier >= 6) { P(x - 1, y + 2, '#6a9a4a'); P(x - 2, y + 3, '#8cbf5e'); P(x + w, y + 2, '#6a9a4a'); P(x + w + 1, y + 3, '#8cbf5e'); }
-    regions.push({ x, y, w, h: 8, label: `<b>${esc(evo.name)}</b>\nEvolution design${(S.style || {}).color ? ' with your chosen colours' : ''}`, click: () => { OKSound.chime(); spawnHearts(277, 14, 1); } });
-  }
-
   // ------------------------------------------------------------ hi-res text
   function drawText() {
     const s = cssScale * dpr;
@@ -2167,7 +2128,6 @@
     drawMenu();
     drawWallDecor();
     drawMeyasubako();
-    drawEvolution();
     drawDoor(h);
     drawLanterns(lit);
     drawChef();
@@ -2556,49 +2516,7 @@
 
   // ----------------------------------------------------------------- decor
   const MON_SVG = document.querySelector('.ok-mon-icon').outerHTML;
-  function renderStyle() {
-    const box = $('ok-style');
-    const colors = onigiri.colorThemes || [];
-    const evos = onigiri.evolutions || [];
-    if (!onigiri.found || (colors.length < 2 && !evos.length)) { box.hidden = true; return; }
-    box.hidden = false;
-    const st = S.style || {};
-    const chip = (group, id, label, swatch, on) =>
-      `<button class="ok-chip${on ? ' on' : ''}" data-group="${group}" data-id="${id}">` +
-      (swatch ? `<i style="background:${swatch}"></i>` : '') + `${esc(label)}</button>`;
-    let html = '<div class="ok-style-row"><b class="jp">色</b><span>Colour</span><div>' +
-      chip('color', '', "Onigiri's current", onigiri.themeColor, !st.color);
-    colors.forEach((c) => { html += chip('color', c.id, c.name, c.theme, st.color === c.id); });
-    html += '</div></div>';
-    if (evos.length) {
-      html += '<div class="ok-style-row"><b class="jp">進化</b><span>Evolution design</span><div>' +
-        chip('evolution', '', 'Automatic', null, !st.evolution) + chip('evolution', 'none', 'None', null, st.evolution === 'none');
-      evos.forEach((e) => { html += chip('evolution', e.id, `${'★'.repeat(Math.min(5, e.tier))} ${e.name}`, null, st.evolution === e.id); });
-      html += '</div></div>';
-    }
-    box.innerHTML = html;
-    box.querySelectorAll('.ok-chip').forEach((b) => b.addEventListener('click', () => {
-      const next = Object.assign({ color: null, evolution: null }, S.style || {});
-      next[b.dataset.group] = b.dataset.id || null;
-      send('style', JSON.stringify(next), (snap) => {
-        if (snap) S = Object.assign(S, snap);
-        applyStyle();
-        renderStyle();
-        OKSound.pluck(5);
-        norenSway = 1;
-      });
-    }));
-  }
-
-  function applyStyle() {
-    theme = styleColor();
-    evo = styleEvo();
-    document.documentElement.style.setProperty('--theme', theme);
-    renderSeigaiha();
-  }
-
   function renderDecor() {
-    renderStyle();
     const grid = $('ok-decor-grid');
     grid.innerHTML = '';
     const level = onigiri.level || 0;
@@ -2724,7 +2642,7 @@
     { jp: 'お客さん', title: 'Guests come from studying', text: 'Every 10 reviews in a deck sends a guest from that deck. They wait outside the door until you visit, so nothing is lost if you study for a long time.', scene: () => ({ x: 254, y: 18, w: 48, h: 112 }) },
     { jp: '大将', title: 'The chef', text: 'Guests are served automatically. Tap the chef to prep onigiri for the tray so guests are served straight away.', scene: () => ({ x: 104, y: 72, w: 76, h: 34 }) },
     { jp: '文', title: 'Tips', text: 'Happy guests leave mon (文). Tap coins to collect them, or they collect themselves. Spend mon on decor.', dom: '.ok-purse' },
-    { jp: '飾り', title: 'Decor & style', text: 'Buy decorations here. If you own several Onigiri restaurants, you can also mix one\'s colours with an evolution design.', dom: '#ok-b-decor' },
+    { jp: '飾り', title: 'Decor', text: 'Buy decorations with your mon. Some pieces unlock at higher Onigiri restaurant levels.', dom: '#ok-b-decor' },
     { jp: 'タマ', title: 'Tama, the shop cat', text: 'A gentle virtual pet. She eats scraps while you review, gets a fish for every guest, and grows as you study. She can\'t get sick or run away.', scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
     { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session.', dom: '#ok-timer' },
     { jp: '大入り', title: 'Big study sessions', text: 'Prefer to study in one go? Go ahead. When you come back, you can serve everyone at 4× speed or collect every tip at once.', dom: '#ok-status' },

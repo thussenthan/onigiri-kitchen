@@ -70,8 +70,9 @@
 }
 .okw-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .okw-spacer { flex: 1; }
-.okw-timer { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.okw-timer[data-phase="break"] .okw-jp { color: #6f9a5c; }
+.okw-today { font-size: 12px; color: var(--fg-subtle, #8b7b69); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.okw-today b { color: var(--fg, #2b2622); }
+.nightMode .okw-today b, .night_mode .okw-today b, .night-mode .okw-today b { color: var(--fg, #efe6d6); }
 .okw-btn {
   all: unset;
   cursor: pointer;
@@ -99,11 +100,10 @@
     background: linear-gradient(180deg, transparent 20%, rgba(20, 12, 6, 0.72));
   }
   .okw-top, .okw-sub { color: rgba(255, 246, 230, 0.85); }
-  .okw-sub span:last-child, .okw-timer { display: none; }
+  .okw-sub span:last-child, .okw-today { display: none; }
   .okw-big { font-size: 13px; }
   .okw-big b { font-size: 16px; }
   .okw-btn { border-color: rgba(255, 255, 255, 0.45); padding: 3px 8px; }
-  .okw-btn[data-act="timer"] { display: none; }
 }
 /* Tall (2+ rows): scene on top, info below */
 @container (min-height: 170px) and (min-width: 300px) {

@@ -73,9 +73,6 @@ def _defaults() -> Dict[str, Any]:
         "fish_fed": 0,
         "first_seen": anki_today(),
         "tutorial_done": False,
-        # Kitchen look: colour from one owned Onigiri restaurant + decoration
-        # from one owned evolution (None = follow what Onigiri has equipped).
-        "style": {"color": None, "evolution": None},
         "today": {"date": "", "reviews": 0, "focus_done": 0, "leech_guests": 0},
         "pet": petmod.defaults(),
     }
@@ -301,10 +298,6 @@ class KitchenState:
         self.save()
         return {"count": len(guests), "mon": total, "kinds": kinds, "decks": decks}
 
-    def set_style(self, color: Optional[str], evolution: Optional[str]) -> None:
-        self.data["style"] = {"color": color or None, "evolution": evolution or None}
-        self.save_soon()
-
     def set_tutorial_done(self, done: bool = True) -> None:
         self.data["tutorial_done"] = bool(done)
         self.save_soon()
@@ -353,5 +346,4 @@ class KitchenState:
             "today": dict(d["today"]),
             "firstSeen": d.get("first_seen"),
             "tutorialDone": bool(d.get("tutorial_done", False)),
-            "style": dict(d.get("style") or {"color": None, "evolution": None}),
         }

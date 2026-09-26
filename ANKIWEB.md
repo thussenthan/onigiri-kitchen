@@ -29,7 +29,7 @@ You study, guests arrive. You take a break, you get to enjoy them.
 - **Study in one big batch.** No limit on waiting guests. After a big session, serve everyone at 4× speed or collect every tip at once. Reviews from your phone count too once synced.
 - **Pomodoro timer.** One dango per focus session. The restaurant opens when your break starts, and nudges you back when it ends. Long breaks are festival nights with fireworks.
 - **Tama, the shop cat.** A gentle virtual pet. Studying feeds her, and she grows with total study days (never streaks), develops a personality, learns tricks and brings you gifts. She can't get sick, run away or die.
-- **Decor & style.** Guests tip in mon. Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish and more, and mix one Onigiri restaurant's colours with an evolution design.
+- **Decor.** Guests tip in mon. Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish and more.
 - **Home-screen widget:** add it to your Onigiri main menu from Onigiri's layout editor (or see it under your decks without Onigiri).
 - **A guided tour** the first time you open it, and a **目安箱 suggestion box** for ideas and bug reports.
 - **Matches your Onigiri theme:** your colours, font and dark mode.

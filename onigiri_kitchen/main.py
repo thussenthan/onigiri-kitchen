@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from aqt import gui_hooks, mw
 from aqt.deckbrowser import DeckBrowser
 from aqt.overview import Overview
-from aqt.qt import QAction, QDialog, QKeySequence, QShortcut, Qt, QVBoxLayout
+from aqt.qt import QAction, QDialog, QKeySequence, QShortcut, Qt, QTimer, QVBoxLayout
 from aqt.reviewer import Reviewer
 from aqt.utils import openLink, restoreGeom, saveGeom, tooltip
 from aqt.webview import AnkiWebView
@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -226,9 +226,9 @@ class KitchenDialog(QDialog):
         # page handles it and closes itself, leaving an empty grey dialog.
         self._close_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Close), self)
         self._close_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        self._close_shortcut.activated.connect(self.close)
+        self._close_shortcut.activated.connect(self.close_soon)
         try:
-            self.web.page().windowCloseRequested.connect(self.close)
+            self.web.page().windowCloseRequested.connect(self.close_soon)
         except Exception:
             pass
         layout = QVBoxLayout()
@@ -258,13 +258,20 @@ class KitchenDialog(QDialog):
         cmd, _, arg = message[len(CMD_PREFIX):].partition(":")
         return handle_kitchen_cmd(cmd, arg, self)
 
+    def close_soon(self) -> None:
+        """Close once the current event (e.g. a call from the web page) has
+        finished. Closing synchronously from inside a page callback tears the
+        page down mid-call and leaves an empty grey window (the Cmd+W bug)."""
+        QTimer.singleShot(0, self.close)
+
     def reject(self) -> None:
         # Esc closes the window (and frees it) instead of just hiding it.
-        self.close()
+        self.close_soon()
 
     def closeEvent(self, event: Any) -> None:
         self._cleanup()
-        super().closeEvent(event)
+        # Accept directly: QDialog.closeEvent would call reject() again.
+        event.accept()
 
     def _cleanup(self) -> None:
         global _dialog
@@ -392,7 +399,7 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         return conf()
     if cmd == "study":
         if dialog is not None:
-            dialog.close()
+            dialog.close_soon()
         if pomo.phase != "focus":
             pomo.start_focus()
         try:
@@ -411,47 +418,17 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         result["state"] = state.snapshot()
         result["pet"] = state.pet.snapshot()
         return result
-    if cmd == "style":
-        try:
-            info = json.loads(arg or "{}")
-        except ValueError:
-            info = {}
-        state.set_style(info.get("color"), info.get("evolution"))
-        return state.snapshot()
     if cmd == "tutorial":
         state.set_tutorial_done(arg != "reset")
         return None
     if cmd == "close":
         if dialog is not None:
-            dialog.close()
+            dialog.close_soon()
         return None
     return None
 
 
 # --------------------------------------------------- Onigiri home-screen widget
-def _style_color(progress: Dict[str, Any]) -> str:
-    """The kitchen's colour (same rule as styleColor() in kitchen.js)."""
-    chosen = (state.data.get("style") or {}).get("color")
-    for c in progress.get("colorThemes", []):
-        if chosen and c["id"] == chosen:
-            return c["theme"]
-    return progress.get("themeColor") or onigiri_link.DEFAULT_THEME_COLOR
-
-
-def _style_evo_tier(progress: Dict[str, Any]) -> int:
-    chosen = (state.data.get("style") or {}).get("evolution")
-    evos = progress.get("evolutions", [])
-    if chosen == "none" or not evos:
-        return 0
-    for e in evos:
-        if e["id"] == chosen:
-            return e["tier"]
-    for e in evos:
-        if e["id"] == progress.get("themeId"):
-            return e["tier"]
-    return evos[-1]["tier"]
-
-
 def widget_payload() -> Dict[str, Any]:
     state.sync_today(todays_reviews_by_deck(), conf().get("reviews_per_guest", 10))
     progress = onigiri_link.read_progress()
@@ -462,10 +439,10 @@ def widget_payload() -> Dict[str, Any]:
         "guests": len(state.data.get("guests", [])),
         "nextIn": max(1, per - int(best)),
         "reviews": int(state.data["today"].get("reviews", 0)),
+        "focusDone": int(state.data["today"].get("focus_done", 0)),
         "mon": int(state.data.get("mon", 0)),
         "pet": state.pet.snapshot(),
-        "theme": _style_color(progress),
-        "evoTier": _style_evo_tier(progress),
+        "theme": progress.get("themeColor") or onigiri_link.DEFAULT_THEME_COLOR,
         "timer": timer_payload(),
     }
 

@@ -12,10 +12,6 @@
   function esc(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
-  function fmt(ms) {
-    const s = Math.max(0, Math.round(ms / 1000));
-    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-  }
   function shade(hex, amt) {
     let h = String(hex || '#d49083').replace('#', '');
     if (h.length === 3) h = h.split('').map((c) => c + c).join('');
@@ -30,12 +26,6 @@
     if (p.tummy < 40) return 'hungry';
     if (p.love > 80) return 'adores you';
     return 'content';
-  }
-
-  function remaining(t) {
-    if (!t) return 0;
-    if (t.endsAt && !t.paused) return t.endsAt - Date.now();
-    return t.remaining || 0;
   }
 
   // ------------------------------------------------------------- scene
@@ -66,7 +56,7 @@
     for (let y = 31; y < H; y += 2) R(0, y, W, 1, '#c1ae70');
 
     // doorway with the noren in the kitchen's colour
-    const dx = Math.max(22, W - 26);
+    const dx = W >= 64 ? W - 26 : Math.max(2, W - 21);
     R(dx - 2, 5, 22, 2, '#3e2717');
     R(dx - 2, 7, 2, 22, '#3e2717');
     R(dx + 18, 7, 2, 22, '#3e2717');
@@ -86,8 +76,6 @@
     for (let p = 0; p < 3; p++) R(dx + 1 + p * 6 + (p === 1 ? sway : 0), 7, 5, 8, theme);
     R(dx, 7, 18, 1, shade(theme, -0.3));
     R(dx + 8, 10, 2, 2, '#fbf7ee');
-    // evolution stars over the door
-    for (let i = 0; i < Math.min(5, d.evoTier || 0); i++) R(dx + 3 + i * 3, 3, 1, 1, '#e8c25a');
 
     // red lantern
     const lit = night;
@@ -150,29 +138,26 @@
   // -------------------------------------------------------------- info
   function renderInfo(el, d) {
     const info = el.querySelector('.okw-info');
-    const t = (d.timer && d.timer.pomo) || { phase: 'idle' };
-    const phase = t.phase;
     const big = d.guests > 0
       ? `<b>${d.guests}</b> guest${d.guests === 1 ? '' : 's'} waiting`
       : `Next guest in <b>${d.nextIn}</b> review${d.nextIn === 1 ? '' : 's'}`;
-    const label = phase === 'focus' ? '集中' : phase === 'break' ? (t.longBreak ? '祭り' : '休憩') : '待機';
-    const clock = phase === 'idle' ? '' : fmt(remaining(t));
-    const toggle = phase === 'idle' ? '▶ Focus' : t.paused ? '▶ Resume' : '❚❚ Pause';
     const p = d.pet || {};
+    // The pomodoro timer already lives in the corner chip, so the widget shows
+    // today's progress instead.
+    const today = `<span class="okw-jp">今日</span><b>${d.reviews || 0}</b> review${d.reviews === 1 ? '' : 's'}` +
+      (d.focusDone ? ` · <b>${d.focusDone}</b> focus` : '');
     info.innerHTML =
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
       `<div class="okw-big">${big}</div>` +
       `<div class="okw-sub"><span>文 ${d.mon}</span><span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span></div>` +
       `<div class="okw-row">` +
-      `<span class="okw-timer" data-phase="${phase}"><span class="okw-jp">${label}</span>${clock}</span>` +
+      `<span class="okw-today">${today}</span>` +
       `<span class="okw-spacer"></span>` +
-      `<button class="okw-btn" data-act="timer">${toggle}</button>` +
       `<button class="okw-btn okw-primary" data-act="open">Visit</button>` +
       `</div>`;
     info.querySelectorAll('.okw-btn').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (b.dataset.act === 'open') send('open');
-      else send('timer:' + (phase === 'idle' ? 'start' : t.paused ? 'resume' : 'pause'));
+      send('open');
     }));
   }
 
@@ -216,22 +201,11 @@
     requestAnimationFrame(frame);
   }
 
-  // live timer updates pushed through the chip (see chip.js)
+  // Timer updates pushed through the chip (see chip.js): Tama naps in the
+  // widget scene during focus sessions.
   document.addEventListener('okitchen-timer', (e) => {
-    for (const w of widgets) {
-      w.d.timer = e.detail;
-      if (w.el.isConnected) renderInfo(w.el, w.d);
-    }
+    for (const w of widgets) w.d.timer = e.detail;
   });
-  setInterval(() => {
-    for (const w of widgets) {
-      const t = w.d.timer && w.d.timer.pomo;
-      if (t && t.phase !== 'idle' && w.el.isConnected) {
-        const clock = w.el.querySelector('.okw-timer');
-        if (clock) clock.lastChild.textContent = fmt(remaining(t));
-      }
-    }
-  }, 1000);
 
   window.OKWidget = { scan };
 
