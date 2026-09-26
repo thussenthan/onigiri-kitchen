@@ -19,8 +19,9 @@ from aqt.qt import QTimer
 
 from . import pet as petmod
 
-MAX_GUESTS = 15
-TAKEOUT_TIP = 2
+# There's no cap on waiting guests: people can study in one big batch and
+# catch up later. Guests last for the Anki day; at rollover anyone still
+# waiting takes their food to go and leaves their tip, so nothing is lost.
 MAX_LEECH_GUESTS_PER_DAY = 3
 
 # Decor you can buy with mon. `level` is the Onigiri restaurant level needed.
@@ -71,6 +72,10 @@ def _defaults() -> Dict[str, Any]:
         "onigiri_made": 0,
         "fish_fed": 0,
         "first_seen": anki_today(),
+        "tutorial_done": False,
+        # Kitchen look: colour from one owned Onigiri restaurant + decoration
+        # from one owned evolution (None = follow what Onigiri has equipped).
+        "style": {"color": None, "evolution": None},
         "today": {"date": "", "reviews": 0, "focus_done": 0, "leech_guests": 0},
         "pet": petmod.defaults(),
     }
@@ -135,18 +140,24 @@ class KitchenState:
     # --------------------------------------------------------------- daily
     def roll_day(self) -> None:
         today = anki_today()
-        if self.data["today"].get("date") != today:
-            self.data["today"] = {"date": today, "reviews": 0, "focus_done": 0, "leech_guests": 0}
+        if self.data["today"].get("date") == today:
+            return
+        # Yesterday's guests go home with takeout, tips still count.
+        leftover = self.data.get("guests") or []
+        if leftover and self.data["today"].get("date"):
+            tips = sum(self.tip_for(g) for g in leftover)
+            self.data["mon"] += tips
+            self.data["takeout"]["count"] += len(leftover)
+            self.data["takeout"]["mon"] += tips
+        self.data["guests"] = []
+        self.data["pending"] = {}
+        self.data["today"] = {"date": today, "reviews": 0, "focus_done": 0, "leech_guests": 0, "by_deck": {}}
+        self.save_soon()
 
     # -------------------------------------------------------------- guests
     def add_guest(self, guest: Dict[str, Any]) -> bool:
-        """Queue a guest. Returns False if the queue was full (became takeout)."""
+        """Queue a guest (no limit; they last until Anki's day rolls over)."""
         guests = self.data["guests"]
-        if len(guests) >= MAX_GUESTS:
-            self.data["takeout"]["count"] += 1
-            self.data["takeout"]["mon"] += TAKEOUT_TIP
-            self.data["mon"] += TAKEOUT_TIP
-            return False
         guest.setdefault("ts", int(time.time()))
         if guest.get("kind") == "golden":
             guests.insert(0, guest)
@@ -160,6 +171,9 @@ class KitchenState:
         self.pet_grew = self.pet.on_review(self.data["today"]["date"], leech_success)
         today = self.data["today"]
         today["reviews"] += 1
+        by_deck = today.get("by_deck")
+        if isinstance(by_deck, dict):
+            by_deck[deck] = by_deck.get(deck, 0) + 1
         pending = self.data["pending"]
         pending[deck] = pending.get(deck, 0) + 1
         new_guest = False
@@ -226,6 +240,75 @@ class KitchenState:
             hidden.append(item_id)
         self.save_soon()
 
+    def sync_today(self, db_counts: Dict[str, int], reviews_per_guest: int) -> int:
+        """Match today's guests to Anki's review log (catches reviews done on
+        other devices, or before the add-on was installed). Returns new guests."""
+        self.roll_day()
+        today = self.data["today"]
+        if not isinstance(today.get("by_deck"), dict):
+            # Save from an older version: start tracking from here without
+            # double-counting the reviews it already saw today.
+            today["by_deck"] = dict(db_counts)
+            self.save_soon()
+            return 0
+        by_deck = today["by_deck"]
+        n = max(1, int(reviews_per_guest))
+        before = len(self.data["guests"])
+        for deck, count in db_counts.items():
+            missing = int(count) - int(by_deck.get(deck, 0))
+            if missing <= 0:
+                continue
+            by_deck[deck] = int(count)
+            today["reviews"] += missing
+            for _ in range(missing):
+                self.pet.on_review(today["date"], False)
+            pending = self.data["pending"]
+            pending[deck] = pending.get(deck, 0) + missing
+            while pending[deck] >= n:
+                pending[deck] -= n
+                self.add_guest({"deck": deck, "kind": "regular", "reviews": n})
+        added = len(self.data["guests"]) - before
+        if added:
+            self.save_soon()
+        return added
+
+    # --------------------------------------------------------- catch-up
+    def tip_for(self, guest: Dict[str, Any]) -> int:
+        """Same tip rules as the animated service in kitchen.js."""
+        shown = [i for i in self.data["owned"] if i not in self.data["hidden"]]
+        kind = guest.get("kind")
+        amount = 12 if kind == "golden" else 6 if kind == "leech" else 3
+        if kind == "golden" and "tanuki" in shown:
+            amount *= 2
+        if "maneki" in shown:
+            amount += 1
+        return amount
+
+    def serve_all(self) -> Dict[str, Any]:
+        """Serve every waiting guest at once (after a big study session)."""
+        guests = self.data["guests"]
+        self.data["guests"] = []
+        total = 0
+        kinds: Dict[str, int] = {}
+        decks: Dict[str, int] = {}
+        for g in guests:
+            tip = self.tip_for(g)
+            total += tip
+            kinds[g.get("kind", "regular")] = kinds.get(g.get("kind", "regular"), 0) + 1
+            if g.get("deck"):
+                decks[g["deck"]] = decks.get(g["deck"], 0) + 1
+            self.pay(tip, g.get("deck"))
+        self.save()
+        return {"count": len(guests), "mon": total, "kinds": kinds, "decks": decks}
+
+    def set_style(self, color: Optional[str], evolution: Optional[str]) -> None:
+        self.data["style"] = {"color": color or None, "evolution": evolution or None}
+        self.save_soon()
+
+    def set_tutorial_done(self, done: bool = True) -> None:
+        self.data["tutorial_done"] = bool(done)
+        self.save_soon()
+
     def bump(self, key: str) -> None:
         if key in ("onigiri_made", "fish_fed"):
             self.data[key] = int(self.data.get(key, 0)) + 1
@@ -269,4 +352,6 @@ class KitchenState:
             "onigiriMade": d.get("onigiri_made", 0),
             "today": dict(d["today"]),
             "firstSeen": d.get("first_seen"),
+            "tutorialDone": bool(d.get("tutorial_done", False)),
+            "style": dict(d.get("style") or {"color": None, "evolution": None}),
         }

@@ -41,6 +41,13 @@ _FALLBACK_THEMES = {
     "restaurant_evo_garden": "#2F553D",
 }
 
+# Evolutions add a tier of decoration in the kitchen (stars, gold trim).
+EVOLUTION_TIERS = {
+    "onigiri_ii": 1, "onigiri_iii": 2, "onigiri_iv": 3, "onigiri_v": 4, "prev_onigiri_heaven": 5,
+    "restaurant_evo_i": 1, "restaurant_evo_ii": 2, "restaurant_evo_iii": 3, "restaurant_evo_iv": 4,
+    "restaurant_evo_legendary": 5, "restaurant_evo_garden": 6,
+}
+
 _package_cache: Optional[str] = None
 
 
@@ -91,6 +98,19 @@ def _collapse_xp(total_xp: int):
         level += 1
 
 
+def _item_info(pkg: str, item_id: str) -> Dict[str, Any]:
+    """Name and colour of an Onigiri restaurant or evolution (read from its module if loaded)."""
+    if item_id == "default":
+        return {"id": "default", "name": "Onigiri Restaurant", "theme": DEFAULT_THEME_COLOR}
+    mod = sys.modules.get(f"{pkg}.gamification.restaurant_level")
+    item = None
+    if mod is not None:
+        item = getattr(mod, "RESTAURANTS", {}).get(item_id) or getattr(mod, "EVOLUTIONS", {}).get(item_id)
+    name = (item or {}).get("name") or item_id.replace("_", " ").title()
+    theme = (item or {}).get("theme") or _FALLBACK_THEMES.get(item_id)
+    return {"id": item_id, "name": name, "theme": theme}
+
+
 def _theme_color(pkg: str, theme_id: str) -> str:
     if theme_id == "default":
         return DEFAULT_THEME_COLOR
@@ -113,6 +133,8 @@ def read_progress() -> Dict[str, Any]:
         "xpNext": _xp_for_next(0),
         "themeColor": DEFAULT_THEME_COLOR,
         "themeId": "default",
+        "colorThemes": [],  # owned restaurants with a colour, for the kitchen style picker
+        "evolutions": [],  # owned evolutions, lowest tier first
     }
     pkg = find_onigiri_package()
     if not pkg:
@@ -148,6 +170,25 @@ def read_progress() -> Dict[str, Any]:
     )
     if not re.fullmatch(r"#[0-9a-fA-F]{3,8}", result["themeColor"] or ""):
         result["themeColor"] = DEFAULT_THEME_COLOR
+
+    owned = data.get("owned_items") or ["default"]
+    if not isinstance(owned, list):
+        owned = ["default"]
+    if "default" not in owned:
+        owned = ["default"] + owned
+    colors, evos = [], []
+    for item_id in owned:
+        if not isinstance(item_id, str):
+            continue
+        info = _item_info(pkg, item_id)
+        if item_id in EVOLUTION_TIERS:
+            info["tier"] = EVOLUTION_TIERS[item_id]
+            evos.append(info)
+        if info.get("theme") and re.fullmatch(r"#[0-9a-fA-F]{3,8}", info["theme"]):
+            if all(c["theme"].lower() != info["theme"].lower() or c["id"] == item_id for c in colors):
+                colors.append({"id": item_id, "name": info["name"], "theme": info["theme"]})
+    result["colorThemes"] = colors
+    result["evolutions"] = sorted(evos, key=lambda e: e["tier"])
     return result
 
 

@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from aqt import gui_hooks, mw
 from aqt.deckbrowser import DeckBrowser
 from aqt.overview import Overview
-from aqt.qt import QAction, QDialog, QKeySequence, Qt, QVBoxLayout
+from aqt.qt import QAction, QDialog, QKeySequence, QShortcut, Qt, QVBoxLayout
 from aqt.reviewer import Reviewer
 from aqt.utils import openLink, restoreGeom, saveGeom, tooltip
 from aqt.webview import AnkiWebView
@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -165,8 +165,32 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
 
 
 # -------------------------------------------------------------------- window
+def todays_reviews_by_deck() -> Dict[str, int]:
+    """Today's reviews per deck from Anki's review log (respects the day rollover)."""
+    try:
+        start = (mw.col.sched.day_cutoff - 86400) * 1000
+        rows = mw.col.db.all(
+            "select case when c.odid != 0 then c.odid else c.did end as d, count() "
+            "from revlog r join cards c on c.id = r.cid "
+            "where r.id >= ? and r.type in (0, 1, 2, 3) group by d",
+            start,
+        )
+    except Exception as e:
+        print(f"Onigiri Kitchen: couldn't read today's reviews: {e}")
+        return {}
+    out: Dict[str, int] = {}
+    for did, count in rows:
+        try:
+            name = mw.col.decks.name(did)
+        except Exception:
+            name = "Deck"
+        out[name] = out.get(name, 0) + int(count)
+    return out
+
+
 def init_payload(reason: str = "") -> Dict[str, Any]:
     state.roll_day()
+    state.sync_today(todays_reviews_by_deck(), conf().get("reviews_per_guest", 10))
     away = state.pet.seen()
     state.save_soon()
     return {
@@ -197,6 +221,15 @@ class KitchenDialog(QDialog):
 
         self.web = AnkiWebView(self)
         self.web.set_bridge_command(self._on_bridge, self)
+        # Cmd+W (Ctrl+W elsewhere) should close the window. Without this the web
+        # page handles it and closes itself, leaving an empty grey dialog.
+        self._close_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Close), self)
+        self._close_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
+        self._close_shortcut.activated.connect(self.close)
+        try:
+            self.web.page().windowCloseRequested.connect(self.close)
+        except Exception:
+            pass
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.web)
@@ -248,10 +281,8 @@ class KitchenDialog(QDialog):
             pass
 
 
-def bug_report_url() -> str:
-    """A pre-filled GitHub issue with version info only (no personal data)."""
+def _version_info() -> str:
     import platform
-    from urllib.parse import quote
 
     try:
         from anki.buildinfo import version as anki_version
@@ -267,17 +298,34 @@ def bug_report_url() -> str:
                 onigiri_version = json.load(f).get("version") or onigiri_version
         except Exception:
             pass
-    body = (
-        "**What happened?**\n\n\n"
-        "**What did you expect?**\n\n\n"
-        "**Steps to reproduce**\n1. \n2. \n\n"
-        "---\n"
+    return (
         f"- Onigiri Kitchen: {VERSION}\n"
         f"- Anki: {anki_version}\n"
         f"- Onigiri: {onigiri_version}\n"
         f"- OS: {platform.system()} {platform.release()}\n"
     )
-    return f"{REPO_URL}/issues/new?title={quote('Bug: ')}&body={quote(body)}"
+
+
+def feedback_url(kind: str) -> str:
+    """A pre-filled GitHub issue. Only version info is included, nothing personal."""
+    from urllib.parse import quote
+
+    if kind == "idea":
+        title, label = "Idea: ", "enhancement"
+        body = (
+            "**What would you like to see?**\n\n\n"
+            "**Why would it help you?**\n\n\n"
+            "---\n" + _version_info()
+        )
+    else:
+        title, label = "Bug: ", "bug"
+        body = (
+            "**What happened?**\n\n\n"
+            "**What did you expect?**\n\n\n"
+            "**Steps to reproduce**\n1. \n2. \n\n"
+            "---\n" + _version_info()
+        )
+    return f"{REPO_URL}/issues/new?labels={label}&title={quote(title)}&body={quote(body)}"
 
 
 def open_kitchen(reason: str = "") -> None:
@@ -352,7 +400,25 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
             mw.moveToState("overview")
         return None
     if cmd == "report":
-        openLink(bug_report_url())
+        openLink(feedback_url("bug"))
+        return None
+    if cmd == "idea":
+        openLink(feedback_url("idea"))
+        return None
+    if cmd == "serveall":
+        result = state.serve_all()
+        result["state"] = state.snapshot()
+        result["pet"] = state.pet.snapshot()
+        return result
+    if cmd == "style":
+        try:
+            info = json.loads(arg or "{}")
+        except ValueError:
+            info = {}
+        state.set_style(info.get("color"), info.get("evolution"))
+        return state.snapshot()
+    if cmd == "tutorial":
+        state.set_tutorial_done(arg != "reset")
         return None
     if cmd == "close":
         if dialog is not None:

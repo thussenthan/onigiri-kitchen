@@ -16,15 +16,22 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   and the season. Everything is drawn in code, with no image files.
 - **Guests come from studying.** Every 10 reviews in a deck brings a guest from that deck, and each deck
   gets its own look. Getting a leech card right sends a grumpy sour-plum guest who cheers up once fed.
-  Finishing a focus session sends a golden guest.
+  Finishing a focus session sends a golden guest. Guests are counted from Anki's review log for the day, so
+  reviews on your phone count too, once synced.
+- **Study in one big batch, catch up later.** There's no limit on waiting guests. After a big session you can
+  serve everyone at 4× speed or collect every tip at once. Guests last until Anki's day rolls over, and anyone
+  still waiting then takes takeout and still leaves a tip.
 - **Pomodoro timer.** One dango per focus session. When a break starts, the restaurant opens. When the
   break ends, you get a gentle nudge back to your cards. Long breaks are festival nights with fireworks.
   A small dango timer sits in the corner of Anki's main screens.
 - **Tama, the shop cat.** A virtual pet with needs (tummy, love, energy) that your studying fills.
   She grows with total study days (never streaks), develops a personality from your habits, learns tricks
   and brings you gifts. **She can't get sick, run away or die.** Days off just make her sleepy.
-- **Decor.** Guests tip in 文 (*mon*). Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish, radio
-  and more, some unlocked by your Onigiri restaurant level.
+- **Decor & style.** Guests tip in 文 (*mon*). Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish,
+  radio and more, some unlocked by your Onigiri restaurant level. If you own several Onigiri restaurants, you can
+  combine one's colours with an evolution design (for example, Macaron Maison blue with evolution stars).
+- **A guided tour** the first time you open it, which you can replay from ⚙.
+- **目安箱 suggestion box** on the wall (and in ⚙) for feature ideas and bug reports.
 - **Matches your Onigiri theme.** It uses your Onigiri colours, font and dark mode automatically.
 - Mostly idle and fully optional: the chef, the cat, the menu tags (they play koto notes), the window, the
   lanterns and most decor all do something when clicked.
@@ -83,7 +90,9 @@ To test inside Anki, symlink or copy `onigiri_kitchen/` into your `addons21` fol
 
 ## Bugs & ideas
 
-Use **⚙ → Report a bug** in the kitchen, or [open an issue](https://github.com/thussenthan/onigiri-kitchen/issues).
+Click the **目安箱 suggestion box** on the restaurant wall, or use **⚙ → Suggest a feature / Report a bug**. Both
+open a pre-filled GitHub issue containing only version info. You can also
+[open an issue](https://github.com/thussenthan/onigiri-kitchen/issues/new/choose) directly.
 
 ## License
 

@@ -10,7 +10,7 @@ if (q.has('hour')) window.OK_DEBUG_HOUR = parseFloat(q.get('hour'));
 if (q.has('ff')) window.OK_DEBUG_FF = parseFloat(q.get('ff'));
 const decks = ['Pharm::Antibiotics','Anatomy::Heart','Biochem','Japanese::N4 Vocab','Micro::Bacteria'];
 const guests = [];
-for (let i=0;i<9;i++) guests.push({deck: decks[i%decks.length], kind: i===2?'leech':(i===0?'golden':'regular'), reviews:10});
+for (let i=0;i<parseInt(q.get('guests')||'9');i++) guests.push({deck: decks[i%decks.length], kind: i===2?'leech':(i===0?'golden':'regular'), reviews:10});
 const mock = { mon: 140, owned: (q.get('owned')||'bonsai,furin,kakejiku,maneki,daruma,kingyo,sakura,radio,matsuri,tanuki').split(',').filter(Boolean), hidden: [] };
 let phase = q.get('phase') || 'idle';
 function pomo(){ const now=Date.now(); return {phase, endsAt: phase==='idle'?null: now+ 4*60000, remaining:0, total: 5*60000, paused:false, rounds: 2, cycle: 4, longBreak: q.has('long'), focusCards: 37, cardGoal:0, now}; }
@@ -19,8 +19,8 @@ const petState = {name: q.get('petname')||'Tama', tummy: parseFloat(q.get('tummy
 window.OK_INIT = {
   pet: petState, petAway: parseInt(q.get('away')||'0'), petStages: STAGES, petGifts: GIFTS,
   reason: q.get('reason')||'',
-  onigiri: {found:true, name: q.get('name')||'My Restaurant', level: parseInt(q.get('level')||'24'), xpInto: 1219, xpNext: 2450, themeColor: '#'+(q.get('color')||'D07A5F')},
-  state: {mon: mock.mon, owned: mock.owned, hidden: [], guestsWaiting: guests.length, servedTotal: 0, today:{date:'2026-09-25', reviews:142, focus_done:2}, firstSeen:'2026-09-01'},
+  onigiri: {found:true, name: q.get('name')||'My Restaurant', level: parseInt(q.get('level')||'24'), xpInto: 1219, xpNext: 2450, themeColor: '#'+(q.get('color')||'D07A5F'), themeId: 'restaurant_evo_i', colorThemes: [{id:'default',name:'Onigiri Restaurant',theme:'#D49083'},{id:'macaron_maison',name:'Macaron Maison',theme:'#AFC3D6'},{id:'restaurant_evo_i',name:'Restaurant I Star',theme:'#D07A5F'}], evolutions: [{id:'restaurant_evo_i',name:'Restaurant I Star',tier:parseInt(q.get('tier')||'1')}]},
+  state: {mon: mock.mon, owned: mock.owned, hidden: [], guestsWaiting: guests.length, servedTotal: 0, today:{date:'2026-09-25', reviews:142, focus_done:2}, firstSeen:'2026-09-01', tutorialDone: !q.has('tour'), style: {color: q.get('stylecolor')||null, evolution: null}},
   takeout: q.has('clean') ? {count:0, mon:0} : {count: 2, mon: 4},
   catalog: [
     {id:'bonsai',name:'Bonsai',jp:'盆栽',level:0,price:15,desc:'A patient little pine.'},
@@ -46,6 +46,8 @@ window.pycmd = function(msg, cb){
   else if (cmd==='pet') { if (arg==='feed') petState.fish--; petState.love=Math.min(100,petState.love+5); r={ok:true,msg:'',pet:petState}; }
   else if (cmd==='petgift') { const gft = q.has('gift') ? Object.assign({}, GIFTS.find(x=>x.id===q.get('gift'))||GIFTS[11]) : null; if (gft && gft.id==='omikuji') gft.fortune={jp:'大吉',text:'Great blessing. Your cards will stick today.'}; r={gift:gft, pet:petState}; }
   else if (cmd==='petname') { petState.name=arg; r=petState; }
+  else if (cmd==='serveall') { const n=guests.length; guests.length=0; mock.mon+=n*3; r={count:n, mon:n*3, kinds:{regular:n}, decks:{a:1,b:1}, state:{mon:mock.mon, guestsWaiting:0}, pet: petState}; }
+  else if (cmd==='style') { const st=JSON.parse(arg); r={style: st, mon: mock.mon, guestsWaiting: guests.length}; }
   else if (cmd==='toggle') { const h=mock.hidden; const i=h.indexOf(arg); if(i>=0) h.splice(i,1); else h.push(arg); r={mon:mock.mon, owned:mock.owned, hidden:h, guestsWaiting: guests.length}; }
   cb && cb(r);
 };

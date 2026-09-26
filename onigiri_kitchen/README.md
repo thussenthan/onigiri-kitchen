@@ -17,7 +17,8 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
   little shop-front icon next to Onigiri's buttons, click the dango timer in the corner, or use
   **Tools → Onigiri Kitchen** (Ctrl+Shift+K). Shift-click the picture to get Onigiri's normal
   expanded view.
-- **Guests come from studying:** every 10 reviews in a deck brings a guest from that deck.
+- **Guests come from studying:** every 10 reviews in a deck brings a guest from that deck. There's no limit, so
+  study in one big batch and catch up later: serve everyone at 4× or collect all tips at once.
   Each deck has its own look. Getting a leech card right sends a grumpy sour-plum guest who
   cheers up once fed. Finishing a focus session sends a golden guest.
 - **Guests tip in 文 (mon):** use mon to buy decor. Some pieces unlock at higher Onigiri

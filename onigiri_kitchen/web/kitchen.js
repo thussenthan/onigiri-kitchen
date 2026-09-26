@@ -120,8 +120,26 @@
   let conf = Object.assign({}, INIT.conf || {});
   let timer = (INIT.timer && INIT.timer.pomo) || { phase: 'idle' };
   let dispMon = S.mon;
-  const theme = onigiri.themeColor || '#D49083';
+  // Kitchen style: colour from one owned Onigiri restaurant + decoration from
+  // one owned evolution, so e.g. Macaron Maison blue can combine with an
+  // evolution's stars. Defaults follow what Onigiri has equipped.
+  function styleColor() {
+    const st = S.style || {};
+    const t = st.color && (onigiri.colorThemes || []).find((c) => c.id === st.color);
+    return (t && t.theme) || onigiri.themeColor || '#D49083';
+  }
+  function styleEvo() {
+    const st = S.style || {};
+    const evos = onigiri.evolutions || [];
+    if (st.evolution === 'none') return null;
+    const picked = st.evolution && evos.find((e) => e.id === st.evolution);
+    if (picked) return picked;
+    return evos.find((e) => e.id === onigiri.themeId) || evos[evos.length - 1] || null;
+  }
+  let theme = styleColor();
+  let evo = styleEvo();
   document.documentElement.style.setProperty('--theme', theme);
+  let rush = false;
 
   const SEAT_X = [54, 132, 82, 160, 216];
   const seatCount = clamp(2 + Math.floor((onigiri.level || 0) / 5), 2, 5);
@@ -650,6 +668,9 @@
         R(px + off, y + r, pw - 1, 1, r < 2 ? shade(nc, -0.25) : nc);
       }
     }
+    if (evo && (evo.tier || 0) >= 5) {
+      for (let p = 0; p < panels; p++) R(x + 1 + p * pw, y + 29, pw - 1, 1, C.gold);
+    }
     // emblem: white circle with an onigiri
     ellipse(x + w / 2, y + 16, 6, 6, '#fbf7ee');
     R(x + w / 2 - 0.5, y + 12, 1, 1, nc);
@@ -1019,7 +1040,7 @@
     R(BOWL_X - 3, 175, 7, 1, '#dff2f7');
     R(BOWL_X - 4, 175, 9, 1, '#5a8cc4');
     if (tama.state === 'eat') R(BOWL_X - 2, 174, 5, 1, '#e8b8a0');
-    regions.push({ x: BOWL_X - 5, y: 172, w: 11, h: 7, label: `<b>お皿</b> ${esc(pet.name)}'s bowl\n${pet.fish} fish saved · tap to feed`, click: () => petAction('feed') });
+    regions.push({ x: BOWL_X - 5, y: 172, w: 11, h: 7, label: `<b>ごはん皿</b> ${esc(pet.name)}'s food dish\n${pet.fish} fish saved · tap to feed`, click: () => petAction('feed') });
   }
 
   function esc(s) {
@@ -1382,7 +1403,7 @@
       floorGifts.push({ gift: res.gift, x: gx, t: 0 });
       tamaSet('sit', 5);
       OKSound.meow();
-      say([`${pet.name}がお土産を!`, `${pet.name} brought you something!`], { x: tama.x, y: 150 });
+      say([`${pet.name}が何か持ってきた!`, `${pet.name} brought you something!`], { x: tama.x, y: 150 });
     });
   }
 
@@ -1766,7 +1787,7 @@
           dispMon += cn.amount;
           bumpPurse();
         }
-      } else if (cn.t > 16) {
+      } else if (cn.t > (rush ? 1.5 : 16)) {
         collectCoin(cn);
       }
     }
@@ -1812,7 +1833,7 @@
         p.vy += rand(-6, 6) * dt;
       } else if (p.type === 'momiji' || p.type === 'petal' || p.type === 'petal-out' || p.type === 'snow') {
         p.vx += Math.sin(time * 2 + p.y) * 4 * dt;
-      } else if (p.type === 'crumb') {
+      } else if (p.type === 'crumb' || p.type === 'coin') {
         p.vy += 60 * dt;
       } else if (p.type === 'spark') {
         p.vy += 14 * dt;
@@ -1821,7 +1842,7 @@
       p.x += (p.vx || 0) * dt;
       p.y += (p.vy || 0) * dt;
       if (p.clip && (p.y > WIN.y + WIN.h - 4 || p.x < WIN.x + 2 || p.x > WIN.x + WIN.w - 3)) p.life = 0;
-      if (p.type === 'petal' && p.y > 178) p.life = 0;
+      if ((p.type === 'petal' || p.type === 'coin') && p.y > 178) p.life = 0;
     }
     particles = particles.filter((p) => p.life > 0);
     if (particles.length > 400) particles.splice(0, particles.length - 400);
@@ -1852,6 +1873,10 @@
         const y = Math.round(p.y);
         R(x + 2, y, 1, 4, p.c); R(x, y + 3, 2, 2, p.c); P(x + 3, y, p.c);
         g.globalAlpha = 1;
+      } else if (p.type === 'coin') {
+        const x = Math.round(p.x);
+        const y = Math.round(p.y);
+        R(x - 1, y, 3, 1, C.gold); R(x - 1, y + 1, 3, 1, C.goldDk); P(x, y, '#fff6cc');
       } else if (p.type === 'momiji') {
         R(p.x, p.y, 2, 2, p.c); P(p.x + 1, p.y - 1, p.c);
       } else {
@@ -1942,6 +1967,39 @@
     }
   }
 
+  // ------------------------------------------ 目安箱 suggestion box (wall)
+  const MEYASU = { x: 144, y: 60, w: 15, h: 15 };
+  function drawMeyasubako() {
+    const { x, y } = MEYASU;
+    R(x + 7, y - 3, 1, 3, '#2b1c12');
+    R(x - 1, y, 17, 2, C.woodDk);
+    R(x, y + 2, 15, 12, '#9a6a3c');
+    R(x, y + 2, 15, 1, '#b98a54');
+    R(x + 4, y + 4, 7, 1, '#2b1c12');
+    R(x + 1, y + 7, 13, 6, '#efe3c4');
+    R(x, y + 14, 15, 1, C.woodDk);
+    regions.push({ x: x - 1, y: y - 3, w: 17, h: 18, label: '<b>目安箱</b> Suggestion box\nShare an idea or report a bug', click: feedbackModal });
+  }
+
+  // Evolution decoration: a star plaque over the door, gold trim at Legendary.
+  function drawEvolution() {
+    if (!evo) return;
+    const tier = evo.tier || 1;
+    const stars = Math.min(5, tier);
+    const w = stars * 5 + 5;
+    const x = 277 - Math.round(w / 2);
+    const y = 8;
+    R(x, y, w, 8, C.woodDk);
+    R(x + 1, y + 1, w - 2, 6, tier >= 5 ? '#3a2a14' : '#5a3a22');
+    for (let i = 0; i < stars; i++) {
+      const sx = x + 3 + i * 5;
+      const col = tier >= 5 ? '#ffd86a' : C.gold;
+      P(sx + 1, y + 2, col); R(sx, y + 3, 3, 1, col); P(sx, y + 4, col); P(sx + 2, y + 4, col);
+    }
+    if (tier >= 6) { P(x - 1, y + 2, '#6a9a4a'); P(x - 2, y + 3, '#8cbf5e'); P(x + w, y + 2, '#6a9a4a'); P(x + w + 1, y + 3, '#8cbf5e'); }
+    regions.push({ x, y, w, h: 8, label: `<b>${esc(evo.name)}</b>\nEvolution design${(S.style || {}).color ? ' with your chosen colours' : ''}`, click: () => { OKSound.chime(); spawnHearts(277, 14, 1); } });
+  }
+
   // ------------------------------------------------------------ hi-res text
   function drawText() {
     const s = cssScale * dpr;
@@ -1969,6 +2027,10 @@
     v.fillStyle = preparing ? '#6b5a4a' : '#9a2f22';
     v.font = `700 ${Math.round(4.2 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
     (preparing ? '準備中' : '営業中').split('').forEach((ch, k) => v.fillText(ch, 245.5 * s, (67.5 + k * 6.5) * s));
+    // suggestion box label
+    v.fillStyle = '#5a3a22';
+    v.font = `700 ${Math.round(3.3 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
+    ['目', '安', '箱'].forEach((ch, k) => v.fillText(ch, (MEYASU.x + 3.5 + k * 4) * s, (MEYASU.y + 10.2) * s));
     // akachochin kanji
     v.fillStyle = 'rgba(30,14,10,0.85)';
     v.font = `700 ${Math.round(4.6 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
@@ -1994,6 +2056,8 @@
   // ------------------------------------------------------------------ loop
   function update(dt) {
     time += dt;
+    // Rush mode speeds up service (not Tama or the scenery) to catch up fast.
+    const gdt = rush ? dt * 4 : dt;
     for (const k of Object.keys(shake)) shake[k] = Math.max(0, shake[k] - dt);
     norenSway = Math.max(0, norenSway - dt * 0.8);
 
@@ -2003,8 +2067,8 @@
     chef.lookT -= dt;
     if (chef.lookT < 0) { chef.look = pick([-1, 0, 0, 1]); chef.lookT = rand(2, 5); }
     if (chef.state === 'make') {
-      chef.t += dt;
-      if (Math.floor(chef.t * 6) !== Math.floor((chef.t - dt) * 6) && Math.floor(chef.t * 6) % 2) {
+      chef.t += gdt;
+      if (Math.floor(chef.t * 6) !== Math.floor((chef.t - gdt) * 6) && Math.floor(chef.t * 6) % 2) {
         particles.push({ x: 120 + rand(0, 3), y: 98, vx: rand(-8, 8), vy: -rand(8, 14), life: 0.45, c: C.rice, type: 'crumb' });
       }
       if (chef.t > 1.8) {
@@ -2036,9 +2100,9 @@
     }
 
     // guests arrive
-    spawnTimer -= dt;
+    spawnTimer -= gdt;
     if (spawnTimer <= 0) {
-      spawnTimer = rand(3.5, 6.5);
+      spawnTimer = rush ? rand(1.2, 2) : rand(3.5, 6.5);
       if (!claiming && freeSeat() && (S.guestsWaiting || 0) > 0) {
         claiming = true;
         send('claim', null, (guest) => {
@@ -2053,10 +2117,17 @@
         });
       }
     }
-    customers.forEach((c) => updateCustomer(c, dt));
+    customers.forEach((c) => updateCustomer(c, gdt));
     customers = customers.filter((c) => !c.gone);
-    updatePlates(dt);
-    updateCoins(dt);
+    updatePlates(gdt);
+    updateCoins(gdt);
+    if (rush && !claiming && (S.guestsWaiting || 0) === 0 && customers.length === 0) {
+      rush = false;
+      renderRushBtn();
+      toast('全員満足 · Everyone served! All caught up');
+      OKSound.fanfare();
+      spawnHearts(tama.x, 150, 2);
+    }
 
     // outside world
     walkerTimer -= dt;
@@ -2095,6 +2166,8 @@
     drawSparrow();
     drawMenu();
     drawWallDecor();
+    drawMeyasubako();
+    drawEvolution();
     drawDoor(h);
     drawLanterns(lit);
     drawChef();
@@ -2257,12 +2330,84 @@
     if (timer.phase === 'focus') {
       el.innerHTML = `<span class="jp">準備中</span>Focus session running. Guests are lining up while you study.`;
     } else if (waiting > 0) {
-      el.innerHTML = `<span class="jp">行列</span>${waiting} guest${waiting === 1 ? '' : 's'} waiting outside · ${inside} inside`;
+      el.innerHTML = `<span class="jp">行列</span>${waiting} guest${waiting === 1 ? '' : 's'} waiting outside · ${inside} inside` + (rush ? ' · serving at 4×' : '');
     } else if (inside > 0) {
       el.innerHTML = `<span class="jp">営業中</span>${inside} guest${inside === 1 ? '' : 's'} dining · every ${per} reviews brings another`;
     } else {
       el.innerHTML = `<span class="jp">静か</span>A quiet moment. Every ${per} reviews in a deck brings a guest here.`;
     }
+  }
+
+  function renderRushBtn() {
+    const b = $('ok-b-rush');
+    const waiting = (S.guestsWaiting || 0) + customers.length;
+    b.hidden = !(waiting > 0 && timer.phase !== 'focus');
+    b.classList.toggle('on', rush);
+    b.innerHTML = rush ? '<span class="jp">急</span> 4× on' : '<span class="jp">急</span> Serve faster';
+  }
+  setInterval(renderRushBtn, 1000);
+
+  function startRush() {
+    rush = true;
+    spawnTimer = 0;
+    renderRushBtn();
+    updateStatus();
+    OKSound.pluck(6);
+  }
+
+  function serveAll() {
+    send('serveall', null, (res) => {
+      if (!res) return;
+      if (res.state) S = Object.assign(S, res.state);
+      if (res.pet) { pet = res.pet; renderPetPanel(); }
+      const count = res.count || 0;
+      if (!count) { toast('Nobody is waiting right now.'); return; }
+      dispMon += res.mon || 0;
+      bumpPurse();
+      for (let i = 0; i < Math.min(60, count * 3); i++) {
+        particles.push({ x: rand(20, 300), y: rand(-40, 0), vx: rand(-6, 6), vy: rand(10, 40), life: 4, c: C.gold, type: 'coin' });
+      }
+      OKSound.fanfare();
+      setTimeout(() => OKSound.coin(), 300);
+      spawnHearts(tama.x, 150, 3);
+      updateStatus();
+      renderRushBtn();
+      const k = res.kinds || {};
+      const extras = [];
+      if (k.golden) extras.push(`${k.golden} golden`);
+      if (k.leech) extras.push(`${k.leech} sour plum${k.leech === 1 ? '' : 's'}`);
+      const deckCount = Object.keys(res.decks || {}).length;
+      modal('完売', 'Sold out!',
+        `Served <b>${count}</b> guest${count === 1 ? '' : 's'}${extras.length ? ' (' + extras.join(', ') + ')' : ''}` +
+        `${deckCount ? ` from <b>${deckCount}</b> deck${deckCount === 1 ? '' : 's'}` : ''}.<br>` +
+        `Tips: <b>+${res.mon} mon</b> · ${esc(pet.name)} got <b>${Math.min(count, 20)}</b> fish saved.`,
+        [['やった!<small>Nice</small>', 'ok-hanko ok-hanko-wide', null]]);
+    });
+  }
+
+  // After a big study session: choose how to catch up.
+  function maybeCatchUp() {
+    const waiting = S.guestsWaiting || 0;
+    if (waiting < 6 || !$('ok-modal').hidden) return false;
+    modal('大入り', `Full house! ${waiting} guests are waiting`,
+      'Great study session! Nothing was lost. How would you like to catch up?',
+      [
+        ['<span class="jp">急</span> Serve everyone at 4×', 'ok-hanko', startRush],
+        ['<span class="jp">文</span> Collect all tips now', 'ok-foot-btn', serveAll],
+        ['At my own pace', 'ok-ghost', null],
+      ]);
+    return true;
+  }
+
+  function feedbackModal() {
+    OKSound.pluck(4);
+    modal('目安箱', 'Suggestion box',
+      'Have an idea for the kitchen or found something broken?<br>Both open a short form on GitHub (a free account is needed).',
+      [
+        ['💡 Suggest a feature', 'ok-hanko', () => send('idea')],
+        ['🐞 Report a bug', 'ok-foot-btn', () => send('report')],
+        ['Close', 'ok-ghost', null],
+      ]);
   }
 
   function renderHeader() {
@@ -2299,12 +2444,12 @@
       phase.textContent = timer.longBreak ? '祭り · Long break' : '休憩 · Break';
       clock.textContent = fmt(remaining());
     } else {
-      phase.textContent = '準備 · Ready';
+      phase.textContent = '待機 · Ready';
       clock.textContent = fmt((conf.focus_minutes || 25) * 60000);
     }
     if (timer.phase === 'idle') main.innerHTML = '開始<small>Start</small>';
     else if (timer.paused) main.innerHTML = '再開<small>Resume</small>';
-    else main.innerHTML = '休止<small>Pause</small>';
+    else main.innerHTML = '一時停止<small>Pause</small>';
     // dango skewer
     const sk = $('ok-skewer');
     const cycle = timer.cycle || conf.rounds_before_long_break || 4;
@@ -2334,6 +2479,11 @@
   });
   $('ok-t-set').addEventListener('click', () => togglePanel('ok-settings'));
   $('ok-report').addEventListener('click', () => send('report'));
+  $('ok-idea').addEventListener('click', () => send('idea'));
+  $('ok-tour-replay').addEventListener('click', () => { $('ok-settings').hidden = true; startTour(); });
+  $('ok-b-rush').addEventListener('click', () => {
+    if (rush) { rush = false; renderRushBtn(); updateStatus(); } else startRush();
+  });
   $('ok-version').textContent = INIT.version ? 'v' + INIT.version : '';
   $('ok-t-reset').addEventListener('click', () => {
     send('timer', 'reset', (r) => r && OK.onTimer(r));
@@ -2350,6 +2500,16 @@
   }
   document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => { $(b.dataset.close).hidden = true; }));
   document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'w' || e.key === 'W')) {
+      e.preventDefault();
+      send('close');
+      return;
+    }
+    if (tourIdx >= 0) {
+      if (e.key === 'Escape') { endTour(); e.preventDefault(); e.stopPropagation(); return; }
+      if (e.key === 'ArrowRight' || e.key === 'Enter') { tourGo(tourIdx + 1); e.preventDefault(); return; }
+      if (e.key === 'ArrowLeft') { tourGo(tourIdx - 1); e.preventDefault(); return; }
+    }
     if (e.key === 'Escape') {
       const open = document.querySelector('.ok-panel:not([hidden]), .ok-modal:not([hidden])');
       if (open) { open.hidden = true; e.preventDefault(); e.stopPropagation(); }
@@ -2396,7 +2556,49 @@
 
   // ----------------------------------------------------------------- decor
   const MON_SVG = document.querySelector('.ok-mon-icon').outerHTML;
+  function renderStyle() {
+    const box = $('ok-style');
+    const colors = onigiri.colorThemes || [];
+    const evos = onigiri.evolutions || [];
+    if (!onigiri.found || (colors.length < 2 && !evos.length)) { box.hidden = true; return; }
+    box.hidden = false;
+    const st = S.style || {};
+    const chip = (group, id, label, swatch, on) =>
+      `<button class="ok-chip${on ? ' on' : ''}" data-group="${group}" data-id="${id}">` +
+      (swatch ? `<i style="background:${swatch}"></i>` : '') + `${esc(label)}</button>`;
+    let html = '<div class="ok-style-row"><b class="jp">色</b><span>Colour</span><div>' +
+      chip('color', '', "Onigiri's current", onigiri.themeColor, !st.color);
+    colors.forEach((c) => { html += chip('color', c.id, c.name, c.theme, st.color === c.id); });
+    html += '</div></div>';
+    if (evos.length) {
+      html += '<div class="ok-style-row"><b class="jp">進化</b><span>Evolution design</span><div>' +
+        chip('evolution', '', 'Automatic', null, !st.evolution) + chip('evolution', 'none', 'None', null, st.evolution === 'none');
+      evos.forEach((e) => { html += chip('evolution', e.id, `${'★'.repeat(Math.min(5, e.tier))} ${e.name}`, null, st.evolution === e.id); });
+      html += '</div></div>';
+    }
+    box.innerHTML = html;
+    box.querySelectorAll('.ok-chip').forEach((b) => b.addEventListener('click', () => {
+      const next = Object.assign({ color: null, evolution: null }, S.style || {});
+      next[b.dataset.group] = b.dataset.id || null;
+      send('style', JSON.stringify(next), (snap) => {
+        if (snap) S = Object.assign(S, snap);
+        applyStyle();
+        renderStyle();
+        OKSound.pluck(5);
+        norenSway = 1;
+      });
+    }));
+  }
+
+  function applyStyle() {
+    theme = styleColor();
+    evo = styleEvo();
+    document.documentElement.style.setProperty('--theme', theme);
+    renderSeigaiha();
+  }
+
   function renderDecor() {
+    renderStyle();
     const grid = $('ok-decor-grid');
     grid.innerHTML = '';
     const level = onigiri.level || 0;
@@ -2473,6 +2675,147 @@
     gRef = prev;
   }
 
+  // ------------------------------------------------ 青海波 seigaiha pattern
+  // Drawn on a canvas (rows painted top to bottom so each scale overlaps the
+  // one above) in the restaurant's colour, then used as a tiling background.
+  function renderSeigaiha() {
+    const css = getComputedStyle(document.body);
+    const bgc = (css.getPropertyValue('--paper') || '#f4ecdd').trim() || '#f4ecdd';
+    const k = 2;
+    const r = 10 * k;
+    const tw = 2 * r;
+    const th = r;
+    // keep the lines visible: darken the colour on light themes, lighten on dark
+    const lum = (hex) => { const [r0, g0, b0] = hexToRgb(hex); return (0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0) / 255; };
+    let bgLum = 0.9;
+    try { if (/^#[0-9a-f]{3,8}$/i.test(bgc)) bgLum = lum(bgc); } catch (e) {}
+    const stroke = bgLum > 0.5 ? shade(theme, -0.35) : shade(theme, 0.15);
+    const cv = document.createElement('canvas');
+    cv.width = tw;
+    cv.height = th;
+    const c = cv.getContext('2d');
+    c.lineWidth = 1.3 * k;
+    let row = 0;
+    for (let y = -2 * r; y <= th + 2 * r; y += r / 2, row++) {
+      const off = row % 2 ? r : 0;
+      for (let x = off - 2 * r; x <= tw + 2 * r; x += 2 * r) {
+        c.fillStyle = bgc;
+        c.beginPath();
+        c.arc(x, y, r, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = stroke;
+        c.globalAlpha = 0.75;
+        [0.93, 0.72, 0.51, 0.3].forEach((f) => {
+          c.beginPath();
+          c.arc(x, y, r * f, Math.PI, Math.PI * 2);
+          c.stroke();
+        });
+        c.globalAlpha = 1;
+      }
+    }
+    const root = document.documentElement.style;
+    root.setProperty('--seigaiha', `url(${cv.toDataURL()})`);
+    root.setProperty('--seigaiha-size', `${tw / k}px ${th / k}px`);
+  }
+
+  // ------------------------------------------------------------ tutorial
+  const TOUR = [
+    { jp: 'ようこそ', title: 'Welcome to your restaurant!', text: 'This little onigiri shop runs by itself. Watch it, or click around, since almost everything does something.' },
+    { jp: 'お客さん', title: 'Guests come from studying', text: 'Every 10 reviews in a deck sends a guest from that deck. They wait outside the door until you visit, so nothing is lost if you study for a long time.', scene: () => ({ x: 254, y: 18, w: 48, h: 112 }) },
+    { jp: '大将', title: 'The chef', text: 'Guests are served automatically. Tap the chef to prep onigiri for the tray so guests are served straight away.', scene: () => ({ x: 104, y: 72, w: 76, h: 34 }) },
+    { jp: '文', title: 'Tips', text: 'Happy guests leave mon (文). Tap coins to collect them, or they collect themselves. Spend mon on decor.', dom: '.ok-purse' },
+    { jp: '飾り', title: 'Decor & style', text: 'Buy decorations here. If you own several Onigiri restaurants, you can also mix one\'s colours with an evolution design.', dom: '#ok-b-decor' },
+    { jp: 'タマ', title: 'Tama, the shop cat', text: 'A gentle virtual pet. She eats scraps while you review, gets a fish for every guest, and grows as you study. She can\'t get sick or run away.', scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
+    { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session.', dom: '#ok-timer' },
+    { jp: '大入り', title: 'Big study sessions', text: 'Prefer to study in one go? Go ahead. When you come back, you can serve everyone at 4× speed or collect every tip at once.', dom: '#ok-status' },
+    { jp: '目安箱', title: 'Ideas & bugs', text: 'Use the suggestion box on the wall (or ⚙ settings) to suggest features or report bugs. You can replay this tour from ⚙.', scene: () => ({ x: MEYASU.x - 3, y: MEYASU.y - 5, w: MEYASU.w + 6, h: MEYASU.h + 7 }) },
+  ];
+  let tourIdx = -1;
+
+  function sceneRect(rc) {
+    const r = view.getBoundingClientRect();
+    const sx = r.width / W;
+    const sy = r.height / H;
+    return { left: r.left + rc.x * sx, top: r.top + rc.y * sy, width: rc.w * sx, height: rc.h * sy };
+  }
+
+  function startTour() {
+    document.querySelectorAll('.ok-panel').forEach((p) => { p.hidden = true; });
+    $('ok-modal').hidden = true;
+    $('ok-tour').hidden = false;
+    tourGo(0);
+  }
+
+  function endTour() {
+    tourIdx = -1;
+    $('ok-tour').hidden = true;
+    send('tutorial', 'done');
+    S.tutorialDone = true;
+    setTimeout(maybeCatchUp, 400);
+  }
+
+  function tourGo(i) {
+    if (i < 0) return;
+    if (i >= TOUR.length) { endTour(); OKSound.phraseUp(); return; }
+    tourIdx = i;
+    const step = TOUR[i];
+    $('ok-tour-step').textContent = `${i + 1} / ${TOUR.length}`;
+    $('ok-tour-jp').textContent = step.jp;
+    $('ok-tour-title').textContent = step.title;
+    $('ok-tour-text').textContent = step.text;
+    $('ok-tour-back').disabled = i === 0;
+    $('ok-tour-next').innerHTML = i === TOUR.length - 1 ? '始めよう<small>Let\'s start</small>' : '次へ<small>Next</small>';
+    OKSound.pluck(2 + (i % 6));
+    positionTour();
+  }
+
+  function positionTour() {
+    if (tourIdx < 0) return;
+    const step = TOUR[tourIdx];
+    const spot = $('ok-tour-spot');
+    const card = $('ok-tour-card');
+    let rect = null;
+    if (step.scene) rect = sceneRect(step.scene());
+    else if (step.dom) {
+      const el = document.querySelector(step.dom);
+      if (el) rect = el.getBoundingClientRect();
+    }
+    const pad = 6;
+    if (rect) {
+      spot.style.left = rect.left - pad + 'px';
+      spot.style.top = rect.top - pad + 'px';
+      spot.style.width = rect.width + pad * 2 + 'px';
+      spot.style.height = rect.height + pad * 2 + 'px';
+      spot.classList.remove('none');
+    } else {
+      spot.style.left = window.innerWidth / 2 + 'px';
+      spot.style.top = window.innerHeight / 2 + 'px';
+      spot.style.width = '0px';
+      spot.style.height = '0px';
+      spot.classList.add('none');
+    }
+    // card: below the target if there's room, otherwise above; centred if no target
+    const cw = card.offsetWidth;
+    const ch = card.offsetHeight;
+    let left;
+    let top;
+    if (!rect) {
+      left = (window.innerWidth - cw) / 2;
+      top = (window.innerHeight - ch) / 2;
+    } else {
+      left = rect.left + rect.width / 2 - cw / 2;
+      top = rect.top + rect.height + pad + 12;
+      if (top + ch > window.innerHeight - 12) top = rect.top - pad - 12 - ch;
+      if (top < 12) top = Math.min(window.innerHeight - ch - 12, rect.top + rect.height + 12);
+    }
+    card.style.left = clamp(left, 12, window.innerWidth - cw - 12) + 'px';
+    card.style.top = clamp(top, 12, window.innerHeight - ch - 12) + 'px';
+  }
+  setInterval(positionTour, 250);
+  $('ok-tour-next').addEventListener('click', () => tourGo(tourIdx + 1));
+  $('ok-tour-back').addEventListener('click', () => tourGo(tourIdx - 1));
+  $('ok-tour-skip').addEventListener('click', endTour);
+
   // --------------------------------------------------------------- modals
   function modal(kanji, title, body, buttons) {
     $('ok-card-kanji').textContent = kanji;
@@ -2501,7 +2844,7 @@
       `You studied <b>${cards || 0}</b> card${cards === 1 ? '' : 's'} that session.<br>` +
       (waiting ? `<b>${waiting}</b> guest${waiting === 1 ? ' is' : 's are'} waiting to be seated.` : 'The kitchen is warm and ready.') +
       `<br>Relax for about <b>${mins || 1}</b> minute${mins === 1 ? '' : 's'}.`,
-      [['いただきます<small>&nbsp;Let\'s go</small>', 'ok-hanko ok-hanko-wide', () => OKSound.pluck(5)]]
+      [['いただきます<small>&nbsp;Let\'s eat!</small>', 'ok-hanko ok-hanko-wide', () => { OKSound.pluck(5); setTimeout(maybeCatchUp, 300); }]]
     );
     if (OKSound.enabled) OKSound.phraseUp();
     if (long) { for (let i = 0; i < 3; i++) setTimeout(firework, i * 400); }
@@ -2561,21 +2904,23 @@
   // ----------------------------------------------------------------- boot
   OKSound.configure({ sound: conf.sound !== false, volume: conf.volume != null ? conf.volume : 0.5 });
   paintBackground();
+  renderSeigaiha();
   renderHeader();
   renderTimer();
   renderSoundBtn();
   updateStatus();
   resize();
-  window.addEventListener('resize', () => { resize(); positionBubble(); });
+  window.addEventListener('resize', () => { resize(); positionBubble(); positionTour(); });
   if (window.OK_DEBUG_FF) for (let i = 0; i < window.OK_DEBUG_FF * 30; i++) update(1 / 30);
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 
   setTimeout(() => {
     const t = INIT.takeout || {};
-    if (t.count) toast(`While you were away, ${t.count} guest${t.count === 1 ? '' : 's'} got takeout (+${t.mon} mon)`);
+    if (t.count) toast(`Yesterday's ${t.count} waiting guest${t.count === 1 ? '' : 's'} took their food to go (+${t.mon} mon)`);
+    if (!S.tutorialDone && INIT.reason !== 'break') { startTour(); return; }
     const greeted = greetOnOpen();
     if (INIT.reason === 'break') breakWelcome();
-    else if (!greeted) say(chefLine());
+    else if (!maybeCatchUp() && !greeted) say(chefLine());
   }, 600);
   }
 

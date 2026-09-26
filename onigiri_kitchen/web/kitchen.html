@@ -11,7 +11,7 @@
     <div class="ok-timer" id="ok-timer">
       <div class="ok-skewer" id="ok-skewer" title="Focus sessions this cycle"></div>
       <div class="ok-timer-text">
-        <span class="ok-phase" id="ok-phase">準備</span>
+        <span class="ok-phase" id="ok-phase">待機</span>
         <b class="ok-clock" id="ok-clock">25:00</b>
       </div>
       <div class="ok-timer-btns">
@@ -40,6 +40,7 @@
     </div>
     <div class="ok-status" id="ok-status"></div>
     <div class="ok-foot-btns">
+      <button class="ok-foot-btn ok-rush" id="ok-b-rush" hidden><span class="jp">急</span> Serve faster</button>
       <button class="ok-foot-btn" id="ok-b-pet"><span class="jp">猫</span> Tama</button>
       <button class="ok-foot-btn" id="ok-b-decor"><span class="jp">飾り</span> Decor</button>
       <button class="ok-foot-btn" id="ok-b-sound"><span class="jp">音</span> <span id="ok-sound-label">Sound on</span></button>
@@ -52,6 +53,7 @@
       <p>Spend the mon your guests leave. Some pieces unlock at higher restaurant levels.</p>
       <button class="ok-close" data-close="ok-decor" title="Close">&times;</button>
     </div>
+    <div class="ok-style" id="ok-style" hidden></div>
     <div class="ok-decor-grid" id="ok-decor-grid"></div>
   </section>
 
@@ -88,7 +90,7 @@
 
   <section class="ok-panel ok-panel-narrow" id="ok-settings" hidden>
     <div class="ok-panel-head">
-      <h2><span class="jp">時計</span> Timer</h2>
+      <h2><span class="jp">タイマー</span> Timer</h2>
       <p>Guests keep coming while you study. Breaks are when you get to enjoy them.</p>
       <button class="ok-close" data-close="ok-settings" title="Close">&times;</button>
     </div>
@@ -105,8 +107,12 @@
       <label class="ok-check"><input type="checkbox" name="widget_click_opens_kitchen"> Clicking Onigiri's restaurant picture opens the kitchen</label>
       <label>Volume <span><input type="range" name="volume" min="0" max="1" step="0.05"></span></label>
       <div class="ok-report">
-        <span>Found a bug or have an idea? <em id="ok-version"></em></span>
-        <button type="button" class="ok-foot-btn" id="ok-report">🐞 Report a bug</button>
+        <div class="ok-report-head"><b class="jp">目安箱</b> Ideas or problems? <em id="ok-version"></em></div>
+        <div class="ok-report-btns">
+          <button type="button" class="ok-foot-btn" id="ok-idea">💡 Suggest a feature</button>
+          <button type="button" class="ok-foot-btn" id="ok-report">🐞 Report a bug</button>
+          <button type="button" class="ok-foot-btn" id="ok-tour-replay">▶ Replay tutorial</button>
+        </div>
       </div>
       <div class="ok-form-btns">
         <button type="button" class="ok-ghost" id="ok-t-reset">Reset cycle</button>
@@ -115,9 +121,25 @@
     </form>
   </section>
 
+  <div class="ok-tour" id="ok-tour" hidden>
+    <div class="ok-tour-spot" id="ok-tour-spot"></div>
+    <div class="ok-tour-card" id="ok-tour-card">
+      <div class="ok-seigaiha-band"></div>
+      <div class="ok-tour-step" id="ok-tour-step">1 / 9</div>
+      <h3><span class="jp" id="ok-tour-jp"></span> <span id="ok-tour-title"></span></h3>
+      <p id="ok-tour-text"></p>
+      <div class="ok-tour-btns">
+        <button class="ok-ghost" id="ok-tour-skip">Skip tour</button>
+        <span class="ok-spacer"></span>
+        <button class="ok-foot-btn" id="ok-tour-back">Back</button>
+        <button class="ok-hanko" id="ok-tour-next">次へ<small>Next</small></button>
+      </div>
+    </div>
+  </div>
+
   <div class="ok-modal" id="ok-modal" hidden>
     <div class="ok-card">
-      <div class="ok-card-seigaiha"></div>
+      <div class="ok-card-seigaiha ok-seigaiha-band"></div>
       <div class="ok-card-kanji" id="ok-card-kanji">休憩</div>
       <h3 id="ok-card-title">Break time</h3>
       <p id="ok-card-body"></p>
