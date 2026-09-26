@@ -1,0 +1,127 @@
+<div id="ok-root">
+  <header id="ok-head">
+    <div class="ok-sign" title="Your Onigiri restaurant">
+      <div class="ok-sign-name" id="ok-name">Onigiri Kitchen</div>
+      <div class="ok-sign-sub">
+        <span class="ok-lv">Lv <b id="ok-level">0</b></span>
+        <span class="ok-xp"><i id="ok-xpfill"></i></span>
+      </div>
+    </div>
+
+    <div class="ok-timer" id="ok-timer">
+      <div class="ok-skewer" id="ok-skewer" title="Focus sessions this cycle"></div>
+      <div class="ok-timer-text">
+        <span class="ok-phase" id="ok-phase">準備</span>
+        <b class="ok-clock" id="ok-clock">25:00</b>
+      </div>
+      <div class="ok-timer-btns">
+        <button class="ok-hanko" id="ok-t-main">開始<small>Start</small></button>
+        <button class="ok-icon-btn" id="ok-t-skip" title="Skip to the next step">&#x23ED;&#xFE0E;</button>
+        <button class="ok-icon-btn" id="ok-t-set" title="Timer settings">&#x2699;&#xFE0E;</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="ok-stage">
+    <canvas id="ok-canvas" aria-label="Your pixel restaurant"></canvas>
+    <div id="ok-bubble" class="ok-bubble" hidden></div>
+    <div id="ok-tip" class="ok-tip" hidden></div>
+    <div id="ok-toast" class="ok-toast" hidden></div>
+  </main>
+
+  <footer id="ok-foot">
+    <div class="ok-purse" title="Mon (文): tips from your guests">
+      <svg class="ok-mon-icon" viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="7" fill="#e8c25a" stroke="#9c7424" stroke-width="1.2"/>
+        <circle cx="8" cy="8" r="5.1" fill="none" stroke="#c99a3a" stroke-width="0.8"/>
+        <rect x="6" y="6" width="4" height="4" fill="#7a5a1c"/>
+      </svg>
+      <b id="ok-mon">0</b><span class="ok-unit">文</span>
+    </div>
+    <div class="ok-status" id="ok-status"></div>
+    <div class="ok-foot-btns">
+      <button class="ok-foot-btn" id="ok-b-pet"><span class="jp">猫</span> Tama</button>
+      <button class="ok-foot-btn" id="ok-b-decor"><span class="jp">飾り</span> Decor</button>
+      <button class="ok-foot-btn" id="ok-b-sound"><span class="jp">音</span> <span id="ok-sound-label">Sound on</span></button>
+    </div>
+  </footer>
+
+  <section class="ok-panel" id="ok-decor" hidden>
+    <div class="ok-panel-head">
+      <h2><span class="jp">飾り</span> Decor</h2>
+      <p>Spend the mon your guests leave. Some pieces unlock at higher restaurant levels.</p>
+      <button class="ok-close" data-close="ok-decor" title="Close">&times;</button>
+    </div>
+    <div class="ok-decor-grid" id="ok-decor-grid"></div>
+  </section>
+
+  <section class="ok-panel ok-panel-narrow" id="ok-pet" hidden>
+    <div class="ok-panel-head ok-pet-head">
+      <canvas id="ok-pet-portrait" class="ok-pet-portrait" width="44" height="36"></canvas>
+      <div class="ok-pet-id">
+        <div class="ok-pet-namewrap" id="ok-pet-namewrap">
+          <h2 id="ok-pet-name">Tama</h2>
+          <button class="ok-ghost" id="ok-pet-rename" title="Rename">rename</button>
+          <form id="ok-pet-nameform"><input id="ok-pet-nameinput" maxlength="16" autocomplete="off"><button class="ok-ghost" type="submit">save</button></form>
+        </div>
+        <div class="ok-pet-stage" id="ok-pet-stage">子猫 Kitten</div>
+        <div class="ok-pet-grow"><i id="ok-pet-grow"></i></div>
+        <div class="ok-pet-growtext" id="ok-pet-growtext"></div>
+      </div>
+      <button class="ok-close" data-close="ok-pet" title="Close">&times;</button>
+    </div>
+    <div class="ok-pet-body">
+      <div class="ok-pet-trait" id="ok-pet-trait"></div>
+      <div class="ok-meters" id="ok-pet-meters"></div>
+      <div class="ok-pet-actions">
+        <button data-pet="pet"><b class="jp">なでる</b><small>Pet</small></button>
+        <button data-pet="brush"><b class="jp">ブラシ</b><small>Brush</small></button>
+        <button data-pet="feed"><b class="jp">魚</b><small>Feed · <span id="ok-pet-fish">0</span> left</small></button>
+        <button data-pet="play"><b class="jp">遊ぶ</b><small>Feather toy</small></button>
+        <button data-pet="trick"><b class="jp">芸</b><small>Trick</small></button>
+      </div>
+      <div class="ok-pet-note">She eats scraps while you review, gets a fish for every guest you serve, and perks up after focus sessions. She never gets sick or runs away. Days off just make her sleepy.</div>
+      <div class="ok-pet-box-head"><b class="jp">宝箱</b> Keepsakes <span id="ok-pet-giftcount"></span></div>
+      <div class="ok-pet-gifts" id="ok-pet-gifts"></div>
+    </div>
+  </section>
+
+  <section class="ok-panel ok-panel-narrow" id="ok-settings" hidden>
+    <div class="ok-panel-head">
+      <h2><span class="jp">時計</span> Timer</h2>
+      <p>Guests keep coming while you study. Breaks are when you get to enjoy them.</p>
+      <button class="ok-close" data-close="ok-settings" title="Close">&times;</button>
+    </div>
+    <form class="ok-form" id="ok-form">
+      <label>Focus <span><input type="number" name="focus_minutes" min="1" max="180" step="1"> min</span></label>
+      <label>Short break <span><input type="number" name="short_break_minutes" min="1" max="60" step="1"> min</span></label>
+      <label>Long break <span><input type="number" name="long_break_minutes" min="1" max="90" step="1"> min</span></label>
+      <label>Sessions per cycle <span><input type="number" name="rounds_before_long_break" min="1" max="12" step="1"></span></label>
+      <label>End focus after <span><input type="number" name="focus_card_goal" min="0" max="2000" step="5"> cards <em>(0 = off)</em></span></label>
+      <label>Reviews per guest <span><input type="number" name="reviews_per_guest" min="1" max="100" step="1"></span></label>
+      <label class="ok-check"><input type="checkbox" name="auto_open_kitchen_on_break"> Open the restaurant when a break starts</label>
+      <label class="ok-check"><input type="checkbox" name="auto_start_next_focus"> Start the next focus session when a break ends</label>
+      <label class="ok-check"><input type="checkbox" name="show_timer_chip_in_reviewer"> Show the dango timer while reviewing</label>
+      <label class="ok-check"><input type="checkbox" name="widget_click_opens_kitchen"> Clicking Onigiri's restaurant picture opens the kitchen</label>
+      <label>Volume <span><input type="range" name="volume" min="0" max="1" step="0.05"></span></label>
+      <div class="ok-report">
+        <span>Found a bug or have an idea? <em id="ok-version"></em></span>
+        <button type="button" class="ok-foot-btn" id="ok-report">🐞 Report a bug</button>
+      </div>
+      <div class="ok-form-btns">
+        <button type="button" class="ok-ghost" id="ok-t-reset">Reset cycle</button>
+        <button type="submit" class="ok-hanko ok-hanko-wide">保存<small>Save</small></button>
+      </div>
+    </form>
+  </section>
+
+  <div class="ok-modal" id="ok-modal" hidden>
+    <div class="ok-card">
+      <div class="ok-card-seigaiha"></div>
+      <div class="ok-card-kanji" id="ok-card-kanji">休憩</div>
+      <h3 id="ok-card-title">Break time</h3>
+      <p id="ok-card-body"></p>
+      <div class="ok-card-btns" id="ok-card-btns"></div>
+    </div>
+  </div>
+</div>

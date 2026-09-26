@@ -1,0 +1,441 @@
+"""Wires the kitchen into Anki: hooks, menu, the kitchen window and the timer chip."""
+
+from __future__ import annotations
+
+import json
+import os
+from typing import Any, Dict, Optional
+
+from aqt import gui_hooks, mw
+from aqt.deckbrowser import DeckBrowser
+from aqt.overview import Overview
+from aqt.qt import QAction, QDialog, QKeySequence, Qt, QVBoxLayout
+from aqt.reviewer import Reviewer
+from aqt.utils import openLink, restoreGeom, saveGeom, tooltip
+from aqt.webview import AnkiWebView
+
+from . import onigiri_link
+from . import pet as petmod
+from .pomodoro import Pomodoro
+from .state import CATALOG, KitchenState
+
+ADDON_DIR = os.path.dirname(__file__)
+PACKAGE = mw.addonManager.addonFromModule(__name__)
+CMD_PREFIX = "okitchen:"
+VERSION = "1.0.0"
+REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
+
+DEFAULT_CONF: Dict[str, Any] = {
+    "focus_minutes": 25,
+    "short_break_minutes": 5,
+    "long_break_minutes": 15,
+    "rounds_before_long_break": 4,
+    "focus_card_goal": 0,
+    "auto_open_kitchen_on_break": True,
+    "auto_start_next_focus": False,
+    "widget_click_opens_kitchen": True,
+    "show_timer_chip": True,
+    "show_timer_chip_in_reviewer": True,
+    "reviews_per_guest": 10,
+    "sound": True,
+    "volume": 0.5,
+    "shortcut": "Ctrl+Shift+K",
+}
+
+state = KitchenState(ADDON_DIR)
+_dialog: Optional["KitchenDialog"] = None
+
+
+def conf() -> Dict[str, Any]:
+    stored = mw.addonManager.getConfig(__name__) or {}
+    merged = dict(DEFAULT_CONF)
+    merged.update(stored)
+    return merged
+
+
+def write_conf(updates: Dict[str, Any]) -> None:
+    current = conf()
+    for key, value in updates.items():
+        if key not in DEFAULT_CONF:
+            continue
+        default = DEFAULT_CONF[key]
+        try:
+            if isinstance(default, bool):
+                value = bool(value)
+            elif isinstance(default, int):
+                value = int(value)
+            elif isinstance(default, float):
+                value = float(value)
+        except (TypeError, ValueError):
+            continue
+        current[key] = value
+    mw.addonManager.writeConfig(__name__, current)
+
+
+# --------------------------------------------------------------------- timer
+def _on_timer_change() -> None:
+    push_timer()
+
+
+def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
+    c = conf()
+    if kind == "focus_done":
+        if info.get("credited"):
+            state.focus_completed()
+        msg = "休憩 Break time! Your restaurant is open."
+        if info.get("long"):
+            msg = "祭り Long break! It's festival night at your restaurant."
+        if c.get("auto_open_kitchen_on_break", True):
+            open_kitchen(reason="break")
+        else:
+            tooltip(msg, period=4000)
+        _eval_kitchen(f"OK.onFocusDone({json.dumps(info)})")
+    elif kind == "break_done":
+        if _dialog is not None:
+            _eval_kitchen("OK.onBreakDone()")
+        else:
+            tooltip("Break's over. Back to the books! 頑張って", period=4000)
+
+
+pomo = Pomodoro(conf, _on_timer_change, _on_timer_event)
+
+
+def timer_payload() -> Dict[str, Any]:
+    c = conf()
+    return {
+        "pomo": pomo.snapshot(),
+        "kitchenOpen": _dialog is not None,
+        "sound": bool(c.get("sound", True)),
+        "volume": float(c.get("volume", 0.5)),
+    }
+
+
+def push_timer() -> None:
+    payload = json.dumps(timer_payload())
+    for web in _main_webviews():
+        try:
+            web.eval(f"window.OKChip && OKChip.update({payload});")
+        except Exception:
+            pass
+    _eval_kitchen(f"window.OK && OK.onTimer({payload})")
+
+
+def _main_webviews():
+    # deckBrowser, overview and reviewer usually share mw.web; dedupe so we
+    # don't update (or chime) the same page three times.
+    views = []
+    for attr in ("deckBrowser", "overview", "reviewer"):
+        obj = getattr(mw, attr, None)
+        web = getattr(obj, "web", None) if obj else None
+        if web is not None and all(web is not v for v in views):
+            views.append(web)
+    return views
+
+
+def _eval_kitchen(js: str) -> None:
+    if _dialog is not None:
+        try:
+            _dialog.web.eval(js)
+        except Exception:
+            pass
+
+
+# ------------------------------------------------------------------- reviews
+def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
+    try:
+        deck = mw.col.decks.name(card.odid or card.did)
+    except Exception:
+        deck = "Deck"
+    leech_success = False
+    if ease > 1:
+        try:
+            leech_success = card.note().has_tag("leech")
+        except Exception:
+            leech_success = False
+    new_guest = state.add_review(deck, leech_success, conf().get("reviews_per_guest", 10))
+    pomo.on_review()
+    grew = getattr(state, "pet_grew", None)
+    if grew is not None:
+        stage = petmod.STAGES[grew]
+        name = state.pet.d.get("name", "Tama")
+        tooltip(f"🐾 {name} grew up! She's now a {stage['jp']} {stage['name']}.", period=5000)
+        _eval_kitchen(f"window.OK && OK.onPet({json.dumps(state.pet.snapshot())}, true)")
+    if new_guest:
+        _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
+
+
+# -------------------------------------------------------------------- window
+def init_payload(reason: str = "") -> Dict[str, Any]:
+    state.roll_day()
+    away = state.pet.seen()
+    state.save_soon()
+    return {
+        "reason": reason,
+        "pet": state.pet.snapshot(),
+        "petAway": away,
+        "petStages": petmod.STAGES,
+        "petGifts": petmod.GIFTS,
+        "onigiri": onigiri_link.read_progress(),
+        "state": state.snapshot(),
+        "takeout": state.pop_takeout(),
+        "catalog": CATALOG,
+        "conf": conf(),
+        "timer": timer_payload(),
+        "version": VERSION,
+    }
+
+
+class KitchenDialog(QDialog):
+    def __init__(self, reason: str = "") -> None:
+        super().__init__(mw)
+        self._closed = False
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.setWindowTitle("Onigiri Kitchen · おにぎり食堂")
+        self.setMinimumSize(720, 520)
+        self.resize(1000, 700)
+        restoreGeom(self, "onigiriKitchen")
+
+        self.web = AnkiWebView(self)
+        self.web.set_bridge_command(self._on_bridge, self)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.web)
+        self.setLayout(layout)
+
+        base = f"/_addons/{PACKAGE}/web"
+        head = onigiri_link.theme_css() + (
+            "<script>window.OK_INIT = "
+            + json.dumps(init_payload(reason), ensure_ascii=False).replace("</", "<\\/")
+            + ";</script>"
+        )
+        with open(os.path.join(ADDON_DIR, "web", "kitchen.html"), encoding="utf-8") as f:
+            body = f.read()
+        self.web.stdHtml(
+            body,
+            css=[f"{base}/kitchen.css"],
+            js=[f"{base}/sound.js", f"{base}/kitchen.js"],
+            head=head,
+            context=self,
+        )
+
+    def _on_bridge(self, message: str) -> Any:
+        if not message.startswith(CMD_PREFIX):
+            return None
+        cmd, _, arg = message[len(CMD_PREFIX):].partition(":")
+        return handle_kitchen_cmd(cmd, arg, self)
+
+    def reject(self) -> None:
+        # Esc closes the window (and frees it) instead of just hiding it.
+        self.close()
+
+    def closeEvent(self, event: Any) -> None:
+        self._cleanup()
+        super().closeEvent(event)
+
+    def _cleanup(self) -> None:
+        global _dialog
+        if self._closed:
+            return
+        self._closed = True
+        saveGeom(self, "onigiriKitchen")
+        state.pet.seen()
+        state.save()
+        if _dialog is self:
+            _dialog = None
+        try:
+            self.web.cleanup()
+        except Exception:
+            pass
+
+
+def bug_report_url() -> str:
+    """A pre-filled GitHub issue with version info only (no personal data)."""
+    import platform
+    from urllib.parse import quote
+
+    try:
+        from anki.buildinfo import version as anki_version
+    except Exception:
+        anki_version = "unknown"
+    onigiri_pkg = onigiri_link.find_onigiri_package()
+    onigiri_version = "not installed"
+    if onigiri_pkg:
+        onigiri_version = "installed"
+        try:
+            path = os.path.join(mw.addonManager.addonsFolder(), onigiri_pkg, "manifest.json")
+            with open(path, encoding="utf-8") as f:
+                onigiri_version = json.load(f).get("version") or onigiri_version
+        except Exception:
+            pass
+    body = (
+        "**What happened?**\n\n\n"
+        "**What did you expect?**\n\n\n"
+        "**Steps to reproduce**\n1. \n2. \n\n"
+        "---\n"
+        f"- Onigiri Kitchen: {VERSION}\n"
+        f"- Anki: {anki_version}\n"
+        f"- Onigiri: {onigiri_version}\n"
+        f"- OS: {platform.system()} {platform.release()}\n"
+    )
+    return f"{REPO_URL}/issues/new?title={quote('Bug: ')}&body={quote(body)}"
+
+
+def open_kitchen(reason: str = "") -> None:
+    global _dialog
+    if _dialog is not None:
+        if reason:
+            _eval_kitchen(f"window.OK && OK.onReason({json.dumps(reason)})")
+        _dialog.show()
+        _dialog.raise_()
+        _dialog.activateWindow()
+        return
+    _dialog = KitchenDialog(reason)
+    _dialog.show()
+
+
+def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> Any:
+    if cmd == "claim":
+        return state.claim_guest()
+    if cmd == "pay":
+        try:
+            info = json.loads(arg or "{}")
+        except ValueError:
+            info = {}
+        state.pay(int(info.get("amount", 0)), info.get("deck"))
+        return state.snapshot()
+    if cmd == "buy":
+        level = onigiri_link.read_progress()["level"]
+        result = state.buy(arg, level)
+        result["state"] = state.snapshot()
+        return result
+    if cmd == "toggle":
+        state.toggle(arg)
+        return state.snapshot()
+    if cmd == "pet":
+        return state.pet_action(arg)
+    if cmd == "petgift":
+        gift = state.pet_gift()
+        return {"gift": gift, "pet": state.pet.snapshot(), "state": state.snapshot()}
+    if cmd == "petname":
+        return state.pet_rename(arg)
+    if cmd == "bump":
+        state.bump(arg)
+        return None
+    if cmd == "timer":
+        action = {
+            "start": pomo.start_focus,
+            "pause": pomo.pause,
+            "resume": pomo.resume,
+            "skip": pomo.skip,
+            "reset": pomo.reset,
+            "extend": pomo.extend_break,
+            "break": pomo.start_break,
+        }.get(arg)
+        if action:
+            action()
+        return timer_payload()
+    if cmd == "conf":
+        try:
+            write_conf(json.loads(arg or "{}"))
+        except ValueError:
+            pass
+        push_timer()
+        return conf()
+    if cmd == "study":
+        if dialog is not None:
+            dialog.close()
+        if pomo.phase != "focus":
+            pomo.start_focus()
+        try:
+            mw.moveToState("review")
+        except Exception:
+            mw.moveToState("overview")
+        return None
+    if cmd == "report":
+        openLink(bug_report_url())
+        return None
+    if cmd == "close":
+        if dialog is not None:
+            dialog.close()
+        return None
+    return None
+
+
+# ------------------------------------------------------ main-screen injection
+def _read_web(name: str) -> str:
+    try:
+        with open(os.path.join(ADDON_DIR, "web", name), encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def on_webview_content(web_content: Any, context: Any) -> None:
+    is_deck_browser = isinstance(context, DeckBrowser)
+    is_overview = isinstance(context, Overview)
+    is_reviewer = isinstance(context, Reviewer)
+    if not (is_deck_browser or is_overview or is_reviewer):
+        return
+    c = conf()
+    show_chip = bool(c.get("show_timer_chip", True)) and (
+        not is_reviewer or bool(c.get("show_timer_chip_in_reviewer", True))
+    )
+    init = {
+        "chip": show_chip,
+        "widget": is_deck_browser and bool(c.get("widget_click_opens_kitchen", True)),
+        "timer": timer_payload(),
+    }
+    web_content.head += (
+        f"<style>{_read_web('chip.css')}</style>"
+        f"<script>window.OK_CHIP_INIT = {json.dumps(init)};</script>"
+        f"<script>{_read_web('sound.js')}</script>"
+        f"<script>{_read_web('chip.js')}</script>"
+    )
+
+
+def on_js_message(handled: tuple, message: str, context: Any) -> tuple:
+    if not isinstance(message, str) or not message.startswith(CMD_PREFIX):
+        return handled
+    cmd, _, arg = message[len(CMD_PREFIX):].partition(":")
+    if cmd == "open":
+        open_kitchen()
+        return (True, None)
+    if cmd == "timer":
+        return (True, handle_kitchen_cmd("timer", arg, None))
+    return handled
+
+
+# --------------------------------------------------------------------- setup
+def on_profile_open() -> None:
+    state.load()
+
+
+def on_profile_close() -> None:
+    if _dialog is not None:
+        _dialog.close()
+    pomo.reset()
+    state.save()
+
+
+def _add_menu() -> None:
+    menu = mw.form.menuTools
+    open_action = QAction("Onigiri Kitchen", mw)
+    shortcut = str(conf().get("shortcut") or "").strip()
+    if shortcut:
+        open_action.setShortcut(QKeySequence(shortcut))
+    open_action.triggered.connect(lambda: open_kitchen())
+    menu.addAction(open_action)
+
+    focus_action = QAction("Onigiri Kitchen: Start Focus Timer", mw)
+    focus_action.triggered.connect(lambda: pomo.start_focus())
+    menu.addAction(focus_action)
+
+
+def setup() -> None:
+    mw.addonManager.setWebExports(__name__, r"web/.*\.(css|js|html|png|svg)")
+    gui_hooks.profile_did_open.append(on_profile_open)
+    gui_hooks.profile_will_close.append(on_profile_close)
+    gui_hooks.reviewer_did_answer_card.append(on_answer)
+    gui_hooks.webview_will_set_content.append(on_webview_content)
+    gui_hooks.webview_did_receive_js_message.append(on_js_message)
+    gui_hooks.main_window_did_init.append(_add_menu)

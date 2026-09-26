@@ -1,0 +1,63 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Kitchen preview</title>
+<link rel="stylesheet" href="../onigiri_kitchen/web/kitchen.css">
+<script>
+const q = new URLSearchParams(location.search);
+const STAGES = [{"days": 0, "jp": "子猫", "name": "Kitten"}, {"days": 3, "jp": "若猫", "name": "Young cat"}, {"days": 10, "jp": "看板猫", "name": "Shop cat"}, {"days": 25, "jp": "招き猫", "name": "Maneki master"}];
+const TRAITS = {"classic": {"jp": "三毛", "name": "Classic calico", "desc": "A well-rounded cat with a steady routine."}, "night": {"jp": "夜更かし", "name": "Night owl", "desc": "Studies late with you. Has a little moon on her forehead."}, "scrappy": {"jp": "やんちゃ", "name": "Scrappy", "desc": "Has helped you through a lot of leeches. Bent ear, big heart."}, "chubby": {"jp": "ぽっちゃり", "name": "Well fed", "desc": "Big review days mean lots of scraps. Very round."}};
+const GIFTS = [{"id": "momiji", "jp": "紅葉", "name": "Maple leaf", "desc": "Bright red, carried in very carefully."}, {"id": "donguri", "jp": "どんぐり", "name": "Acorn", "desc": "Rolled all the way from the garden."}, {"id": "matsubokkuri", "jp": "松ぼっくり", "name": "Pinecone", "desc": "Slightly chewed."}, {"id": "button", "jp": "ボタン", "name": "Button", "desc": "Nobody knows whose it is."}, {"id": "ribbon", "jp": "リボン", "name": "Ribbon", "desc": "She looked very proud of this one."}, {"id": "hane", "jp": "羽根", "name": "Feather", "desc": "The sparrow's. It's fine, it has others."}, {"id": "biidama", "jp": "ビー玉", "name": "Marble", "desc": "A glass marble with a blue swirl."}, {"id": "kaigara", "jp": "貝殻", "name": "Seashell", "desc": "How did she even find this?"}, {"id": "hanabira", "jp": "花びら", "name": "Petal", "desc": "A sakura petal, a little squished."}, {"id": "orizuru", "jp": "折り鶴", "name": "Paper crane", "desc": "Folded by a guest. Wished for good grades."}, {"id": "kosen", "jp": "古銭", "name": "Old coin", "desc": "A real mon! Added to your purse."}, {"id": "omikuji", "jp": "おみくじ", "name": "Fortune slip", "desc": "A temple fortune. Read it for today's luck."}];
+if (q.has('hour')) window.OK_DEBUG_HOUR = parseFloat(q.get('hour'));
+if (q.has('ff')) window.OK_DEBUG_FF = parseFloat(q.get('ff'));
+const decks = ['Pharm::Antibiotics','Anatomy::Heart','Biochem','Japanese::N4 Vocab','Micro::Bacteria'];
+const guests = [];
+for (let i=0;i<9;i++) guests.push({deck: decks[i%decks.length], kind: i===2?'leech':(i===0?'golden':'regular'), reviews:10});
+const mock = { mon: 140, owned: (q.get('owned')||'bonsai,furin,kakejiku,maneki,daruma,kingyo,sakura,radio,matsuri,tanuki').split(',').filter(Boolean), hidden: [] };
+let phase = q.get('phase') || 'idle';
+function pomo(){ const now=Date.now(); return {phase, endsAt: phase==='idle'?null: now+ 4*60000, remaining:0, total: 5*60000, paused:false, rounds: 2, cycle: 4, longBreak: q.has('long'), focusCards: 37, cardGoal:0, now}; }
+const stage = parseInt(q.get('stage')||'2');
+const petState = {name: q.get('petname')||'Tama', tummy: parseFloat(q.get('tummy')||'62'), love: 70, energy: parseFloat(q.get('energy')||'70'), stage, stageJp: STAGES[stage].jp, stageName: STAGES[stage].name, studyDays: [1,5,14,30][stage], nextStageDays: stage<3?STAGES[stage+1].days:null, trait: q.get('trait')||'classic', traitInfo: TRAITS[q.get('trait')||'classic'], fish: 4, gifts: {donguri:2, orizuru:1, kosen:1}, timesPetted: 3};
+window.OK_INIT = {
+  pet: petState, petAway: parseInt(q.get('away')||'0'), petStages: STAGES, petGifts: GIFTS,
+  reason: q.get('reason')||'',
+  onigiri: {found:true, name: q.get('name')||'My Restaurant', level: parseInt(q.get('level')||'24'), xpInto: 1219, xpNext: 2450, themeColor: '#'+(q.get('color')||'D07A5F')},
+  state: {mon: mock.mon, owned: mock.owned, hidden: [], guestsWaiting: guests.length, servedTotal: 0, today:{date:'2026-09-25', reviews:142, focus_done:2}, firstSeen:'2026-09-01'},
+  takeout: q.has('clean') ? {count:0, mon:0} : {count: 2, mon: 4},
+  catalog: [
+    {id:'bonsai',name:'Bonsai',jp:'盆栽',level:0,price:15,desc:'A patient little pine.'},
+    {id:'furin',name:'Wind chime',jp:'風鈴',level:2,price:25,desc:'Glass fūrin by the window.'},
+    {id:'kakejiku',name:'Hanging scroll',jp:'掛け軸',level:4,price:35,desc:'継続: keep going.'},
+    {id:'maneki',name:'Maneki-neko',jp:'招き猫',level:6,price:50,desc:'Every guest tips +1 mon.'},
+    {id:'daruma',name:'Daruma',jp:'達磨',level:8,price:45,desc:'Paints eyes with focus sessions.'},
+    {id:'kingyo',name:'Goldfish bowl',jp:'金魚鉢',level:10,price:60,desc:'Tap to feed.'},
+    {id:'sakura',name:'Sakura branch',jp:'桜の枝',level:12,price:70,desc:'Petals drift.'},
+    {id:'radio',name:'Radio',jp:'ラジオ',level:15,price:80,desc:'Koto music.'},
+    {id:'matsuri',name:'Festival lanterns',jp:'祭り提灯',level:18,price:90,desc:'Festival style.'},
+    {id:'tanuki',name:'Tanuki statue',jp:'信楽狸',level:30,price:120,desc:'Golden guests tip double.'}],
+  conf: {focus_minutes:25, short_break_minutes:5, long_break_minutes:15, rounds_before_long_break:4, focus_card_goal:0, reviews_per_guest:10, sound:false, volume:0.5, auto_open_kitchen_on_break:true},
+  timer: {pomo: pomo(), sound:false, volume:0.5}
+};
+window.pycmd = function(msg, cb){
+  const [, cmd, ...rest] = msg.split(':'); const arg = rest.join(':');
+  let r = null;
+  if (cmd==='claim') r = guests.shift() || null;
+  else if (cmd==='pay') { mock.mon += JSON.parse(arg).amount; r = {mon: mock.mon, owned: mock.owned, hidden: mock.hidden, guestsWaiting: guests.length, today:{reviews:142, focus_done:2}}; }
+  else if (cmd==='timer') { if (arg==='start') phase='focus'; if (arg==='skip') phase = phase==='focus'?'break':'idle'; if (arg==='reset') phase='idle'; r = {pomo: pomo(), sound:false}; }
+  else if (cmd==='conf') r = Object.assign(window.OK_INIT.conf, JSON.parse(arg));
+  else if (cmd==='pet') { if (arg==='feed') petState.fish--; petState.love=Math.min(100,petState.love+5); r={ok:true,msg:'',pet:petState}; }
+  else if (cmd==='petgift') { const gft = q.has('gift') ? Object.assign({}, GIFTS.find(x=>x.id===q.get('gift'))||GIFTS[11]) : null; if (gft && gft.id==='omikuji') gft.fortune={jp:'大吉',text:'Great blessing. Your cards will stick today.'}; r={gift:gft, pet:petState}; }
+  else if (cmd==='petname') { petState.name=arg; r=petState; }
+  else if (cmd==='toggle') { const h=mock.hidden; const i=h.indexOf(arg); if(i>=0) h.splice(i,1); else h.push(arg); r={mon:mock.mon, owned:mock.owned, hidden:h, guestsWaiting: guests.length}; }
+  cb && cb(r);
+};
+</script></head>
+<body class="${q.get('night')?'nightMode':''}">
+<div id="mount"></div>
+<script>
+if (q.get('night')) document.body.className='nightMode';
+fetch('../onigiri_kitchen/web/kitchen.html').then(r=>r.text()).then(html=>{
+  document.getElementById('mount').outerHTML = html;
+  const load = (src)=>new Promise(res=>{const s=document.createElement('script'); s.src=src; s.onload=res; document.body.appendChild(s);});
+  load('../onigiri_kitchen/web/sound.js').then(()=>load('../onigiri_kitchen/web/kitchen.js')).then(()=>{ if(q.get('panel')) document.getElementById(q.get('panel')).click(); if(q.get('js')) eval(q.get('js')); });
+});
+</script>
+</body></html>

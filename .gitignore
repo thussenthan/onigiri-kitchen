@@ -1,0 +1,10 @@
+dist/
+__pycache__/
+*.pyc
+.DS_Store
+# per-user save data
+onigiri_kitchen/user_files/kitchen_*.json
+onigiri_kitchen/user_files/*.tmp
+onigiri_kitchen/meta.json
+.claude/
+dev/anki_order.html

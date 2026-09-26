@@ -1,0 +1,151 @@
+/* Onigiri Kitchen - dango timer chip + widget hover hint */
+.okc {
+  /* Onigiri's page variables when present, washi fallbacks otherwise */
+  --okc-paper: var(--canvas-inset, #f7f0e3);
+  --okc-ink: var(--fg, #2b2622);
+  --okc-sub: var(--fg-subtle, #7a6a58);
+  --okc-line: var(--border, #dccbad);
+  --okc-shu: var(--accent-color, #c8412f);
+  --okc-matcha: #7fa36b;
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 6px 4px;
+  border-radius: 999px;
+  background: var(--okc-paper);
+  color: var(--okc-ink);
+  border: 1px solid var(--okc-line);
+  box-shadow: 0 4px 14px rgba(60, 40, 20, 0.14);
+  font: 700 12px/1 var(--font-main, -apple-system), -apple-system, system-ui, "Hiragino Sans", sans-serif;
+  opacity: 0.88;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  user-select: none;
+  overflow: hidden;
+}
+.nightMode .okc, .night_mode .okc, .night-mode .okc {
+  --okc-paper: var(--canvas-inset, #2a2522);
+  --okc-ink: var(--fg, #efe6d6);
+  --okc-sub: var(--fg-subtle, #b3a38e);
+  --okc-line: var(--border, #4a3f35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.okc:hover { opacity: 1; transform: translateY(-1px); }
+.okc button {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+.okc-main { padding: 3px 8px 3px 6px; border-radius: 999px; }
+.okc-main:hover { background: rgba(200, 65, 47, 0.08); }
+.okc-dango { display: inline-flex; align-items: center; gap: 0; position: relative; }
+.okc-dango::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  right: -4px;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: #b98a54;
+  border-radius: 2px;
+}
+.okc-dango i {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: -1px;
+  box-shadow: inset -1px -1px 0 rgba(0, 0, 0, 0.12);
+}
+.okc-dango i:nth-child(1) { background: #f2a9b9; }
+.okc-dango i:nth-child(2) { background: #fbf6ec; border: 1px solid #e3d8c5; width: 7px; height: 7px; }
+.okc-dango i:nth-child(3) { background: #9cc58f; }
+.okc[data-phase="idle"] .okc-dango { opacity: 0.75; }
+.okc-label { letter-spacing: 0.05em; color: var(--okc-sub); font-weight: 700; }
+.okc[data-phase="focus"] .okc-label { color: var(--okc-shu); }
+.okc[data-phase="break"] .okc-label { color: var(--okc-matcha); }
+.okc-time { font-variant-numeric: tabular-nums; min-width: 2.2em; }
+.okc.paused .okc-time { opacity: 0.55; }
+.okc-actions {
+  display: inline-flex;
+  max-width: 0;
+  overflow: hidden;
+  transition: max-width 0.25s ease;
+}
+.okc:hover .okc-actions { max-width: 60px; }
+.okc-btn {
+  width: 22px;
+  height: 22px;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--okc-sub) !important;
+}
+.okc-btn:hover { background: rgba(200, 65, 47, 0.1); color: var(--okc-shu) !important; }
+.okc-bar {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+}
+.okc-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--okc-shu);
+  opacity: 0.7;
+  transition: width 1s linear;
+}
+.okc[data-phase="break"] .okc-bar span { background: var(--okc-matcha); }
+
+/* Hover hint on Onigiri's restaurant picture */
+.ok-visitable { position: relative; }
+.ok-visitable::after {
+  content: attr(data-ok-hint);
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translate(-50%, 4px);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(43, 38, 34, 0.78);
+  color: #f7f0e3;
+  font: 600 10.5px/1.4 "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 30;
+}
+.ok-visitable:hover::after { opacity: 1; transform: translate(-50%, 0); }
+.onigiri-restaurant-level-widget.expanded-view .ok-visitable::after { display: none; }
+
+/* Tama napping on the timer */
+.okc-cat { position: relative; display: inline-flex; align-items: flex-end; height: 14px; margin-left: 1px; }
+.okc-cat svg { height: 12px; width: auto; filter: drop-shadow(0 1px 0 rgba(60, 40, 20, 0.25)); }
+.okc-cat-sit { display: none; height: 14px !important; }
+.okc:not([data-phase="focus"]) .okc-cat-sleep { display: none; }
+.okc:not([data-phase="focus"]) .okc-cat-sit { display: block; }
+.okc-z {
+  position: absolute;
+  right: -3px;
+  top: -8px;
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--okc-sub);
+  animation: okc-z 2.4s ease-in-out infinite;
+}
+.okc:not([data-phase="focus"]) .okc-z { display: none; }
+@keyframes okc-z { 0% { opacity: 0; transform: translate(0, 3px); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate(3px, -4px); } }

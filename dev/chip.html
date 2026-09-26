@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+body{font-family:system-ui;background:#eff1f5;margin:0;padding:30px}
+.onigiri-restaurant-level-widget{display:flex;width:420px;height:170px;background:#e9eaee;border-radius:15px;overflow:hidden}
+.restaurant-image-container{flex:0 0 45%;display:flex;align-items:center;justify-content:center;background:#bfc4d0}
+.restaurant-image-container .img{width:110px;height:110px;border-radius:12px;background:linear-gradient(#d07a5f,#a8743f)}
+.restaurant-info{padding:15px 20px}
+.rl-nav-btn{width:24px;height:24px;border:none;background:transparent;color:#757575}
+.rl-nav-icon{width:16px;height:16px}
+.rl-widget-nav-buttons{display:flex}
+</style>
+<script>
+window.OK_CHIP_INIT={chip:true,widget:true,timer:{pomo:{phase:'focus',endsAt:Date.now()+18*60000+21000,total:25*60000,remaining:0,paused:false,rounds:1,cycle:4},sound:false}};
+window.pycmd=(m,cb)=>{document.title=m; cb&&cb(null)};
+</script>
+<link rel="stylesheet" href="../onigiri_kitchen/web/chip.css">
+<script src="../onigiri_kitchen/web/sound.js"></script>
+<script src="../onigiri_kitchen/web/chip.js"></script>
+</head><body>
+<div class="onigiri-restaurant-level-widget"><div class="restaurant-image-container" onclick="this.parentNode.style.outline='4px solid red'"><div class="img"></div></div>
+<div class="restaurant-info"><div class="rl-widget-nav-buttons"><button class="rl-nav-btn">S</button><button class="rl-nav-btn">R</button></div><b>My Restaurant</b><div style="font-size:40px;font-weight:800">24</div></div></div>
+</body></html>
