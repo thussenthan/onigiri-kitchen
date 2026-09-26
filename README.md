@@ -51,12 +51,15 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 
 | Animal | Price | Needs | Perk |
 |---|---|---|---|
-| 兎 Rabbit | 300 文 | — | +5 mon for every finished focus session |
-| 黒猫 Black cat | 450 文 | Lv 3 | Tama's love never drops below 40 |
-| 柴犬 Shiba | 600 文 | Lv 5 | +1 tip from every guest |
-| 狐 Fox | 900 文 | Lv 10 | Sour-plum (leech) guests tip double |
-| 狸 Tanuki | 1,200 文 | Lv 15 | End-of-day takeout tips are doubled |
-| 鶴 Crane | 2,000 文 | Lv 20 | Every deck you finish brings a golden guest |
+| 兎 Rabbit | 1,500 文 | — | +5 mon for every finished focus session |
+| 黒猫 Black cat | 2,500 文 | Lv 3 | Tama's love never drops below 40 |
+| 柴犬 Shiba | 4,000 文 | Lv 5 | +1 tip from every guest |
+| 狐 Fox | 6,000 文 | Lv 10 | Sour-plum (leech) guests tip double |
+| 狸 Tanuki | 9,000 文 | Lv 15 | End-of-day takeout tips are doubled |
+| 鶴 Crane | 14,000 文 | Lv 20 | Every deck you finish brings a golden guest |
+
+They're long-term goals: a review earns about 0.35 mon on average, so the rabbit takes roughly 4,000 reviews.
+The full set takes about 3 months at 1,200 reviews a day, or under a year at 300 a day.
 
 ## Install
 

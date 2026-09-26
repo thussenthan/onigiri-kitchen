@@ -48,25 +48,29 @@ CATALOG: List[Dict[str, Any]] = [
      "desc": "A Shigaraki tanuki for good fortune. Golden guests tip double."},
 ]
 # Animal companions: big milestone purchases that live in the restaurant.
+# A review earns about 0.35 mon on average (a 3-mon guest per 10 reviews,
+# plus golden/sour-plum guests), so prices are set so the rabbit takes about
+# 4k reviews and the whole set (37,000 mon) takes about 3 months at 1,200
+# reviews a day, and under a year at 300 a day.
 # Each has a small perk (applied in tip_for / focus_completed / roll_day /
 # pet love floor, and the golden guest per finished deck in main.py).
 ANIMALS: List[Dict[str, Any]] = [
-    {"id": "usagi", "kind": "animal", "name": "Rabbit", "jp": "兎", "level": 0, "price": 300,
+    {"id": "usagi", "kind": "animal", "name": "Rabbit", "jp": "兎", "level": 0, "price": 1500,
      "desc": "A fluffy white rabbit who hops about the tatami.",
      "perk": "+5 mon for every finished focus session (she pounds celebration mochi)."},
-    {"id": "kuro", "kind": "animal", "name": "Black cat", "jp": "黒猫", "level": 3, "price": 450,
+    {"id": "kuro", "kind": "animal", "name": "Black cat", "jp": "黒猫", "level": 3, "price": 2500,
      "desc": "Tama's best friend. They nap together.",
      "perk": "Tama's love never drops below 40."},
-    {"id": "shiba", "kind": "animal", "name": "Shiba", "jp": "柴犬", "level": 5, "price": 600,
+    {"id": "shiba", "kind": "animal", "name": "Shiba", "jp": "柴犬", "level": 5, "price": 4000,
      "desc": "A cheerful shiba inu who greets everyone at the door.",
      "perk": "+1 tip from every guest."},
-    {"id": "kitsune", "kind": "animal", "name": "Fox", "jp": "狐", "level": 10, "price": 900,
+    {"id": "kitsune", "kind": "animal", "name": "Fox", "jp": "狐", "level": 10, "price": 6000,
      "desc": "A clever kitsune with a snow-tipped tail.",
      "perk": "Sour-plum (leech) guests tip double."},
-    {"id": "tanuki_friend", "kind": "animal", "name": "Tanuki", "jp": "狸", "level": 15, "price": 1200,
+    {"id": "tanuki_friend", "kind": "animal", "name": "Tanuki", "jp": "狸", "level": 15, "price": 9000,
      "desc": "A round, mischievous tanuki who drums on its belly.",
      "perk": "End-of-day takeout tips are doubled."},
-    {"id": "tsuru", "kind": "animal", "name": "Crane", "jp": "鶴", "level": 20, "price": 2000,
+    {"id": "tsuru", "kind": "animal", "name": "Crane", "jp": "鶴", "level": 20, "price": 14000,
      "desc": "An elegant red-crowned crane, a symbol of luck and long life.",
      "perk": "Every deck you finish brings a golden guest."},
 ]
