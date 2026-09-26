@@ -17,6 +17,40 @@ SAMPLE = {
              "border": "#45475a", "canvas-inset": "#313244", "highlight-bg": "#313244", "accent-fg": "#1b1b24"},
 }
 
+# Prefer Onigiri's *real* default theme (read from a local Onigiri install)
+# so the preview shows how the kitchen looks inside Onigiri out of the box.
+ONIGIRI_DIR = os.path.expanduser("~/Library/Application Support/Anki2/addons21/1011095603")
+THEME_VARS = ("accent-color", "bg", "fg", "fg-subtle", "border", "canvas-inset", "highlight-bg")
+
+
+def onigiri_default_palette():
+    import ast
+    try:
+        tree = ast.parse(open(os.path.join(ONIGIRI_DIR, "config.py"), encoding="utf-8").read())
+    except OSError:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Dict):
+            for k, v in zip(node.keys, node.values):
+                if isinstance(k, ast.Constant) and k.value == "colors" and isinstance(v, ast.Dict):
+                    colors = ast.literal_eval(v)
+                    out = {}
+                    for mode in ("light", "dark"):
+                        pal = {name: colors[mode]["--" + name] for name in THEME_VARS if "--" + name in colors[mode]}
+                        acc = pal.get("accent-color", "#007aff").lstrip("#")
+                        r, g, b = (int(acc[i:i + 2], 16) / 255 for i in (0, 2, 4))
+                        pal["accent-fg"] = "#1b1b24" if 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.55 else "#ffffff"
+                        out[mode] = pal
+                    return out
+    return None
+
+
+_real = onigiri_default_palette()
+if _real:
+    SAMPLE = _real
+    print("using Onigiri's default theme")
+
+
 def block(pal):
     return "".join(f"--oni-{k}:{v};" for k, v in pal.items())
 
