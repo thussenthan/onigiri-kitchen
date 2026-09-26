@@ -22,7 +22,7 @@ from .state import CATALOG, KitchenState
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.5.2"
+VERSION = "1.5.3"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -514,6 +514,11 @@ def on_webview_content(web_content: Any, context: Any) -> None:
     is_reviewer = isinstance(context, Reviewer)
     if not (is_deck_browser or is_overview or is_reviewer):
         return
+    if is_overview and _finishing is not None and not _finishing["injected"]:
+        # This is the congrats page being built right now: put the confetti in it.
+        _finishing["injected"] = True
+        web_content.head += "<script>" + _celebration_script(_finishing["opts"], on_load=True).replace("</", "<\\/") + "</script>"
+        debug_log("confetti built into the congrats page")
     c = conf()
     show_chip = bool(c.get("show_timer_chip", True)) and (
         not is_reviewer or bool(c.get("show_timer_chip_in_reviewer", True))
@@ -550,6 +555,24 @@ def on_js_message(handled: tuple, message: str, context: Any) -> tuple:
 
 # ------------------------------------------------ 紙吹雪 deck-finished confetti
 _celebrate_next = False
+_finishing: Optional[Dict[str, Any]] = None  # set while the finished screen is being drawn
+
+
+def debug_log(msg: str) -> None:
+    """Small rolling log in user_files/debug_log.txt to diagnose issues."""
+    import datetime as _dt
+
+    path = os.path.join(ADDON_DIR, "user_files", "debug_log.txt")
+    try:
+        lines = []
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                lines = f.read().splitlines()[-199:]
+        lines.append(f"{_dt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+    except Exception:
+        pass
 
 
 def on_state_will_change(new_state: str, old_state: str) -> None:
@@ -557,21 +580,23 @@ def on_state_will_change(new_state: str, old_state: str) -> None:
     # when you open a deck that's already finished.
     global _celebrate_next
     _celebrate_next = old_state == "review" and new_state == "overview"
+    if old_state == "review" or new_state == "overview":
+        debug_log(f"state {old_state} -> {new_state} (celebrate next: {_celebrate_next})")
 
 
-def after_finished_screen(overview: Any, *args: Any, **kwargs: Any) -> None:
-    """Runs after Anki (or Onigiri) shows 'Congratulations, you finished'."""
-    global _celebrate_next
-    if not _celebrate_next:
-        return
-    _celebrate_next = False
+def _celebration_script(opts: Dict[str, Any], on_load: bool) -> str:
+    call = f"OKCelebrate({json.dumps(opts, ensure_ascii=False)});"
+    if on_load:
+        # built into the page: wait until it has loaded and laid out
+        call = (
+            "(function(){function go(){setTimeout(function(){" + call + "},350);}"
+            "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',go);}else{go();}})();"
+        )
+    return _read_web("sound.js") + "\n" + _read_web("celebrate.js") + "\n" + call
+
+
+def _celebration_opts() -> Dict[str, Any]:
     c = conf()
-    # 鶴 crane perk: every finished deck brings a golden guest
-    if state.shown("tsuru"):
-        state.add_guest({"deck": None, "kind": "golden", "reviews": 0})
-        state.save_soon()
-    if not c.get("celebrate_deck_finish", True):
-        return
     try:
         deck = mw.col.decks.current()["name"].split("::")[-1]
     except Exception:
@@ -583,12 +608,33 @@ def after_finished_screen(overview: Any, *args: Any, **kwargs: Any) -> None:
             accent = theme["light"].get("--accent-color")
     except Exception:
         pass
-    opts = {"deck": deck, "accent": accent, "sound": bool(c.get("sound", True)), "volume": float(c.get("volume", 0.5))}
-    script = _read_web("sound.js") + "\n" + _read_web("celebrate.js") + f"\nOKCelebrate({json.dumps(opts, ensure_ascii=False)});"
+    return {"deck": deck, "accent": accent, "sound": bool(c.get("sound", True)), "volume": float(c.get("volume", 0.5))}
+
+
+def around_finished_screen(overview: Any, _old: Any) -> Any:
+    """Wraps Anki's (or Onigiri's) 'Congratulations, you finished' screen."""
+    global _celebrate_next, _finishing
+    celebrate = _celebrate_next
+    _celebrate_next = False
+    debug_log(f"finished screen shown (after reviewing: {celebrate})")
+    if celebrate and state.shown("tsuru"):
+        # 鶴 crane perk: every finished deck brings a golden guest
+        state.add_guest({"deck": None, "kind": "golden", "reviews": 0})
+        state.save_soon()
+    if celebrate and conf().get("celebrate_deck_finish", True):
+        _finishing = {"opts": _celebration_opts(), "injected": False}
     try:
-        overview.web.eval(script)
-    except Exception as e:
-        print(f"Onigiri Kitchen: confetti failed: {e}")
+        return _old(overview)
+    finally:
+        pending, _finishing = _finishing, None
+        if pending and not pending["injected"]:
+            # The page wasn't built through stdHtml (e.g. plain Anki's own
+            # congrats page), so send the script once it has loaded.
+            try:
+                overview.web.eval(_celebration_script(pending["opts"], on_load=False))
+                debug_log("confetti sent to the page after it loaded (fallback)")
+            except Exception as e:
+                debug_log(f"confetti failed: {e!r}")
 
 
 def test_confetti() -> None:
@@ -604,14 +650,18 @@ def test_confetti() -> None:
         pass
     script = _read_web("sound.js") + "\n" + _read_web("celebrate.js") + f"\nOKCelebrate({json.dumps(opts)});"
     mw.web.eval(script)
+    debug_log(f"test confetti played (screen: {mw.state})")
 
 
 def _install_celebration() -> None:
     from anki.hooks import wrap
 
     if hasattr(Overview, "_show_finished_screen"):
-        # "after" keeps Anki's (or Onigiri's) finished screen as-is and adds confetti on top.
-        Overview._show_finished_screen = wrap(Overview._show_finished_screen, after_finished_screen, "after")
+        # "around" keeps Anki's (or Onigiri's) finished screen as-is and adds confetti on top.
+        Overview._show_finished_screen = wrap(Overview._show_finished_screen, around_finished_screen, "around")
+        debug_log("celebration hook installed")
+    else:
+        debug_log("Overview._show_finished_screen not found: no confetti hook")
 
 
 # --------------------------------------------------------------------- setup
