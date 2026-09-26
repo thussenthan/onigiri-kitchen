@@ -1,6 +1,8 @@
 # Onigiri Kitchen · おにぎり食堂
 
-A cozy pixel-art restaurant, pomodoro timer and shop cat for [Anki](https://apps.ankiweb.net),
+[![AnkiWeb](https://img.shields.io/badge/AnkiWeb-427107295-4a90d9)](https://ankiweb.net/shared/info/427107295)
+
+A cozy pixel-art restaurant, pomodoro timer and virtual pet for [Anki](https://apps.ankiweb.net),
 built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603) add-on.
 
 **You study, guests arrive. You take a break, you get to enjoy them.**
@@ -33,7 +35,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 
 ## Install
 
-- **From AnkiWeb:** *(link coming soon)*
+- **From AnkiWeb (recommended):** in Anki, go to **Tools → Add-ons → Get Add-ons…** and enter code
+  **`427107295`** ([AnkiWeb page](https://ankiweb.net/shared/info/427107295)). You'll get updates automatically.
 - **From GitHub:** download `onigiri_kitchen.ankiaddon` from the
   [latest release](https://github.com/thussenthan/onigiri-kitchen/releases/latest) and double-click it,
   or use **Tools → Add-ons → Install from file…**. Then restart Anki.

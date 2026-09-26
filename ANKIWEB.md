@@ -1,17 +1,16 @@
 # AnkiWeb listing
 
-Upload at <https://ankiweb.net/shared/upload> (you must be logged in to AnkiWeb).
+Live at <https://ankiweb.net/shared/info/427107295> (install code `427107295`).
+To publish an update: run `./build.sh`, open the AnkiWeb page while logged in, choose **Update**, and upload the new zip.
 
 | Field | Value |
 |---|---|
 | **File** | `dist/onigiri_kitchen-ankiweb.zip` (run `./build.sh` first) |
-| **Title** | Onigiri Kitchen: pixel restaurant, pomodoro timer & shop cat |
+| **Title** | Onigiri Kitchen: pixel restaurant, pomodoro timer & virtual pet |
 | **Tags** | `onigiri gamification pomodoro timer pet cozy pixel motivation` |
 | **Support page** | https://github.com/thussenthan/onigiri-kitchen/issues |
 | **Branches** | minimum 23.10, maximum blank (tested on 26.9) |
 
-After the first upload, AnkiWeb gives the add-on a numeric ID. Put that link in `README.md` under
-"Install". For updates, use **Update** on the add-on's AnkiWeb page with a fresh zip.
 
 ## Description (paste into the description box, which accepts Markdown)
 
