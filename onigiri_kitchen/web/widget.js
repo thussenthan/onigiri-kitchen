@@ -151,7 +151,6 @@
       R(tx + 4, 30, 1, 1, '#fbf7ee');
       R(tx + 7, 30, 1, 1, '#fbf7ee');
       R(tx - 6, 36, 5, 1, '#3b3030');
-      if (Math.floor(time) % 3 === 0) R(tx + 9, 27 - (time % 1) * 3, 2, 1, '#8b7b69');
     } else {
       const tail = Math.round(Math.sin(time * 3));
       R(tx - 3, 31, 7, 6, '#fbf7ee');
@@ -166,6 +165,12 @@
       R(tx + 4, 33 + tail, 1, 3, '#3b3030');
     }
 
+    // a little Z floats up now and then while the pet naps (like in the kitchen)
+    if (p.species && sleepy && Math.floor(time) % 3 === 0) {
+      const zx = Math.min(tx + 4, W - 4);
+      const zy = Math.round(24 - (time % 1) * 5);
+      R(zx, zy, 3, 1, '#8b7b69'); R(zx + 1, zy + 1, 1, 1, '#8b7b69'); R(zx, zy + 2, 3, 1, '#8b7b69');
+    }
     if (night) {
       ctx.fillStyle = 'rgba(22,14,40,0.22)';
       ctx.fillRect(0, -off, W, H + off);
