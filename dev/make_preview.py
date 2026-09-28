@@ -81,10 +81,21 @@ _env = anki_stub.setup()
 _state = _env.import_("state")
 _pet = _env.import_("pet")
 data = {"catalog": _state.CATALOG, "petSpecies": _pet.species_payload(),
-        "puffleColors": _state.PUFFLE_COLORS, "puffleColorPrice": _state.PUFFLE_COLOR_PRICE}
+        "puffleColors": _state.PUFFLE_COLORS, "birdColors": _state.BIRD_COLORS, "puffleColorPrice": _state.PUFFLE_COLOR_PRICE}
 open(os.path.join(ROOT, "dev", "preview_data.js"), "w", encoding="utf-8").write(
     "window.OK_PREVIEW_DATA = " + json.dumps(data, ensure_ascii=False) + ";\n")
 print("wrote dev/preview_data.js")
+
+# Anki styles every <button> on its pages; load its stylesheet first (as
+# stdHtml does) so the preview shows the same hover/disabled behaviour.
+anki_css = ""
+_wv = "/Applications/Anki.app/Contents/Resources/app_packages/_aqt/data/web/css/webview.css"
+if os.path.exists(_wv):
+    os.makedirs(os.path.join(ROOT, "dev", "assets"), exist_ok=True)
+    shutil.copyfile(_wv, os.path.join(ROOT, "dev", "assets", "anki-webview.css"))
+    anki_css = '<link rel="stylesheet" href="assets/anki-webview.css">'
+else:
+    print("note: Anki not found locally, so the preview skips Anki's own styles")
 
 pre = open(os.path.join(ROOT, "dev", "preview.html"), encoding="utf-8").read()
 _i = pre.index("<script>") + 8
@@ -93,6 +104,7 @@ body = open(os.path.join(ROOT, "onigiri_kitchen", "web", "kitchen.html"), encodi
 
 page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Kitchen preview (Anki load order)</title>
 <script>if (new URLSearchParams(location.search).has('noanim')) document.write('<style>*{{animation:none!important;transition:none!important}}</style>');</script>
+{anki_css}
 <link rel="stylesheet" href="../onigiri_kitchen/web/kitchen.css">
 {theme}
 <script src="../onigiri_kitchen/web/sound.js"></script>

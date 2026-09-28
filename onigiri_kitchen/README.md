@@ -35,7 +35,9 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
 Save up mon for more pets (rabbit, black cat, shiba, fox, tanuki, crane), or adopt the starter
 pets you didn't pick (1,000 mon each). They move into the restaurant and each has a perk (hover
 one in the shop to see it). Tap the bed to tuck everyone in; it grows a spot for each pet.
-Every lantern has a candle you can light or snuff with a click.
+Each table has a candle you can light or snuff with a click; lanterns and candles light
+themselves at dusk and go out at dawn. Without Onigiri, the restaurant level (which unlocks
+some shop items) goes up every 3 days you've studied.
 Once you have a puffle, puffle colours (250 mon each), an igloo lamp and penguins passing the
 window appear too. Finishing a deck right after reviewing sets off 紙吹雪 confetti (turn it off with
 `celebrate_deck_finish` in the config).

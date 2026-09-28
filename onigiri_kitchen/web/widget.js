@@ -121,13 +121,19 @@
         for (let i = 0; i < row.length; i++) if (pal[row[i]]) R(tx - 5 + i, 37 - rows.length + j - up, 1, 1, pal[row[i]]);
       });
     } else if (p.species === 'bird') {
+      // a tiny Java sparrow in its colour: outline, cap, white cheek, pink beak
+      const pal = {
+        grey: ['#8f949f', '#1e1d23', '#232128'], white: ['#f6f3ec', '#f6f3ec', '#8e877c'], sakura: ['#8f949f', '#1e1d23', '#232128'],
+        cinnamon: ['#c9a58a', '#6b4a38', '#4a3326'], silver: ['#b8bfcc', '#565c69', '#3a3f49'], cream: ['#ecdfc8', '#b69c7b', '#7a6650'],
+      }[d.birdColor] || ['#8f949f', '#1e1d23', '#232128'];
+      const [body, cap, line] = pal;
       const hop = sleepy ? 0 : Math.floor(time * 3) % 4 === 0 ? 1 : 0;
-      const y = 37 - hop;
-      R(tx - 3, y - 4, 7, 3, '#8e939e'); R(tx - 2, y - 5, 5, 1, '#8e939e'); R(tx - 1, y - 2, 4, 1, '#c4b8be');
-      R(tx - 5, y - 4, 2, 1, '#2c2b31');
-      R(tx + 2, y - 8, 4, 3, sleepy ? '#fbfbf8' : '#232228'); R(tx + 3, y - 6, 3, 2, '#fbfbf8');
-      if (!sleepy) { R(tx + 6, y - 7, 2, 2, '#ee5667'); R(tx + 4, y - 7, 1, 1, '#e0485a'); }
-      R(tx, y - 1, 1, 1, '#e8a0a8'); R(tx + 2, y - 1, 1, 1, '#e8a0a8');
+      const rows = ['...LLLL..', '..LccccL.', '.LLcwwepL', 'LbbLwwwLp', 'LbbbbbbL.', '.LbbbbL..', '..LLLL...'];
+      const map = { L: line, c: cap, w: sleepy ? cap : '#ffffff', e: sleepy ? cap : '#2a2320', p: '#f05a6e', b: body };
+      rows.forEach((row, j) => {
+        for (let i = 0; i < row.length; i++) if (map[row[i]]) R(tx - 4 + i, 37 - rows.length + j - hop, 1, 1, map[row[i]]);
+      });
+      R(tx - 1, 37 - hop, 1, 1, '#eea5ad'); R(tx + 1, 37 - hop, 1, 1, '#eea5ad');
     } else if (sleepy) {
       R(tx - 5, 33, 11, 4, '#fbf7ee');
       R(tx - 4, 33, 3, 2, '#e0a13a');
@@ -168,12 +174,15 @@
     // from Anki's review log (the timer lives in the corner chip).
     const st = d.stats || {};
     const num = (n) => (n >= 100000 ? Math.round(n / 1000) + 'k' : Number(n || 0).toLocaleString());
-    const stat = (v, label, tip) => `<span class="okw-stat" title="${tip}"><b>${v}</b><small>${label}</small></span>`;
+    // short forms for narrow widgets, so all four stats always fit
+    const short = (n) => (n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n || 0));
+    const two = (l, sh) => `<span class="okw-l">${l}</span><span class="okw-s">${sh}</span>`;
+    const stat = (v, vs, label, ls, tip) => `<span class="okw-stat" title="${tip}"><b>${two(v, vs)}</b><small>${two(label, ls)}</small></span>`;
     const stats = d.stats
-      ? stat(num(st.total), 'reviews', `${Number(st.total || 0).toLocaleString()} reviews all time`) +
-        stat(num(st.average), 'per day', 'Average reviews on the days you studied') +
-        stat(num(st.days), st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
-        stat(`${st.bestStreak || 0}d`, 'best streak', 'Longest run of days in a row with reviews')
+      ? stat(num(st.total), short(st.total), 'reviews', 'reviews', `${Number(st.total || 0).toLocaleString()} reviews all time`) +
+        stat(num(st.average), short(st.average), 'per day', '/day', 'Average reviews on the days you studied') +
+        stat(num(st.days), short(st.days), st.days === 1 ? 'day' : 'days', st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
+        stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'streak', 'Longest run of days in a row with reviews')
       : '';
     info.innerHTML =
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +

@@ -1009,29 +1009,6 @@ body { background-image: none !important; font-family: var(--sans); }
 .ok-pet-namewrap.editing h2 { display: none; }
 .ok-pet-namewrap form input { width: 150px; }
 
-/* shop pets: the perk shows as a small popup on hover */
-.ok-item.ok-animal { position: relative; }
-.ok-item.ok-animal .ok-perk {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  top: 8px;
-  z-index: 2;
-  flex: none;
-  padding: 7px 10px;
-  border-radius: 10px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-lg, 0 10px 30px rgba(40, 24, 10, 0.25));
-  font-size: 11.5px;
-  line-height: 1.4;
-  opacity: 0;
-  transform: translateY(4px);
-  pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-.ok-item.ok-animal:hover .ok-perk { opacity: 1; transform: none; }
-.ok-perk-hint { font-size: 11px; font-weight: 700; color: var(--shu); }
 
 /* pet card: even buttons and a tidy header, whatever the labels say */
 .ok-pet-actions button { justify-content: center; min-height: 54px; }
@@ -1042,3 +1019,84 @@ body { background-image: none !important; font-family: var(--sans); }
 .ok-pet-happy { display: flex; align-items: center; justify-content: center; gap: 4px; text-align: center; }
 .ok-acc-row > div { align-items: center; }
 .ok-gift { justify-content: center; }
+
+/* ------------------------------------------ guard against Anki's buttons
+   Anki styles every <button> on its pages: a margin, a 1px border and a
+   gradient on hover, and a different bottom border when disabled. Those
+   rules beat ours on hover (button:hover is more specific than a class), so
+   buttons changed size and pushed their neighbours around. "body .x" matches
+   that specificity and comes later, so each button keeps one shape in every
+   state; our own :hover rules (more specific still) only change colours. */
+body .ok-chip, body .ok-foot-btn, body .ok-hanko, body .ok-icon-btn, body .ok-ghost, body .ok-close,
+body .ok-pet-actions button, body .ok-tabs button, body .ok-color, body .ok-starter-opt, body .ok-swatch,
+body .ok-item button, body .ok-card-btns button {
+  margin: 0;
+  box-shadow: none;
+  -webkit-appearance: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+body .ok-chip { padding: 5px 11px; border: 1.5px solid var(--line); background: var(--card); }
+body .ok-foot-btn { padding: 7px 14px; border: 1px solid var(--line); background: var(--card); }
+body .ok-hanko { border: none; background: var(--shu); }
+body .ok-icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: none; background: transparent; }
+body .ok-ghost { padding: 4px 6px; border: none; background: transparent; }
+body .ok-close { padding: 0; border: none; background: transparent; }
+body .ok-close { display: inline-flex; align-items: center; justify-content: center; }
+body .ok-pet-actions button { padding: 8px 4px 7px; border: 1.5px solid var(--line); background: var(--card); }
+body .ok-tabs button { padding: 8px 6px; border: none; background: transparent; }
+body .ok-color { padding: 8px 4px 6px; border: 1.5px solid var(--line); background: var(--card); }
+body .ok-starter-opt { padding: 10px 8px; border: 2px solid var(--line); background: var(--card); }
+body .ok-swatch { padding: 0; border: 2px solid var(--card); }
+body .ok-item button { padding: 4px 10px; border: 1.5px solid var(--shu); background: transparent; }
+body .ok-item button.ok-owned { border-color: var(--matcha); }
+/* hover colours (kept), selected states */
+.ok-foot-btn:hover, .ok-chip:hover, .ok-pet-actions button:hover, .ok-color:hover, .ok-starter-opt:hover { border-color: var(--shu); }
+.ok-chip.on { border-color: var(--shu); background: color-mix(in srgb, var(--shu) 16%, var(--card)); }
+.ok-tabs button.on { background: var(--card); box-shadow: 0 1px 3px rgba(40, 24, 10, 0.18); }
+.ok-tabs button:hover:not(.on) { background: color-mix(in srgb, var(--card) 55%, transparent); }
+.ok-icon-btn:hover, .ok-close:hover { background: var(--paper-2); }
+.ok-item button:hover { background: var(--shu); color: #fff8ee; }
+.ok-item button.ok-owned:hover { background: var(--matcha); color: #fff; }
+.ok-hanko:hover { background: var(--shu); }
+/* disabled: no hover change at all, no stray bottom border */
+.ok-item button[disabled], .ok-item button[disabled]:hover,
+.ok-pet-actions button[disabled], .ok-pet-actions button[disabled]:hover,
+.ok-color[disabled], .ok-color[disabled]:hover,
+.ok-hanko[disabled], .ok-hanko[disabled]:hover {
+  cursor: default;
+  box-shadow: none !important;
+}
+.ok-item button[disabled], .ok-item button[disabled]:hover { background: transparent; color: var(--shu); border: 1.5px solid var(--shu); opacity: 0.4; }
+.ok-pet-actions button[disabled], .ok-pet-actions button[disabled]:hover { background: var(--card); border: 1.5px solid var(--line); opacity: 0.45; }
+.ok-color[disabled], .ok-color[disabled]:hover { background: var(--card); border: 1.5px solid var(--line); opacity: 0.45; color: var(--ink); }
+.ok-hanko[disabled], .ok-hanko[disabled]:hover { background: var(--shu); color: var(--accent-fg); border: none; }
+
+/* shop pets: the perk takes the description's place on hover (same box, so nothing moves) */
+.ok-item-text { flex: 1; display: grid; }
+.ok-item-text > p { grid-area: 1 / 1; margin: 0; transition: opacity 0.15s ease; }
+.ok-item-text > .ok-perk { opacity: 0; }
+.ok-item.ok-animal:hover .ok-item-text > .ok-perk { opacity: 1; }
+.ok-item.ok-animal:hover .ok-item-text > .ok-desc { opacity: 0; }
+
+/* settings: Save stays visible at the bottom while the form scrolls */
+.ok-form { min-height: 0; }
+.ok-form-btns {
+  position: sticky;
+  bottom: -16px;
+  z-index: 1;
+  justify-content: flex-end;
+  margin: 6px -18px -16px;
+  padding: 10px 18px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+/* Start / Pause / Resume: a clearly darker press-able colour on hover */
+.ok-hanko:hover {
+  background: color-mix(in srgb, var(--shu) 78%, #000);
+  color: var(--accent-fg, #fff);
+  filter: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--shu) 28%, transparent);
+}
+.ok-hanko:active { transform: scale(0.97); }
+.ok-icon-btn svg { width: 16px; height: 16px; }

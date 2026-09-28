@@ -52,7 +52,7 @@ SPECIES: Dict[str, Dict[str, Any]] = {
         "they": "it", "them": "it", "their": "its",
         "food": "millet spray", "foods": "millet sprays", "foodJp": "粟", "toy": "Bell toy", "idle": "Chirping",
         "tricks": ["Wing wave", "Song", "Loop"],
-        "desc": "A buncho with a big pink beak who hops along the tatami and sings.",
+        "desc": "A buncho with a big pink beak who flies about the restaurant and sings. Pick its colour!",
         "stages": [("雛", "Chick"), ("若鳥", "Fledgling"), ("看板鳥", "Shop bird"), ("福鳥", "Lucky bird")],
         "traits": {
             "classic": ("桜文鳥", "Classic grey", "A tidy little bird with a steady routine."),

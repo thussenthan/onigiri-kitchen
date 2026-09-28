@@ -61,7 +61,7 @@ PETS: List[Dict[str, Any]] = [
      "desc": "A round, fluffy puffle that bounces around the shop. Comes in the colour of your choice.",
      "perk": "Your pet's energy never drops below 40."},
     {"id": "buncho", "kind": "pet", "species": "bird", "name": "Java sparrow", "jp": "文鳥", "level": 0, "price": 1000,
-     "desc": "A buncho with a big pink beak who hops about and sings.",
+     "desc": "A buncho with a big pink beak who flies about and sings. Comes in the colour of your choice.",
      "perk": "Your pet's tummy never drops below 40."},
 ]
 PET_FOR_SPECIES = {p["species"]: p["id"] for p in PETS}
@@ -84,6 +84,24 @@ PUFFLE_COLORS: List[Dict[str, Any]] = [
     {"id": "rainbow", "name": "Rainbow", "jp": "虹", "hex": "#e0508a", "starter": False},
 ]
 PUFFLE_COLORS_BY_ID = {c["id"]: c for c in PUFFLE_COLORS}
+
+# Java sparrow (文鳥) colours, after the real buncho varieties. Same deal as
+# the puffle: the first is free, more cost PUFFLE_COLOR_PRICE each.
+BIRD_COLORS: List[Dict[str, Any]] = [
+    {"id": "grey", "name": "Grey", "jp": "並", "hex": "#8f949f", "starter": True},
+    {"id": "white", "name": "White", "jp": "白", "hex": "#f4f1ea", "starter": True},
+    {"id": "sakura", "name": "Sakura", "jp": "桜", "hex": "#7d828d", "starter": True},
+    {"id": "cinnamon", "name": "Cinnamon", "jp": "シナモン", "hex": "#c9a58a", "starter": True},
+    {"id": "silver", "name": "Silver", "jp": "シルバー", "hex": "#b8bfcc", "starter": False},
+    {"id": "cream", "name": "Cream", "jp": "クリーム", "hex": "#eadcc4", "starter": False},
+]
+BIRD_COLORS_BY_ID = {c["id"]: c for c in BIRD_COLORS}
+
+# kind -> (colours by id, owned key, current key, shop pet id, default, noun)
+COLOR_KINDS = {
+    "puffle": (PUFFLE_COLORS_BY_ID, "puffle_colors", "puffle_color", "puffle", "blue", "puffle"),
+    "bird": (BIRD_COLORS_BY_ID, "bird_colors", "bird_color", "buncho", "grey", "Java sparrow"),
+}
 # Animal companions: big milestone purchases that live in the restaurant.
 # A review earns about 0.35 mon on average (a ~3-mon guest per 10 reviews,
 # plus golden/sour-plum guests), so prices are set so the rabbit takes about
@@ -140,6 +158,8 @@ def _defaults() -> Dict[str, Any]:
         "tutorial_done": False,
         "puffle_colors": [],  # owned puffle colours
         "puffle_color": "",
+        "bird_colors": [],  # owned Java sparrow colours
+        "bird_color": "",
         "today": {"date": "", "reviews": 0, "focus_done": 0, "leech_guests": 0},
         "pet": petmod.defaults(),
     }
@@ -481,50 +501,62 @@ class KitchenState:
             self.save_soon()
         return gift
 
-    # ----------------------------------------------------- starter & puffle
+    # ------------------------------------------- starter & pet colours
     def choose_starter(self, species: str, color: str = "") -> bool:
         if not self.pet.choose(species):
             return False
-        if species == "puffle":
-            c = PUFFLE_COLORS_BY_ID.get(color)
-            self.grant_first_color(color if c and c["starter"] else "blue")
+        if species in COLOR_KINDS:
+            by_id, *_rest = COLOR_KINDS[species]
+            c = by_id.get(color)
+            self.grant_first_color(species, color if c and c["starter"] else COLOR_KINDS[species][4])
         self.save()
         return True
 
-    def has_puffle(self) -> bool:
-        return self.pet.species == "puffle" or "puffle" in self.data["owned"]
+    def has_kind(self, kind: str) -> bool:
+        """You have a puffle / Java sparrow (as your starter or from the shop)."""
+        return self.pet.species == kind or COLOR_KINDS[kind][3] in self.data["owned"]
 
-    def grant_first_color(self, color: str) -> bool:
-        """The first colour comes free with the puffle (starter colours only)."""
-        c = PUFFLE_COLORS_BY_ID.get(color)
-        if not c or not c["starter"] or self.data["puffle_colors"] or not self.has_puffle():
+    def has_puffle(self) -> bool:
+        return self.has_kind("puffle")
+
+    def grant_first_color(self, kind: str, color: str) -> bool:
+        """The first colour comes free with the pet (starter colours only)."""
+        by_id, owned_key, current_key, *_rest = COLOR_KINDS[kind]
+        c = by_id.get(color)
+        if not c or not c["starter"] or self.data.get(owned_key) or not self.has_kind(kind):
             return False
-        self.data["puffle_colors"] = [color]
-        self.data["puffle_color"] = color
+        self.data[owned_key] = [color]
+        self.data[current_key] = color
         return True
 
-    def puffle_color(self, color: str) -> Dict[str, Any]:
+    def pet_color(self, kind: str, color: str) -> Dict[str, Any]:
         """Wear an owned colour, take the free first one, or buy a new one."""
-        c = PUFFLE_COLORS_BY_ID.get(color)
+        if kind not in COLOR_KINDS:
+            return {"ok": False, "msg": "That pet doesn't come in colours."}
+        by_id, owned_key, current_key, _pid, _default, noun = COLOR_KINDS[kind]
+        c = by_id.get(color)
         if not c:
             return {"ok": False, "msg": "That colour doesn't exist."}
-        if not self.has_puffle():
-            return {"ok": False, "msg": "Get a puffle first!"}
-        owned = self.data["puffle_colors"]
+        if not self.has_kind(kind):
+            return {"ok": False, "msg": f"Get a {noun} first!"}
+        owned = self.data.setdefault(owned_key, [])
         if color in owned:
-            self.data["puffle_color"] = color
+            self.data[current_key] = color
             self.save_soon()
-            return {"ok": True, "msg": f"{c['jp']} {c['name']} puffle!"}
-        if self.grant_first_color(color):
+            return {"ok": True, "msg": f"{c['jp']} {c['name']} {noun}!"}
+        if self.grant_first_color(kind, color):
             self.save()
-            return {"ok": True, "msg": f"{c['jp']} {c['name']} puffle!"}
+            return {"ok": True, "msg": f"{c['jp']} {c['name']} {noun}!"}
         if self.data["mon"] < PUFFLE_COLOR_PRICE:
             return {"ok": False, "msg": "Not enough mon yet. Keep serving guests!"}
         self.data["mon"] -= PUFFLE_COLOR_PRICE
         owned.append(color)
-        self.data["puffle_color"] = color
+        self.data[current_key] = color
         self.save()
         return {"ok": True, "msg": f"{c['jp']} {c['name']} unlocked!"}
+
+    def puffle_color(self, color: str) -> Dict[str, Any]:
+        return self.pet_color("puffle", color)
 
     def pet_style(self, key: str, value: Any) -> Dict[str, Any]:
         self.pet.set_style(key, value)
@@ -550,4 +582,6 @@ class KitchenState:
             "tutorialDone": bool(d.get("tutorial_done", False)),
             "puffleColor": d.get("puffle_color") or "",
             "puffleColors": list(d.get("puffle_colors") or []),
+            "birdColor": d.get("bird_color") or "",
+            "birdColors": list(d.get("bird_colors") or []),
         }

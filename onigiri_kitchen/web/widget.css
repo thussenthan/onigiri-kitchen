@@ -70,7 +70,7 @@
 .okw-spacer { flex: 1; }
 /* all-time stats: total, daily average, days studied, best streak */
 .okw-stats { flex: 1; min-width: 0; display: flex; gap: 9px; overflow: hidden; }
-.okw-stat { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.okw-stat { flex: none; display: flex; flex-direction: column; line-height: 1.15; }
 .okw-stat b { font-size: 13px; font-weight: 800; color: var(--fg, #2b2622); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .okw-stat small { font-size: 10px; font-weight: 600; color: var(--fg-subtle, #8b7b69); white-space: nowrap; }
 .nightMode .okw-stat b, .night_mode .okw-stat b, .night-mode .okw-stat b { color: var(--fg, #efe6d6); }
@@ -112,9 +112,29 @@
   .okw-scene { flex: 1 1 0; min-height: 0; width: 100%; height: auto; aspect-ratio: auto; }
   .okw-info { flex: 0 0 auto; }
 }
-/* Not much width: keep the first two stats */
+/* Not much width: short numbers and labels, so all four stats still fit */
+.okw-stat .okw-s { display: none; }
 @container (max-width: 420px) {
-  .okw-stat:nth-child(n + 3) { display: none; }
+  .okw-stat .okw-l { display: none; }
+  .okw-stat .okw-s { display: inline; }
+  .okw-stats { gap: 8px; }
+}
+/* Narrow and only one row tall: the whole card opens the kitchen anyway, so
+   the Visit button makes room for the stats */
+@container (max-width: 420px) and (max-height: 150px) {
+  .okw-row .okw-btn { display: none; }
+  .okw-stats { gap: 7px; }
+  .okw-stat b { font-size: 12px; }
+  .okw-stat small { font-size: 9.5px; }
+}
+/* Narrow but tall (1 column, 2+ rows): the stats fit on the scene too */
+@container (max-width: 300px) and (min-height: 170px) {
+  .okw-stats { display: flex; gap: 7px; flex: 1 0 100%; }
+  .okw-row { flex-wrap: wrap; row-gap: 6px; }
+  .okw-stat b { font-size: 12px; }
+  .okw-stat small { font-size: 9.5px; }
+  .okw-stat b { color: #fff; }
+  .okw-stat small { color: rgba(255, 246, 230, 0.8); }
 }
 /* Single row: drop the small title so everything fits */
 @container (max-height: 100px) {
@@ -122,3 +142,8 @@
 }
 /* Plain Anki (no Onigiri): a card under the deck list */
 .okw-plain { max-width: 480px; height: 130px; margin: 18px auto 0; }
+
+/* 1 column, 1 row: no room for stats, so keep the Visit button */
+@container (max-width: 300px) and (max-height: 150px) {
+  .okw-row .okw-btn { display: inline-block; }
+}

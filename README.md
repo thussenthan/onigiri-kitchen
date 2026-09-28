@@ -27,8 +27,9 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   after 1 minute without activity it pauses (and gives that time back), then resumes on your next card.
   The ↺ button next to the timer resets the cycle.
 - **Choose your starter pet.** The first time you open the kitchen, pick a partner: Tama the cat, a puffle
-  (in the colour of your choice) or a 文鳥 Java sparrow, who flies about the restaurant between perches on the
-  window sill, the menu rail, the door frame and the tables. The other two can be adopted later from the shop.
+  (in the colour of your choice) or a 文鳥 Java sparrow (grey, white, sakura or cinnamon, with silver and cream in
+  the shop), who flies about the restaurant between perches on the
+  window sill, the menu rail, the door frame, the counter, the rice cooker and any empty place at the tables. The other two can be adopted later from the shop.
 
   ![Choosing a starter pet](docs/starter.png)
 - **Your shop pet.** A virtual pet with needs (tummy, love, energy) that your studying fills.
@@ -40,14 +41,16 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   The **Pet** button opens its card (Care, Style and Keepsakes tabs); double-click the name to rename it.
   Tap the bed to tuck everyone in: it grows a spot for every pet who lives with you.
 - **The shop.** Guests tip in 文 (*mon*). Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish, radio
-  and more, some unlocked by your Onigiri restaurant level. The pets you didn't pick are 1,000 文 each.
+  and more, some unlocked by your Onigiri restaurant level (without Onigiri, you gain a level for every 3 days
+  you've studied). The pets you didn't pick are 1,000 文 each, and extra puffle or sparrow colours 250 文.
 - **Puffle extras.** Once you have a puffle, extra puffle colours (250 文 each, swap any time), an igloo lamp for
   the counter and little penguins waddling past the window (more of them in winter) switch on too.
 - **More pets.** Big milestone purchases that move into the restaurant, each with a perk (hover one in the
   shop to see it): a rabbit, a black cat (your pet's best friend), a shiba, a fox, a tanuki and a red-crowned crane.
   At night and during focus sessions they all curl up on the bed.
-- **Candles you can light.** Every paper lantern has its own candle: click one to light or snuff it. They light
-  themselves one by one at dusk and go out at dawn.
+- **Candles on the tables.** Click a candle to light or snuff it (with a little flame, sparks and a curl of smoke).
+  The paper lanterns switch on and off together with a click. Lanterns and candles light themselves at dusk and
+  go out at dawn.
 - **紙吹雪 confetti** when you finish a deck, with a little fanfare on the "Congratulations" screen.
 - **Home-screen widget.** A small live pixel scene with guests waiting, mon, your pet's mood and all-time stats
   (total reviews, daily average, days studied and longest streak), plus a Visit button. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under

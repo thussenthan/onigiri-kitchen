@@ -17,12 +17,12 @@ from aqt.webview import AnkiWebView
 from . import onigiri_link
 from . import pet as petmod
 from .pomodoro import Pomodoro
-from .state import CATALOG, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
+from .state import BIRD_COLORS, CATALOG, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
 
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.6.0"
+VERSION = "1.6.2"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -230,13 +230,14 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
         "petStages": state.pet.stages(),
         "petSpecies": petmod.species_payload(),
         "puffleColors": PUFFLE_COLORS,
+        "birdColors": BIRD_COLORS,
         "puffleColorPrice": PUFFLE_COLOR_PRICE,
         "petGifts": petmod.GIFTS,
         "petRareGifts": petmod.RARE_GIFTS,
         "petMilestones": {k: {"kind": v[0], "need": v[1]} for k, v in petmod.MILESTONES.items()},
         "petsPerDay": petmod.PETS_PER_DAY,
         "setBonusNow": set_bonus_now,
-        "onigiri": onigiri_link.read_progress(),
+        "onigiri": restaurant_progress(),
         "state": state.snapshot(),
         "takeout": state.pop_takeout(),
         "catalog": CATALOG,
@@ -396,7 +397,7 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         state.pay(int(info.get("amount", 0)), info.get("deck"))
         return state.snapshot()
     if cmd == "buy":
-        level = onigiri_link.read_progress()["level"]
+        level = restaurant_progress()["level"]
         result = state.buy(arg, level)
         result["state"] = state.snapshot()
         return result
@@ -425,6 +426,14 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         return {"ok": ok, "pet": state.pet.snapshot(), "stages": state.pet.stages(), "state": state.snapshot()}
     if cmd == "pufflecolor":
         result = state.puffle_color(arg)
+        result["state"] = state.snapshot()
+        return result
+    if cmd == "petcolor":
+        try:
+            info = json.loads(arg or "{}")
+        except ValueError:
+            info = {}
+        result = state.pet_color(str(info.get("kind", "")), str(info.get("color", "")))
         result["state"] = state.snapshot()
         return result
     if cmd == "bump":
@@ -524,6 +533,31 @@ def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
     return value
 
 
+# Without Onigiri there's no restaurant level to read, so shop items that need
+# a level would stay locked forever. Instead the level grows with the days
+# you've studied (from Anki's review log): one level every DAYS_PER_LEVEL days.
+DAYS_PER_LEVEL = 3
+MAX_STUDY_LEVEL = 30
+
+
+def restaurant_progress() -> Dict[str, Any]:
+    progress = onigiri_link.read_progress()
+    if progress.get("found"):
+        return progress
+    stats = lifetime_stats(int(state.data["today"].get("reviews", 0))) or {}
+    days = int(stats.get("days", 0))
+    level = min(MAX_STUDY_LEVEL, days // DAYS_PER_LEVEL)
+    progress.update(
+        level=level,
+        xpInto=0 if level >= MAX_STUDY_LEVEL else days % DAYS_PER_LEVEL,
+        xpNext=DAYS_PER_LEVEL,
+        levelFrom="study",
+        studyDays=days,
+        daysPerLevel=DAYS_PER_LEVEL,
+    )
+    return progress
+
+
 def widget_payload() -> Dict[str, Any]:
     _sync_with_log()
     progress = onigiri_link.read_progress()
@@ -539,6 +573,7 @@ def widget_payload() -> Dict[str, Any]:
         "mon": int(state.data.get("mon", 0)),
         "pet": state.pet.snapshot(),
         "puffleColor": (PUFFLE_COLORS_BY_ID.get(state.data.get("puffle_color") or "blue") or PUFFLE_COLORS[0])["hex"],
+        "birdColor": state.data.get("bird_color") or "grey",
         "theme": progress.get("themeColor") or onigiri_link.DEFAULT_THEME_COLOR,
         "timer": timer_payload(),
     }
