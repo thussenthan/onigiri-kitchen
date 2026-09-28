@@ -27,7 +27,7 @@ You study, guests arrive. You take a break, you get to enjoy them.
 - **A living pixel restaurant.** Click Onigiri's restaurant widget to open it. Lanterns, a noren curtain in your theme colour, and a window onto Mt. Fuji that follows your real clock and the seasons.
 - **Guests come from studying.** Every 10 reviews in a deck brings a guest from that deck, and each deck has its own look. Getting a leech right sends a grumpy sour-plum guest who cheers up once fed.
 - **Your Onigiri Specials are on the menu:** guests order dishes from your Specials Book, so the menu grows with every Daily Special you finish, and golden guests order today's special. Rarer specials tip more, collecting them earns rewards for your restaurant, and the chef cheers when your Onigiri restaurant levels up.
-- **A daily goal party:** set a daily card goal in settings and your restaurant throws a little fireworks party when you reach it.
+- **A daily goal party:** reach your daily card goal (100 by default, change it in settings) and your restaurant throws a little fireworks party the next time you visit.
 - **Study in one big batch.** No limit on waiting guests. After a big session, serve everyone at 4× speed or collect every tip at once. Reviews from your phone count too once synced.
 - **Pomodoro timer.** One dango per focus session. It only counts while you're reviewing (it pauses after a minute idle). The restaurant opens when your break starts, and nudges you back when it ends. Long breaks are festival nights with fireworks.
 - **Pick a starter pet:** Tama the cat, a puffle in your favourite colour, or a Java sparrow (grey, white, sakura or cinnamon) that flies around the restaurant. Adopt the others later from the shop.

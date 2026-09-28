@@ -25,8 +25,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   rewards: a specials board at 10, a golden headband for the chef at 25, a golden frame for your first Epic and a
   legendary knife for your first Legendary. When your Onigiri restaurant levels up, the chef cheers the next time
   you visit. Without Onigiri, the house onigiri flavours unlock as your restaurant levels up.
-- **A daily goal party.** Set a daily card goal in ⚙ and your restaurant throws a little party with fireworks
-  when you reach it.
+- **A daily goal party.** Reach your daily card goal (100 by default, change it in ⚙) and your restaurant throws a
+  little party with fireworks the next time you visit.
 - **Study in one big batch, catch up later.** There's no limit on waiting guests. After a big session you can
   serve everyone at 4× speed or collect every tip at once. Guests last until Anki's day rolls over, and anyone
   still waiting then takes takeout and still leaves a tip.

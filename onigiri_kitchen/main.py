@@ -31,7 +31,7 @@ DEFAULT_CONF: Dict[str, Any] = {
     "long_break_minutes": 15,
     "rounds_before_long_break": 4,
     "focus_card_goal": 0,
-    "daily_card_goal": 0,
+    "daily_card_goal": 100,
     "auto_open_kitchen_on_break": True,
     "auto_start_next_focus": False,
     "widget_click_opens_kitchen": True,
@@ -221,11 +221,11 @@ def check_daily_goal() -> None:
         return
     today["goal_hit"] = goal
     state.save_soon()
+    # No pop-up while you study: the party waits for your next visit (or
+    # starts right away if the kitchen happens to be open).
     if _dialog is not None:
         today["goal_seen"] = True
         _eval_kitchen(f"window.OK && OK.onGoal({goal})")
-    else:
-        tooltip(f"🎆 Daily goal reached: {goal} cards! Your restaurant is throwing a little party.", period=5000)
 
 
 def init_payload(reason: str = "") -> Dict[str, Any]:

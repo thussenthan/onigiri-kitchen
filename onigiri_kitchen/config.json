@@ -4,7 +4,7 @@
     "long_break_minutes": 15,
     "rounds_before_long_break": 4,
     "focus_card_goal": 0,
-    "daily_card_goal": 0,
+    "daily_card_goal": 100,
     "auto_open_kitchen_on_break": true,
     "auto_start_next_focus": false,
     "widget_click_opens_kitchen": true,
