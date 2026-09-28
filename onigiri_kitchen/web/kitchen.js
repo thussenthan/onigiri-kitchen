@@ -1751,10 +1751,7 @@
     ellipse(hx, hy, 3, 2, CAT.fur);
     P(hx - 2, hy - 3, CAT.fur); P(hx + 2, hy - 3, CAT.fur); P(hx + 2, hy - 2, col.a);
     R(hx - 2, hy, 1, 1, C.ink); R(hx + 1, hy, 2, 1, C.ink);
-    if (Math.floor(time) % 3 === 0) {
-      const zy = hy - 7 - (time % 1) * 5;
-      R(hx - 1, zy, 3, 1, '#8b7b69'); P(hx, zy + 1, '#8b7b69'); R(hx - 1, zy + 2, 3, 1, '#8b7b69');
-    }
+    sleepZ(hx - 1, hy - 7);
   }
 
   function catSleep(cx, by) {
@@ -1776,10 +1773,7 @@
     if (pet.trait === 'night') P(hx, hy - 2, '#ffe27a');
     const tail = Math.round(Math.sin(time * 0.7));
     R(cx - rx - 1, by - 2 + tail, rx, 2, col.b);
-    if (Math.floor(time) % 3 === 0) {
-      const zy = hy - 6 - (time % 1) * 5;
-      R(hx + 5, zy, 3, 1, '#8b7b69'); P(hx + 6, zy + 1, '#8b7b69'); R(hx + 5, zy + 2, 3, 1, '#8b7b69');
-    }
+    sleepZ(hx + 5, hy - 6);
   }
 
   function catRoll(cx, by) {
@@ -2051,10 +2045,15 @@
     return { x: hx, y: hy - hr };
   }
 
+  // a Z floats up now and then over a sleeping pet (x, y: where a 3-wide
+  // mark would start; the 5x5 Z is centred on it so it reads as a Z)
   function sleepZ(x, y) {
     if (Math.floor(time) % 3 !== 0) return;
-    const zy = y - (time % 1) * 5;
-    R(x, zy, 3, 1, '#8b7b69'); P(x + 1, zy + 1, '#8b7b69'); R(x, zy + 2, 3, 1, '#8b7b69');
+    const zx = x - 1;
+    const zy = Math.round(y - 1 - (time % 1) * 5);
+    R(zx, zy, 5, 1, '#8b7b69');
+    for (let k = 1; k <= 3; k++) P(zx + 4 - k, zy + k, '#8b7b69');
+    R(zx, zy + 4, 5, 1, '#8b7b69');
   }
   // Pets without a kotatsu head-poke sleep on top of it instead.
   function bedTop(x) {
