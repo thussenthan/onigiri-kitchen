@@ -77,6 +77,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 |---|---|---|
 | ![Night](docs/night.png) | ![The pet card](docs/pet.png) | ![The shop](docs/shop.png) |
 
+![The お品書き menu: tap the specials board to see your Specials Book](docs/menu.png)
+
 ![Confetti and sakura petals when you finish a deck](docs/confetti.png)
 
 ### Pets

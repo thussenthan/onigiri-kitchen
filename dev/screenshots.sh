@@ -17,5 +17,6 @@ shot night 1000 655 "$BASE/anki_order.html?hour=21&night=1&rain=0&clean=1&long=1
 shot starter 1000 655 "$BASE/anki_order.html?hour=10&rain=0&clean=1&fresh=1&noanim=1&js=setTimeout(()=>{document.querySelector('[data-species=puffle]').click();document.querySelector('[data-color=pink]').click()},200)"
 shot pet 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=puffle&puffle=blue&puffles=blue,pink,gold&stage=2&happy=1&owned=$DECOR&noanim=1&guests=0&panel=ok-b-pet"
 shot shop 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=cat&stage=2&mon=5200&owned=$DECOR,puffle,usagi&puffle=green&puffles=green&noanim=1&guests=0&panel=ok-b-decor"
+shot menu 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=cat&stage=2&owned=$DECOR,shinagaki&noanim=1&guests=0&js=OKD.openOshinagaki()"
 shot widget 1000 560 "$BASE/widget.html"
 sips --cropOffset 60 20 -c 820 1960 docs/widget.png >/dev/null # just the grid
