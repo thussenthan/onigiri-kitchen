@@ -9,7 +9,7 @@ To publish an update: run `./build.sh`, open the AnkiWeb page while logged in, c
 | **Title** | Onigiri Kitchen · おにぎり食堂 |
 | **Tags** | `onigiri gamification pomodoro timer pet cozy pixel motivation` |
 | **Support page** | https://github.com/thussenthan/onigiri-kitchen/issues |
-| **Branches** | minimum 23.10, maximum blank (tested on 26.9) |
+| **Branches** | minimum `23.10.0`, maximum the newest Anki you've tested (from Help → About, e.g. `25.09.2`; no `-` prefix, so newer versions can still download it). A blank maximum gives "invalid version range". |
 
 The AnkiWeb title is also the name people see in Anki's add-on list, so keep it as the Japanese name.
 
