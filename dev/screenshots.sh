@@ -6,8 +6,8 @@ set -e
 cd "$(dirname "$0")/.."
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 BASE="http://localhost:8791/dev"
-shot() { # name width height url
-  "$CH" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+shot() { # name width height url [scale]
+  "$CH" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor="${5:-2}" \
     --window-size="$2,$3" --virtual-time-budget=9000 --screenshot="docs/$1.png" "$4" 2>/dev/null
   echo "docs/$1.png"
 }
@@ -18,5 +18,6 @@ shot starter 1000 655 "$BASE/anki_order.html?hour=10&rain=0&clean=1&fresh=1&noan
 shot pet 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=puffle&puffle=blue&puffles=blue,pink,gold&stage=2&happy=1&owned=$DECOR&noanim=1&guests=0&panel=ok-b-pet"
 shot shop 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=cat&stage=2&mon=5200&owned=$DECOR,puffle,usagi&puffle=green&puffles=green&noanim=1&guests=0&panel=ok-b-decor"
 shot menu 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=cat&stage=2&owned=$DECOR,shinagaki&noanim=1&guests=0&js=OKD.openOshinagaki()"
+shot confetti 1400 815 "$BASE/celebrate.html?t=0&el=1.4&banner=1" 1 # caught up 1.4 s in, petals and all
 shot widget 1000 560 "$BASE/widget.html"
 sips --cropOffset 60 20 -c 820 1960 docs/widget.png >/dev/null # just the grid

@@ -12,4 +12,10 @@ const t = parseFloat(new URLSearchParams(location.search).get('t') || '1.1');
 const el = parseFloat(new URLSearchParams(location.search).get('el') || '0');
 if (el) sessionStorage.setItem('okCelebrate:shot', String(Date.now() - el * 1000));
 OKCelebrate({deck: 'Exam 3', accent: '#007aff', sound: false, preview: t, id: el ? 'shot' : undefined});
+// screenshots: a caught-up celebration hides its banner, so show it anyway
+if (new URLSearchParams(location.search).get('banner')) {
+  const b = document.querySelector('#ok-celebrate > div').cloneNode(true); // a copy, so its fade-out timer can't hide it
+  b.style.cssText += ';display:block;opacity:1;transform:translate(-50%,0);transition:none';
+  document.querySelector('#ok-celebrate > div').replaceWith(b);
+}
 </script></body></html>
