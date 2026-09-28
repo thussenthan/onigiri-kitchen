@@ -7,6 +7,7 @@
     "daily_card_goal": 100,
     "auto_open_kitchen_on_break": true,
     "auto_start_next_focus": false,
+    "endless_focus": false,
     "widget_click_opens_kitchen": true,
     "show_timer_chip": true,
     "show_timer_chip_in_reviewer": true,

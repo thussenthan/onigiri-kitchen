@@ -22,7 +22,7 @@ from .state import BIRD_COLORS, CATALOG, earned_rewards, PUFFLE_COLOR_PRICE, PUF
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -34,6 +34,7 @@ DEFAULT_CONF: Dict[str, Any] = {
     "daily_card_goal": 100,
     "auto_open_kitchen_on_break": True,
     "auto_start_next_focus": False,
+    "endless_focus": False,
     "widget_click_opens_kitchen": True,
     "show_timer_chip": True,
     "show_timer_chip_in_reviewer": True,
@@ -95,6 +96,11 @@ def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
         else:
             tooltip(msg, period=4000)
         _eval_kitchen(f"OK.onFocusDone({json.dumps(info)})")
+    elif kind == "endless_block":
+        # Endless focus: a focus-length studied, credited quietly (no break,
+        # no pop-up): a dango on the skewer and a golden guest.
+        state.focus_completed()
+        _eval_kitchen(f"window.OK && OK.onEndlessBlock({json.dumps(info)})")
     elif kind == "idle_paused":
         mins = info.get("minutes", 1)
         tooltip(
@@ -116,6 +122,7 @@ def timer_payload() -> Dict[str, Any]:
     return {
         "pomo": pomo.snapshot(),
         "kitchenOpen": _dialog is not None,
+        "endlessMode": bool(c.get("endless_focus", False)),
         "sound": bool(c.get("sound", True)),
         "volume": float(c.get("volume", 0.5)),
     }
@@ -242,6 +249,12 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     for rid in earned_rewards(specials.get("book") or []):
         if rid not in state.data["owned"]:
             state.data["owned"].append(rid)
+    # dishes that joined the menu since your last visit (the chef announces
+    # them); the first time, just remember what's already there
+    names = [d["name"] for d in specials.get("book") or []]
+    seen = state.data.get("menu_seen")
+    new_dishes = [n for n in names if n not in seen] if isinstance(seen, list) else []
+    state.data["menu_seen"] = names
     progress = restaurant_progress()
     last_level = state.data.get("last_level")
     state.data["last_level"] = int(progress.get("level", 0))
@@ -272,6 +285,7 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
         "onigiri": progress,
         "specials": specials,
         "levelUp": level_up,
+        "newDishes": new_dishes,
         "goalParty": goal_party,
         "state": state.snapshot(),
         "takeout": state.pop_takeout(),
@@ -486,6 +500,12 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         }.get(arg)
         if action:
             action()
+        elif arg == "endless":
+            # the ∞ switch: remember the mode, and switch a running session over
+            on = not bool(conf().get("endless_focus", False))
+            write_conf({"endless_focus": on})
+            pomo.set_endless(on)
+            push_timer()
         return timer_payload()
     if cmd == "conf":
         try:

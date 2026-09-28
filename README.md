@@ -23,8 +23,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   Rarer specials tip more (+1 mon for Uncommon up to +6 for Legendary). The chef cooks each order (tap him to make
   dishes ahead for the tray), and the menu tags on the wall show your newest specials. Collecting specials earns
   rewards: a specials board at 10, a golden headband for the chef at 25, a golden frame for your first Epic and a
-  legendary knife for your first Legendary. When your Onigiri restaurant levels up, the chef cheers the next time
-  you visit. Without Onigiri, the house onigiri flavours unlock as your restaurant levels up.
+  legendary knife for your first Legendary. When you finish a new special, the chef announces it (and makes one)
+  the next time you visit, and he cheers when your Onigiri restaurant levels up. Without Onigiri, the house onigiri flavours unlock as your restaurant levels up.
 - **A daily goal party.** Reach your daily card goal (100 by default, change it in ⚙) and your restaurant throws a
   little party with fireworks the next time you visit.
 - **Study in one big batch, catch up later.** There's no limit on waiting guests. After a big session you can
@@ -34,7 +34,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   break ends, you get a gentle nudge back to your cards. Long breaks are festival nights with fireworks.
   A small dango timer sits in the corner of Anki's main screens. Focus only counts while you're actually reviewing:
   after 1 minute without activity it pauses (and gives that time back), then resumes on your next card.
-  The ↺ button next to the timer resets the cycle.
+  The ↺ button next to the timer resets the cycle. Rather study without breaks? Tap **∞ endless focus**: the clock
+  counts up, no break pop-ups interrupt you, and every focus-length you study still counts as a finished session.
 - **Choose your starter pet.** The first time you open the kitchen, pick a partner: Tama the cat, a puffle
   (in the colour of your choice) or a 文鳥 Java sparrow (grey, white, sakura or cinnamon, with silver and cream in
   the shop), who flies about the restaurant between perches on the

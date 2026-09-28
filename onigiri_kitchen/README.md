@@ -31,7 +31,8 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
   unlock at higher Onigiri restaurant levels.
 - **The timer:** a pomodoro timer, with one dango per focus session. When a break starts, the
   restaurant opens. When the break ends, it nudges you back to your cards. A long break
-  turns into a festival night with fireworks outside the window.
+  turns into a festival night with fireworks outside the window. Tap ∞ for endless focus:
+  no breaks, the clock counts up, and every focus-length still counts as a session.
 - **Things to click:** the chef makes onigiri for the tray, your pet enjoys being petted,
   the menu tags play koto notes, the window calls a sparrow, and the lanterns switch
   on and off. The window follows your real clock and the season.

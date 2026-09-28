@@ -119,6 +119,7 @@
   let S = Object.assign({ mon: 0, owned: [], hidden: [], guestsWaiting: 0, today: {} }, INIT.state || {});
   let conf = Object.assign({}, INIT.conf || {});
   let timer = (INIT.timer && INIT.timer.pomo) || { phase: 'idle' };
+  const INIT_TIMER_MODE = { endless: !!(INIT.timer && INIT.timer.endlessMode) };
   let dispMon = S.mon;
   const theme = onigiri.themeColor || '#D49083';
   document.documentElement.style.setProperty('--theme', theme);
@@ -3455,19 +3456,52 @@
   }
 
   // ----------------------------------------------------------------- radio
+  // Koto music in short phrases on the miyako-bushi scale: each phrase opens
+  // with two strings plucked together (an octave or a fifth, as koto players
+  // do), wanders a little, and settles back home on D before a short rest.
+  let radioLeft = 0;
+  function radioDyad(step, interval, when) {
+    OKSound.koto(OKSound.scaleNote(step), when || 0, 1.5);
+    OKSound.koto(OKSound.scaleNote(step + interval), (when || 0) + 0.035, 1.5); // a slight strum
+  }
   function updateRadio(dt) {
     if (!radioOn || !has('radio')) return;
     radioTimer -= dt;
-    if (radioTimer <= 0) {
-      radioTimer = pick([0.45, 0.45, 0.9, 0.9, 1.35]);
-      if (Math.random() < 0.8) {
-        radioStep = clamp(radioStep + pick([-2, -1, -1, 1, 1, 2]), 0, 9);
+    if (radioTimer > 0) return;
+    const note = () => particles.push({ x: 226 + rand(-2, 2), y: 44, vx: rand(-3, 3), vy: -8, life: 1.3, c: '#f3e6c8', type: 'note' });
+    if (radioLeft <= 0) {
+      // new phrase: an opening pair of strings
+      radioStep = pick([0, 2, 3, 5]);
+      radioDyad(radioStep, pick([5, 5, 3]));
+      radioLeft = 5 + Math.floor(Math.random() * 5);
+      radioTimer = 0.9;
+      note();
+      return;
+    }
+    radioLeft--;
+    if (radioLeft === 0) {
+      // cadence: home to D, an octave pair, then a breath
+      radioStep = radioStep >= 3 ? 5 : 0;
+      radioDyad(radioStep, 5);
+      OKSound.koto(OKSound.scaleNote(0) / 2, 0.05, 2.2);
+      radioTimer = pick([2.2, 2.7, 3.2]);
+      note();
+      return;
+    }
+    radioTimer = pick([0.45, 0.45, 0.9, 0.9, 1.35]);
+    if (Math.random() < 0.85) {
+      radioStep = clamp(radioStep + pick([-2, -1, -1, 1, 1, 2]), 0, 9);
+      if (Math.random() < 0.15) {
+        // now and then a quick grace note from the string above, just before
+        OKSound.koto(OKSound.scaleNote(radioStep + 1), 0, 0.22);
+        OKSound.koto(OKSound.scaleNote(radioStep), 0.07, 1.1);
+      } else {
         OKSound.pluck(radioStep);
-        particles.push({ x: 226 + rand(-2, 2), y: 44, vx: rand(-3, 3), vy: -8, life: 1.3, c: '#f3e6c8', type: 'note' });
       }
-      if (Math.random() < 0.25) OKSound.koto(OKSound.scaleNote(0) / 2, 0.05, 1.8);
+      note();
     }
   }
+
 
   // ------------------------------------------------------------------ loop
   function update(dt) {
@@ -3858,7 +3892,12 @@
   // -------------------------------------------------------------- timer UI
   function fmt(ms) {
     const s = Math.max(0, Math.round(ms / 1000));
+    if (s >= 3600) return Math.floor(s / 3600) + ':' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  // endless focus counts up: time studied so far, ticking while it runs
+  function elapsed() {
+    return (timer.elapsed || 0) + (timer.paused ? 0 : Math.max(0, Date.now() - (timer.now || Date.now())));
   }
   function remaining() {
     if (timer.endsAt && !timer.paused) return timer.endsAt - Date.now();
@@ -3871,7 +3910,14 @@
     const phase = $('ok-phase');
     const clock = $('ok-clock');
     const main = $('ok-t-main');
-    if (timer.phase === 'focus') {
+    const endlessMode = !!(INIT_TIMER_MODE.endless);
+    $('ok-t-endless').classList.toggle('on', endlessMode);
+    $('ok-t-endless').title = endlessMode ? 'Endless focus is on: no breaks. Tap to go back to the pomodoro countdown' : 'Endless focus: study without breaks';
+    $('ok-t-skip').title = timer.endless ? 'Stop endless focus' : 'Skip to the next step';
+    if (timer.phase === 'focus' && timer.endless) {
+      phase.textContent = timer.idle ? '休止 · Paused while idle' : '無限 · Endless focus';
+      clock.textContent = fmt(elapsed());
+    } else if (timer.phase === 'focus') {
       phase.textContent = timer.idle
         ? '休止 · Paused while idle'
         : '集中 · Focus' + (timer.cardGoal ? ` · ${timer.focusCards}/${timer.cardGoal}` : '');
@@ -3880,8 +3926,8 @@
       phase.textContent = timer.longBreak ? '祭り · Long break' : '休憩 · Break';
       clock.textContent = fmt(remaining());
     } else {
-      phase.textContent = '待機 · Ready';
-      clock.textContent = fmt((conf.focus_minutes || 25) * 60000);
+      phase.textContent = endlessMode ? '待機 · Ready · no breaks' : '待機 · Ready';
+      clock.textContent = endlessMode ? '0:00' : fmt((conf.focus_minutes || 25) * 60000);
     }
     // ▶ Start / ❚❚ Pause / ▶ Resume: same width every time, outlined while paused
     const PLAY = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.8v8.4L10 6z" fill="currentColor"/></svg>';
@@ -3890,7 +3936,7 @@
     if (main.dataset.state !== state) {
       main.dataset.state = state;
       main.innerHTML = state === 'start' ? `${PLAY}開始<small>Start</small>` : state === 'resume' ? `${PLAY}再開<small>Resume</small>` : `${PAUSE}一時停止<small>Pause</small>`;
-      main.title = state === 'start' ? 'Start a focus session' : state === 'resume' ? 'Resume the timer' : 'Pause the timer';
+      main.title = state === 'start' ? (endlessMode ? 'Start endless focus (no breaks)' : 'Start a focus session') : state === 'resume' ? 'Resume the timer' : 'Pause the timer';
     }
     main.classList.toggle('ok-t-paused', state === 'resume');
     // dango skewer
@@ -3916,6 +3962,15 @@
     const act = timer.phase === 'idle' ? 'start' : timer.paused ? 'resume' : 'pause';
     send('timer', act, (r) => r && OK.onTimer(r));
     OKSound.blip();
+  });
+  $('ok-t-endless').addEventListener('click', () => {
+    send('timer', 'endless', (r) => {
+      if (!r) return;
+      INIT_TIMER_MODE.endless = !!r.endlessMode;
+      OK.onTimer(r);
+      toast(r.endlessMode ? '無限 · Endless focus: no breaks. Every session still counts' : 'Pomodoro breaks are back on');
+      OKSound.blip();
+    });
   });
   $('ok-t-skip').addEventListener('click', () => {
     send('timer', 'skip', (r) => r && OK.onTimer(r));
@@ -4287,7 +4342,7 @@
     { jp: '文', title: 'Tips', text: 'Happy guests leave mon (文). Tap coins to collect them, or they collect themselves. Spend mon on decor.', dom: '.ok-purse' },
     { jp: '店', title: 'The shop', text: 'Spend mon on decor and pets: the starters you didn\'t pick and big milestone friends who move in, each with a perk. Some unlock at higher Onigiri levels.', dom: '#ok-b-decor' },
     { jp: () => sp().jp, title: () => `${pet.name}, your ${sp().name.toLowerCase()}`, text: () => `A gentle virtual pet. ${They()} eats while you review, gets a ${sp().food} for every guest, and grows as you study. ${They()} can't get sick or run away. The Pet button opens ${sp().their} care card.`, scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
-    { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session.', dom: '#ok-timer' },
+    { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session. Rather skip the breaks? Tap ∞ for endless focus: it counts up, and every session still counts.', dom: '#ok-timer' },
     { jp: '大入り', title: 'Big study sessions', text: 'Prefer to study in one go? Go ahead. When you come back, you can serve everyone at 4× speed or collect every tip at once.', dom: '#ok-status' },
     { jp: '目安箱', title: 'Ideas & bugs', text: 'Use the suggestion box on the wall (or ⚙ settings) to suggest features or report bugs. You can replay this tour from ⚙.', scene: () => ({ x: MEYASU.x - 3, y: MEYASU.y - 5, w: MEYASU.w + 6, h: MEYASU.h + 7 }) },
   ];
@@ -4563,6 +4618,26 @@
       if (Math.random() < 0.5) firework();
     }
   }
+  // New specials in your Book since your last visit: the chef announces them
+  // and makes the first one for the tray, so a guest can try it.
+  function newDishCheer(names) {
+    const dishes = names.map((n) => MENU_DISHES.book.find((d) => d.name === n)).filter(Boolean);
+    if (!dishes.length) return;
+    const first = dishes[0];
+    const list = dishes.length === 1 ? first.name
+      : dishes.length === 2 ? `${dishes[0].name} and ${dishes[1].name}`
+        : `${dishes.slice(0, 2).map((d) => d.name).join(', ')} and ${dishes.length - 2} more`;
+    OKSound.fanfare();
+    say(['新メニュー!', `New on the menu: ${list}!`]);
+    toast(`新メニュー · ${dishes.length} new dish${dishes.length === 1 ? '' : 'es'} from your Onigiri Specials Book`);
+    spawnHearts(121, 74, 2);
+    if (chef.state === 'idle' && trayDishes.length < 6) {
+      chef.state = 'make';
+      chef.t = 0;
+      chef.target = null;
+      chef.dish = first;
+    }
+  }
   // Onigiri's restaurant levelled up since you were last here: the chef cheers.
   function levelUpCheer(lu) {
     const seatsThen = clamp(2 + Math.floor(lu.from / 5), 2, 5);
@@ -4580,6 +4655,7 @@
       if (!payload) return;
       const prev = timer.phase;
       timer = payload.pomo || timer;
+      if (typeof payload.endlessMode === 'boolean') INIT_TIMER_MODE.endless = payload.endlessMode;
       if (typeof payload.sound === 'boolean') { conf.sound = payload.sound; OKSound.configure(payload); renderSoundBtn(); }
       renderTimer();
       updateStatus();
@@ -4593,6 +4669,13 @@
       S.guestsWaiting = (S.guestsWaiting || 0) + (info && info.credited ? 1 : 0);
       if (!$('ok-modal').hidden) return;
       breakWelcome(info);
+    },
+    // endless focus: a session's worth studied, credited quietly (no pop-up)
+    onEndlessBlock() {
+      S.guestsWaiting = (S.guestsWaiting || 0) + 1;
+      updateStatus();
+      renderTimer();
+      OKSound.pluck(7);
     },
     onBreakDone() {
       breakOver();
@@ -4642,8 +4725,12 @@
     const t = INIT.takeout || {};
     if (t.count) toast(`Yesterday's ${t.count} waiting guest${t.count === 1 ? '' : 's'} took their food to go (+${t.mon} mon)`);
     if (!pet.species) { openChooser('starter'); return; }
-    if (INIT.levelUp) setTimeout(() => levelUpCheer(INIT.levelUp), 200);
-    if (INIT.goalParty) setTimeout(() => goalParty(INIT.goalParty), INIT.levelUp ? 3200 : 300);
+    // good news on arrival, one after another
+    const news = [];
+    if (INIT.levelUp) news.push(() => levelUpCheer(INIT.levelUp));
+    if ((INIT.newDishes || []).length) news.push(() => newDishCheer(INIT.newDishes));
+    if (INIT.goalParty) news.push(() => goalParty(INIT.goalParty));
+    news.forEach((fn, i) => setTimeout(fn, 250 + i * 3400));
     if (INIT.setBonusNow) { setBonusModal(500); return; }
     if (!S.tutorialDone && INIT.reason !== 'break') { startTour(); return; }
     const greeted = greetOnOpen();

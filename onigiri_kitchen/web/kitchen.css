@@ -1107,3 +1107,7 @@ body .ok-item button.ok-owned { border-color: var(--matcha); }
 #ok-t-main svg { width: 11px; height: 11px; flex: none; }
 #ok-t-main.ok-t-paused { background: transparent; color: var(--shu); box-shadow: inset 0 0 0 2px var(--shu); }
 #ok-t-main.ok-t-paused:hover { background: color-mix(in srgb, var(--shu) 14%, transparent); color: var(--shu); box-shadow: inset 0 0 0 2px var(--shu), 0 0 0 3px color-mix(in srgb, var(--shu) 22%, transparent); }
+
+/* ∞ endless focus switch */
+.ok-icon-btn.ok-t-endless svg { width: 18px; height: 18px; }
+body .ok-icon-btn.ok-t-endless.on { color: var(--shu); background: color-mix(in srgb, var(--shu) 14%, transparent); }

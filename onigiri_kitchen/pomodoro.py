@@ -1,5 +1,9 @@
 """A wall-clock pomodoro timer (focus -> break -> focus ...).
 
+Endless focus (the ∞ button) is the no-breaks version: the clock counts up,
+never stops for a break, and every focus-length of study quietly counts as a
+finished session (a dango and a golden guest) without any break pop-ups.
+
 Times are stored as absolute end timestamps, so the countdown stays accurate
 even if Qt timers are delayed while Anki is busy.
 """
@@ -35,6 +39,11 @@ class Pomodoro:
         # Idle pause: focus only counts down while you're actually reviewing.
         self.last_activity = time.time()
         self.idle_paused = False
+        # Endless focus: time studied is banked + the running stretch.
+        self.endless = False
+        self.banked = 0.0
+        self.seg_start: Optional[float] = None
+        self.blocks_done = 0
         self._timer = QTimer(mw)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
@@ -68,11 +77,85 @@ class Pomodoro:
         except (TypeError, ValueError):
             return 0
 
+    def _block(self) -> float:
+        return self._minutes("focus_minutes", 25) * 60
+
+    def _endless_mode(self) -> bool:
+        return bool(self._conf().get("endless_focus", False))
+
+    def elapsed(self, now: Optional[float] = None) -> float:
+        now = time.time() if now is None else now
+        return self.banked + (now - self.seg_start if self.seg_start is not None else 0.0)
+
     # ----------------------------------------------------------- controls
     def start_focus(self) -> None:
+        if self._endless_mode():
+            self.start_endless()
+            return
+        self.endless = False
         self._begin(FOCUS, self._minutes("focus_minutes", 25) * 60)
         self.focus_cards = 0
         self.last_activity = time.time()
+        self.idle_paused = False
+        self._emit()
+
+    def start_endless(self) -> None:
+        self.phase = FOCUS
+        self.endless = True
+        self.banked = 0.0
+        self.seg_start = time.time()
+        self.blocks_done = 0
+        self.total = self._block()
+        self.ends_at = None
+        self.paused_remaining = None
+        self.focus_cards = 0
+        self.last_activity = time.time()
+        self.idle_paused = False
+        self._timer.start()
+        self._emit()
+
+    def set_endless(self, on: bool) -> None:
+        """Switch a running focus session between countdown and endless,
+        keeping the time you've already put in."""
+        if self.phase != FOCUS or on == self.endless:
+            return
+        now = time.time()
+        if on:
+            running = self.ends_at is not None
+            left = (self.ends_at - now) if running else (self.paused_remaining or 0.0)
+            self.banked = max(0.0, self.total - left)
+            self.seg_start = now if running else None
+            self.blocks_done = 0
+            self.endless = True
+            self.total = self._block()
+            self.ends_at = None
+            self.paused_remaining = None
+            self._timer.start()
+        else:
+            block = self._block()
+            left = max(60.0, block - (self.elapsed(now) % block))
+            running = self.seg_start is not None
+            self.endless = False
+            self.seg_start = None
+            self.banked = 0.0
+            self.total = block
+            if running:
+                self.ends_at = now + left
+                self.paused_remaining = None
+                self._timer.start()
+            else:
+                self.ends_at = None
+                self.paused_remaining = left
+        self._emit()
+
+    def _stop_endless(self) -> None:
+        self.endless = False
+        self.seg_start = None
+        self.banked = 0.0
+        self._timer.stop()
+        self.phase = IDLE
+        self.ends_at = None
+        self.paused_remaining = None
         self.idle_paused = False
         self._emit()
 
@@ -83,6 +166,12 @@ class Pomodoro:
         self._emit()
 
     def pause(self) -> None:
+        if self.endless and self.phase == FOCUS:
+            if self.seg_start is not None:
+                self.banked = self.elapsed()
+                self.seg_start = None
+                self._emit()
+            return
         if self.ends_at is not None:
             self.paused_remaining = max(0.0, self.ends_at - time.time())
             self.ends_at = None
@@ -92,6 +181,12 @@ class Pomodoro:
     def resume(self) -> None:
         self.idle_paused = False
         self.last_activity = time.time()
+        if self.endless and self.phase == FOCUS:
+            if self.seg_start is None:
+                self.seg_start = time.time()
+                self._timer.start()
+                self._emit()
+            return
         if self.paused_remaining is not None:
             self.ends_at = time.time() + self.paused_remaining
             self.paused_remaining = None
@@ -99,7 +194,9 @@ class Pomodoro:
             self._emit()
 
     def skip(self) -> None:
-        if self.phase == FOCUS:
+        if self.endless and self.phase == FOCUS:
+            self._stop_endless()  # "skip" ends an endless session (no break)
+        elif self.phase == FOCUS:
             # Ending focus early goes straight to a break, without the golden guest.
             self._finish_focus(credited=False)
         elif self.phase == BREAK:
@@ -108,6 +205,9 @@ class Pomodoro:
             self.start_focus()
 
     def reset(self) -> None:
+        self.endless = False
+        self.seg_start = None
+        self.banked = 0.0
         self.idle_paused = False
         self._timer.stop()
         self.phase = IDLE
@@ -132,6 +232,9 @@ class Pomodoro:
 
     def on_review(self) -> None:
         self.touch()
+        if self.endless and self.phase == FOCUS:
+            self.focus_cards += 1
+            return
         if self.phase != FOCUS or self.ends_at is None:
             return
         self.focus_cards += 1
@@ -148,6 +251,9 @@ class Pomodoro:
         self._timer.start()
 
     def _tick(self) -> None:
+        if self.endless and self.phase == FOCUS:
+            self._tick_endless()
+            return
         if self.phase == FOCUS and self.ends_at is not None:
             limit = self._idle_limit()
             now = time.time()
@@ -167,6 +273,31 @@ class Pomodoro:
             self._finish_focus(credited=True)
         elif self.phase == BREAK:
             self._finish_break()
+
+    def _tick_endless(self) -> None:
+        if self.seg_start is None:
+            return
+        now = time.time()
+        limit = self._idle_limit()
+        if limit and now - self.last_activity > limit:
+            # idle: stop counting, and give back the idle stretch
+            self.banked += max(0.0, self.last_activity - self.seg_start)
+            self.seg_start = None
+            self.idle_paused = True
+            self._emit()
+            self._on_event("idle_paused", {"minutes": round(limit / 60, 1)})
+            return
+        # every focus-length studied counts as a finished session, quietly
+        blocks = int(self.elapsed(now) // self._block())
+        while self.blocks_done < blocks:
+            self.blocks_done += 1
+            if self.rounds >= self._cycle():
+                self.rounds = 0
+            self.rounds += 1
+            cards = self.focus_cards
+            self.focus_cards = 0
+            self._emit()
+            self._on_event("endless_block", {"credited": True, "cards": cards})
 
     def _finish_focus(self, credited: bool) -> None:
         self.rounds += 1
@@ -206,7 +337,9 @@ class Pomodoro:
             "endsAt": int(self.ends_at * 1000) if self.ends_at else None,
             "remaining": int(remaining * 1000),
             "total": int(self.total * 1000),
-            "paused": self.paused_remaining is not None,
+            "paused": (self.seg_start is None) if self.endless and self.phase == FOCUS else self.paused_remaining is not None,
+            "endless": self.endless and self.phase == FOCUS,
+            "elapsed": int(self.elapsed() * 1000) if self.endless else 0,
             "idle": self.idle_paused,
             "rounds": self.rounds,
             "cycle": self._cycle(),

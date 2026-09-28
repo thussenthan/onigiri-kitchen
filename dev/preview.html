@@ -38,7 +38,7 @@ window.pycmd = function(msg, cb){
   let r = null;
   if (cmd==='claim') r = guests.shift() || null;
   else if (cmd==='pay') { mock.mon += JSON.parse(arg).amount; r = {mon: mock.mon, owned: mock.owned, hidden: mock.hidden, guestsWaiting: guests.length, today:{reviews:142, focus_done:2}}; }
-  else if (cmd==='timer') { if (arg==='start') phase='focus'; if (arg==='skip') phase = phase==='focus'?'break':'idle'; if (arg==='reset') phase='idle'; r = {pomo: pomo(), sound:true}; }
+  else if (cmd==='timer') { if (arg==='endless') window.__endless=!window.__endless; if (arg==='start') { phase='focus'; window.__endlessStart=Date.now(); } if (arg==='skip') phase = window.__endless && phase==='focus' ? 'idle' : phase==='focus'?'break':'idle'; if (arg==='reset') phase='idle'; const pm=pomo(); if (window.__endless && phase==='focus') Object.assign(pm, {endless:true, endsAt:null, paused:false, elapsed: Date.now()-(window.__endlessStart||Date.now())+ 26*60000, total:25*60000}); r = {pomo: pm, sound:true, endlessMode: !!window.__endless}; }
   else if (cmd==='conf') r = Object.assign(window.OK_INIT.conf, JSON.parse(arg));
   else if (cmd==='pet') { if (arg==='feed') petState.fish--; petState.love=Math.min(100,petState.love+5); r={ok:true,msg:'',pet:petState}; }
   else if (cmd==='petgift') { const gft = q.has('gift') ? Object.assign({}, GIFTS.find(x=>x.id===q.get('gift'))||GIFTS[11]) : null; if (gft && gft.id==='omikuji') gft.fortune={jp:'大吉',text:'Great blessing. Your cards will stick today.'}; r={gift:gft, pet:petState}; }
