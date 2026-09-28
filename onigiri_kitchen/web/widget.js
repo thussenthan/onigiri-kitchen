@@ -29,19 +29,25 @@
   }
 
   // ------------------------------------------------------------- scene
-  // The canvas is always 40px tall; its width follows the widget's shape so
+  // The scene is 40px tall; the canvas width follows the widget's shape so
   // the scene fills any size (more wall on wide widgets) without cropping.
+  // Tall, narrow widgets get a taller canvas instead (more wall above), so
+  // pixels stay square.
   function fitCanvas(canvas) {
     const r = canvas.getBoundingClientRect();
     if (!r.width || !r.height) return;
     const want = Math.max(40, Math.min(200, Math.round((H * r.width) / r.height)));
+    const tall = Math.max(H, Math.round((want * r.height) / r.width));
     if (canvas.width !== want) canvas.width = want;
+    if (canvas.height !== tall) canvas.height = tall;
     // narrow widgets lay their text over the scene (see widget.css)
     canvas.okwOverlay = getComputedStyle(canvas).position === 'absolute';
   }
 
   function drawScene(ctx, d, time) {
     const W = ctx.canvas.width;
+    const off = ctx.canvas.height - H; // extra wall above the scene on tall widgets
+    ctx.setTransform(1, 0, 0, 1, 0, off);
     const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
     const hour = new Date().getHours() + new Date().getMinutes() / 60;
     const night = hour < 6 || hour >= 19.5;
@@ -49,10 +55,10 @@
 
     // wall & floor
     for (let x = 0; x < W; x += 8) {
-      R(x, 0, 8, 29, (x / 8) % 2 ? '#7f5230' : '#865733');
-      R(x, 0, 1, 29, '#5e3c22');
+      R(x, -off, 8, 29 + off, (x / 8) % 2 ? '#7f5230' : '#865733');
+      R(x, -off, 1, 29 + off, '#5e3c22');
     }
-    R(0, 0, W, 2, '#3e2717');
+    R(0, -off, W, 2, '#3e2717');
     R(0, 29, W, 11, '#cdbb7e');
     R(0, 29, W, 1, '#3e2717');
     for (let y = 31; y < H; y += 2) R(0, y, W, 1, '#c1ae70');
@@ -162,8 +168,9 @@
 
     if (night) {
       ctx.fillStyle = 'rgba(22,14,40,0.22)';
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, -off, W, H + off);
     }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   // -------------------------------------------------------------- info
