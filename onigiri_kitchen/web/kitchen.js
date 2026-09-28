@@ -2045,15 +2045,20 @@
     return { x: hx, y: hy - hr };
   }
 
-  // a Z floats up now and then over a sleeping pet (x, y: where a 3-wide
-  // mark would start; the 5x5 Z is centred on it so it reads as a Z)
+  // an n-by-n pixel Z: top bar, diagonal, bottom bar
+  function zGlyph(x, y, n, c) {
+    R(x, y, n, 1, c);
+    for (let k = 1; k <= n - 2; k++) P(x + n - 1 - k, y + k, c);
+    R(x, y + n - 1, n, 1, c);
+  }
+  // z Z Z: three Zs rise one after another over a sleeping pet, then a pause
+  // (x, y: just above the pet's head)
   function sleepZ(x, y) {
-    if (Math.floor(time) % 3 !== 0) return;
-    const zx = x - 1;
-    const zy = Math.round(y - 1 - (time % 1) * 5);
-    R(zx, zy, 5, 1, '#8b7b69');
-    for (let k = 1; k <= 3; k++) P(zx + 4 - k, zy + k, '#8b7b69');
-    R(zx, zy + 4, 5, 1, '#8b7b69');
+    const c = time % 3;
+    if (c >= 2.4) return;
+    [4, 4, 5].forEach((n, k) => {
+      if (c >= k * 0.6) zGlyph(x - 1 + k * 5, Math.round(y - 1 - k * 5 - (n - 4)), n, '#8b7b69');
+    });
   }
   // Pets without a kotatsu head-poke sleep on top of it instead.
   function bedTop(x) {

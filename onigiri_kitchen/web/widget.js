@@ -165,14 +165,20 @@
       R(tx + 4, 33 + tail, 1, 3, '#3b3030');
     }
 
-    // a little Z floats up now and then while the pet naps (like in the kitchen)
-    if (p.species && sleepy && Math.floor(time) % 3 === 0) {
-      const zx = Math.min(tx + 4, W - 6);
-      const zy = Math.round(22 - (time % 1) * 5);
+    // z Z Z rising one after another while the pet naps (like in the kitchen);
+    // up to the left when there's no room on the right
+    if (p.species && sleepy && time % 3 < 2.4) {
+      const c = time % 3;
       const zc = '#d8c8ab';
-      R(zx, zy, 5, 1, zc);
-      for (let k = 1; k <= 3; k++) R(zx + 4 - k, zy + k, 1, 1, zc); // the diagonal
-      R(zx, zy + 4, 5, 1, zc);
+      const right = tx + 20 <= W;
+      [4, 5, 6].forEach((n, k) => {
+        if (c < k * 0.6) return;
+        const zx = right ? tx + 3 + k * 5 : tx - 3 - k * 5 - n + 4;
+        const zy = 23 - k * 5 - (n - 4);
+        R(zx, zy, n, 1, zc);
+        for (let j = 1; j <= n - 2; j++) R(zx + n - 1 - j, zy + j, 1, 1, zc);
+        R(zx, zy + n - 1, n, 1, zc);
+      });
     }
     if (night) {
       ctx.fillStyle = 'rgba(22,14,40,0.22)';
