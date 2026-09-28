@@ -22,7 +22,7 @@ from .state import BIRD_COLORS, CATALOG, earned_rewards, PUFFLE_COLOR_PRICE, PUF
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.7.1"
+VERSION = "1.7.2"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -35,6 +35,7 @@ DEFAULT_CONF: Dict[str, Any] = {
     "auto_open_kitchen_on_break": True,
     "auto_start_next_focus": False,
     "endless_focus": False,
+    "clock_style": "analog",
     "widget_click_opens_kitchen": True,
     "show_timer_chip": True,
     "show_timer_chip_in_reviewer": True,
@@ -72,6 +73,8 @@ def write_conf(updates: Dict[str, Any]) -> None:
                 value = int(value)
             elif isinstance(default, float):
                 value = float(value)
+            elif key == "clock_style" and value not in ("analog", "flip"):
+                continue
         except (TypeError, ValueError):
             continue
         current[key] = value

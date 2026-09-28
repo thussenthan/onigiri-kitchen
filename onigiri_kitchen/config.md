@@ -5,6 +5,7 @@ Most of these can also be changed from the timer panel inside the kitchen (the d
 - `focus_minutes`: length of a focus session.
 - `short_break_minutes` / `long_break_minutes`: break lengths.
 - `rounds_before_long_break`: focus sessions per cycle (one dango each). The long break comes after the last one.
+- `clock_style`: the restaurant clock, `analog` (wall clock) or `flip` (flip clock). Tap the clock to switch.
 - `endless_focus`: study without breaks (the ∞ button): the timer counts up and every focus-length quietly counts as a finished session.
 - `focus_card_goal`: end focus early after this many reviews (`0` = time only).
 - `daily_card_goal`: reach this many reviews in a day and your restaurant throws a little party with fireworks the next time you visit (default `100`, `0` = off).

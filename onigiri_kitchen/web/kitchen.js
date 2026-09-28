@@ -1069,6 +1069,24 @@
     return `<b>${item.jp}</b> ${item.name}\n${item.desc}`;
   }
 
+  // 漢数字: 10 → 十, 23 → 二十三, 105 → 百五, 2026 → 二千二十六
+  function kanjiNum(n) {
+    n = Math.max(0, Math.floor(n));
+    if (n === 0) return '零';
+    const d = '〇一二三四五六七八九';
+    const units = ['', '十', '百', '千'];
+    let out = '';
+    const man = Math.floor(n / 10000);
+    if (man) { out += kanjiNum(man) + '万'; n %= 10000; }
+    String(n).padStart(4, '0').split('').forEach((ch, i) => {
+      const v0 = +ch;
+      const u = units[3 - i];
+      if (!v0) return;
+      out += (v0 === 1 && u ? '' : d[v0]) + u;
+    });
+    return out;
+  }
+
   // Specials Book rewards (earned by collecting Onigiri specials)
   function drawRewards() {
     const book = MENU_DISHES.book;
@@ -1089,7 +1107,7 @@
       const y = 40;
       R(x, y, 15, 34, '#5a3a22'); R(x + 1, y + 1, 13, 32, '#7a4d2c'); R(x + 2, y + 2, 11, 30, '#efe6cf');
       R(x + 7, y - 3, 1, 3, '#2b1c12');
-      regions.push({ x, y: y - 3, w: 15, h: 37, label: `<b>品書き</b> Specials board\n${book.length} specials collected in your Onigiri Specials Book`, click: () => { OKSound.pluck(5); } });
+      regions.push({ x, y: y - 3, w: 15, h: 37, label: `<b>品書き</b> Specials board · ${kanjiNum(book.length)}品\n${book.length} specials collected in your Onigiri Specials Book\nTap to open the menu`, click: openOshinagaki });
     }
     if (has('densetsu_bocho')) {
       // the legendary knife on a little rack above the chef
@@ -1104,7 +1122,146 @@
     }
   }
 
+  // 柱時計: a clock on real time, either a wooden wall clock or a flip clock
+  // (tap to swap; remembered in your settings). The hands and flip cards are
+  // drawn in hi-res in drawText. It never chimes by itself.
+  const CLOCK = { x: 224, y: 27, r: 7 };
+  const flip = { shown: null, prev: null, t: [0, 0, 0, 0] }; // digits and per-card flip timers
+  const FLIP_TIME = 0.5;
+  const clockStyle = () => (conf.clock_style === 'flip' ? 'flip' : 'analog');
+  function clockTime() {
+    const now = new Date();
+    const hh = now.getHours();
+    const mm = now.getMinutes();
+    return { now, hh, mm, h12: ((hh + 11) % 12) + 1, ampm: hh < 12 ? 'am' : 'pm' };
+  }
+  function drawClock() {
+    const { x, y, r } = CLOCK;
+    const t = clockTime();
+    if (clockStyle() === 'flip') {
+      // a little wooden stand for the flip cards
+      R(x - 12, y - 6, 25, 13, C.woodDk); R(x - 11, y - 5, 23, 11, '#2a1d14');
+      R(x - 10, y + 7, 3, 2, C.woodDk); R(x + 8, y + 7, 3, 2, C.woodDk);
+      R(x, y - 9, 1, 3, '#2b1c12');
+    } else {
+      // pendulum box below the face
+      R(x - 4, y + r, 9, 10, C.woodDk); R(x - 3, y + r + 1, 7, 8, '#3a2618');
+      const sw = Math.round(Math.sin(time * 3.1) * 2);
+      line(x, y + r + 1, x + sw, y + r + 6, C.gold); R(x + sw - 1, y + r + 6, 3, 2, C.gold);
+      // face with a wooden rim and hour marks
+      ellipse(x, y, r + 1, r + 1, C.woodDk);
+      ellipse(x, y, r, r, '#5a3a22');
+      ellipse(x, y, r - 1, r - 1, '#f6efdc');
+      [[0, -1], [1, 0], [0, 1], [-1, 0]].forEach(([dx, dy]) => P(x + dx * (r - 2), y + dy * (r - 2), '#5a4632'));
+      R(x, y - r - 3, 1, 2, '#2b1c12');
+    }
+    const other = clockStyle() === 'flip' ? 'the wall clock' : 'a flip clock';
+    regions.push({ x: x - 13, y: y - r - 3, w: 27, h: r * 2 + 14, label: `<b>柱時計</b> Clock · ${t.h12}:${String(t.mm).padStart(2, '0')} ${t.ampm}\nTap to switch to ${other}`, click: swapClock });
+  }
+  function swapClock() {
+    conf.clock_style = clockStyle() === 'flip' ? 'analog' : 'flip';
+    send('conf', JSON.stringify({ clock_style: conf.clock_style }));
+    flip.shown = null; // fresh cards, no flip on switching
+    OKSound.koto(OKSound.scaleNote(0), 0, 1.2);
+    OKSound.koto(OKSound.scaleNote(3), 0.18, 1.4);
+    toast(conf.clock_style === 'flip' ? 'パタパタ · Flip clock' : '柱時計 · Wall clock');
+  }
+  function updateClock(dt) {
+    if (clockStyle() !== 'flip') return;
+    const t = clockTime();
+    const digits = [t.h12 >= 10 ? '1' : '', String(t.h12 % 10), String(Math.floor(t.mm / 10)), String(t.mm % 10)];
+    if (!flip.shown) { flip.shown = digits; flip.prev = digits.slice(); flip.t = [0, 0, 0, 0]; return; }
+    digits.forEach((d, i) => {
+      if (d !== flip.shown[i]) { flip.prev[i] = flip.shown[i]; flip.shown[i] = d; flip.t[i] = FLIP_TIME; }
+    });
+    for (let i = 0; i < 4; i++) flip.t[i] = Math.max(0, flip.t[i] - dt);
+  }
+  // hi-res: hands, or the four flip cards
+  function drawClockHiRes(s) {
+    const cx = (CLOCK.x + 0.5) * s;
+    const cy = (CLOCK.y + 0.5) * s;
+    if (clockStyle() !== 'flip') {
+      const t = clockTime();
+      const m = t.mm + t.now.getSeconds() / 60;
+      const h = (t.hh % 12) + m / 60;
+      const hand = (ang, len, w, col) => {
+        v.strokeStyle = col;
+        v.lineWidth = w * s;
+        v.lineCap = 'round';
+        v.beginPath();
+        v.moveTo(cx, cy);
+        v.lineTo(cx + Math.sin(ang) * len * s, cy - Math.cos(ang) * len * s);
+        v.stroke();
+      };
+      hand((h / 12) * Math.PI * 2, 3.4, 0.9, '#2b2622');
+      hand((m / 60) * Math.PI * 2, 5.1, 0.6, '#2b2622');
+      v.fillStyle = C.shu;
+      v.beginPath();
+      v.arc(cx, cy, 0.7 * s, 0, Math.PI * 2);
+      v.fill();
+      return;
+    }
+    if (!flip.shown) return;
+    const cw = 4.4 * s;
+    const ch = 8 * s;
+    const gap = 0.5 * s;
+    const colon = 1.6 * s;
+    const total = cw * 4 + gap * 2 + colon;
+    let x0 = CLOCK.x * s + 0.5 * s - total / 2;
+    const top = cy - ch / 2;
+    v.textAlign = 'center';
+    v.textBaseline = 'middle';
+    v.font = `800 ${Math.round(6.4 * s)}px -apple-system,system-ui,"Helvetica Neue",sans-serif`;
+    const half = (digit, x, which, k) => {
+      // draw one half ('top' | 'bottom') of a card, squashed by k about the middle
+      const mid = top + ch / 2;
+      v.save();
+      v.translate(0, mid);
+      v.scale(1, Math.max(0.0001, k));
+      v.translate(0, -mid);
+      v.beginPath();
+      if (which === 'top') v.rect(x, top, cw, ch / 2); else v.rect(x, mid, cw, ch / 2);
+      v.clip();
+      v.fillStyle = which === 'top' ? '#3a3230' : '#2e2826';
+      v.fillRect(x, top, cw, ch);
+      v.fillStyle = '#f3ecdc';
+      if (digit) v.fillText(digit, x + cw / 2, mid + 0.2 * s);
+      v.restore();
+    };
+    for (let i = 0; i < 4; i++) {
+      const x = x0;
+      const cur = flip.shown[i];
+      const old = flip.prev[i];
+      const tt = flip.t[i];
+      if (tt > 0) {
+        const p = 1 - tt / FLIP_TIME; // 0 → 1
+        half(cur, x, 'top', 1); // new top, behind the falling flap
+        half(old, x, 'bottom', 1); // old bottom, until the new one lands
+        if (p < 0.5) half(old, x, 'top', 1 - p * 2); // the old top folds down
+        else half(cur, x, 'bottom', (p - 0.5) * 2); // the new bottom drops into place
+      } else {
+        half(cur, x, 'top', 1);
+        half(cur, x, 'bottom', 1);
+      }
+      // the split line and a little shine
+      v.fillStyle = 'rgba(0,0,0,0.55)';
+      v.fillRect(x, top + ch / 2 - 0.15 * s, cw, 0.3 * s);
+      v.fillStyle = 'rgba(255,255,255,0.06)';
+      v.fillRect(x, top, cw, ch * 0.18);
+      x0 += cw + (i === 1 ? gap + colon + gap : gap);
+      if (i === 1) {
+        // blinking colon between hours and minutes
+        if (Math.floor(Date.now() / 1000) % 2 === 0) {
+          v.fillStyle = '#f3ecdc';
+          v.fillRect(x + cw + gap + colon / 2 - 0.35 * s, cy - 1.6 * s, 0.7 * s, 0.7 * s);
+          v.fillRect(x + cw + gap + colon / 2 - 0.35 * s, cy + 0.9 * s, 0.7 * s, 0.7 * s);
+        }
+      }
+    }
+  }
+
   function drawWallDecor() {
+    drawClock();
     for (const id of ['kakejiku', 'furin']) {
       if (!has(id)) continue;
       const d = DECOR[id];
@@ -3440,10 +3597,14 @@
       v.fillStyle = '#2b2622';
       v.font = `700 ${Math.round(3.6 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
       ['品', '書'].forEach((ch, k) => v.fillText(ch, 310.5 * s, (48 + k * 5.5) * s));
+      // the count in kanji, top to bottom (十, 二十三, 百…)
+      const kn = kanjiNum(MENU_DISHES.book.length).split('');
+      const step = kn.length > 3 ? 3.9 : 5;
       v.fillStyle = '#9a2f22';
-      v.font = `800 ${Math.round(4.6 * s)}px -apple-system,system-ui,sans-serif`;
-      v.fillText(String(MENU_DISHES.book.length), 310.5 * s, 64 * s);
+      v.font = `800 ${Math.round((kn.length > 3 ? 3.3 : 4) * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
+      kn.forEach((ch, k) => v.fillText(ch, 310.5 * s, (61 + k * step) * s));
     }
+    drawClockHiRes(s);
     // suggestion box label
     v.fillStyle = '#5a3a22';
     v.font = `700 ${Math.round(3.3 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
@@ -3598,7 +3759,7 @@
     windTimer -= dt;
     if (windTimer <= 0) {
       windTimer = rand(25, 50);
-      if (has('furin')) { shake.furin = 1; OKSound.chime(); }
+      if (has('furin')) shake.furin = 0.6; // a silent sway: it only rings when you tap it
       norenSway = Math.max(norenSway, 0.6);
     }
 
@@ -3612,6 +3773,7 @@
     updateRadio(dt);
     updateLamps(dt);
     updateParty(dt);
+    updateClock(dt);
   }
 
   function render() {
@@ -4433,6 +4595,56 @@
   $('ok-tour-back').addEventListener('click', () => tourGo(tourIdx - 1));
   $('ok-tour-skip').addEventListener('click', endTour);
 
+  // --------------------------------------------------- お品書き the menu
+  // A washi-paper menu of everything the kitchen serves: today's special,
+  // your Specials Book (rarest first) and the house onigiri.
+  const RARITY_ORDER = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
+  function openOshinagaki() {
+    OKSound.pluck(5);
+    const el = $('ok-menu');
+    const list = $('ok-menu-list');
+    list.innerHTML = '';
+    const entry = (d, note) => {
+      const rar = RARITY[d.rarity] || RARITY.common;
+      const row = document.createElement('div');
+      row.className = 'ok-menu-item';
+      const cv = document.createElement('canvas');
+      cv.width = 11;
+      cv.height = 9;
+      const prev = gRef;
+      gRef = cv.getContext('2d');
+      drawDish(d, 1, 1);
+      gRef = prev;
+      row.appendChild(cv);
+      // (always a tip cell, so the seals line up in a column)
+      const bonus = `<small class="ok-menu-tip">${d.from !== 'house' && rar.bonus ? `+${rar.bonus}文` : ''}</small>`;
+      row.insertAdjacentHTML('beforeend',
+        `<div class="ok-menu-name"><b>${esc(d.name)}</b>${d.desc ? `<span>${esc(d.desc)}</span>` : ''}${note ? `<em>${note}</em>` : ''}</div>` +
+        (d.from === 'house' ? '<i class="ok-menu-seal house">定番</i>' : `<i class="ok-menu-seal" style="--seal:${rar.c}" title="${rar.name}">${rar.jp}</i>`) + bonus);
+      list.appendChild(row);
+    };
+    const section = (jp, en) => list.insertAdjacentHTML('beforeend', `<div class="ok-menu-sec"><b>${jp}</b><span>${en}</span></div>`);
+    const today = MENU_DISHES.today;
+    if (today) {
+      section('本日のおすすめ', "Today's special");
+      const t = SPECIALS.today;
+      entry(today, t.done ? '✓ Prepared in Onigiri today' : `${t.progress}/${t.target} cards in Onigiri · golden guests order it`);
+    }
+    const book = MENU_DISHES.book.slice().sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
+    if (book.length) {
+      section('特製', `From your Specials Book · ${kanjiNum(book.length)}品 (${book.length})`);
+      book.forEach((d) => entry(d));
+    }
+    section('定番', 'House onigiri');
+    MENU_DISHES.house.forEach((d) => entry(d));
+    const n = MENU_DISHES.book.length;
+    $('ok-menu-count').textContent = n ? `${kanjiNum(n)}品` : '';
+    $('ok-menu-count').title = `${n} specials`;
+    el.hidden = false;
+    list.scrollTop = 0;
+  }
+  $('ok-menu').addEventListener('click', (e) => { if (e.target === $('ok-menu') || e.target.closest('[data-close-menu]')) $('ok-menu').hidden = true; });
+
   // ------------------------------------------------- 相棒 starter chooser
   // First visit: pick a cat, a puffle (and its colour) or a Java sparrow.
   // The same card picks the free first colour for a puffle bought later.
@@ -4713,7 +4925,7 @@
   // dev preview only: draw sprites onto a test canvas
   if (window.OK_DEBUG_HOOKS) {
     window.OKD = {
-      tama, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish,
+      tama, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish, openOshinagaki,
       step(n) { for (let i = 0; i < n; i++) update(1 / 30); },
       draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, withPet, ANIMAL_ART }); } finally { gRef = prev; } },
     };

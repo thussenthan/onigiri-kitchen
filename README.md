@@ -22,7 +22,7 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   Special you've finished), so the menu grows as your Book does, and golden guests order today's Daily Special.
   Rarer specials tip more (+1 mon for Uncommon up to +6 for Legendary). The chef cooks each order (tap him to make
   dishes ahead for the tray), and the menu tags on the wall show your newest specials. Collecting specials earns
-  rewards: a specials board at 10, a golden headband for the chef at 25, a golden frame for your first Epic and a
+  rewards: a specials board at 10 (tap it for a お品書き menu of everything the kitchen serves), a golden headband for the chef at 25, a golden frame for your first Epic and a
   legendary knife for your first Legendary. When you finish a new special, the chef announces it (and makes one)
   the next time you visit, and he cheers when your Onigiri restaurant levels up. Without Onigiri, the house onigiri flavours unlock as your restaurant levels up.
 - **A daily goal party.** Reach your daily card goal (100 by default, change it in ⚙) and your restaurant throws a
@@ -58,6 +58,7 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **More pets.** Big milestone purchases that move into the restaurant, each with a perk (hover one in the
   shop to see it): a rabbit, a black cat (your pet's best friend), a shiba, a fox, a tanuki and a red-crowned crane.
   At night and during focus sessions they all curl up on the bed.
+- **A clock on real time.** A wooden wall clock, or tap it for a flip clock with split-flap digits.
 - **Candles on the tables.** Click a candle to light or snuff it (with a little flame, sparks and a curl of smoke).
   The paper lanterns switch on and off together with a click. Lanterns and candles light themselves at dusk and
   go out at dawn.
