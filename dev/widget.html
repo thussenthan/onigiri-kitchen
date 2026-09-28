@@ -7,6 +7,8 @@ body.nightMode { --bg:#2c2c2c; --fg:#e0e0e0; --fg-subtle:#9e9e9e; --border:#4242
 .external-widget-container, .onigiri-widget-container { width:100%; height:100%; display:flex; flex-direction:column; overflow:hidden; }
 .fake { background:var(--canvas-inset); border-radius:15px; border:1px solid var(--border); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; padding:0 18px; box-sizing:border-box; color:var(--fg); font-size:13px; } .fake .lbl { color:var(--fg-subtle); font-size:12px; font-weight:600; } .fake b { font-size:22px; font-weight:800; }
 h3 { font-size:13px; color:var(--fg-subtle); margin:18px 0 8px; }
+.heat { position:relative; justify-content:flex-start; padding:16px 18px; } .cells { position:absolute; inset:46px 18px 18px; display:grid; grid-template-columns:repeat(14,1fr); grid-auto-rows:min-content; align-content:start; gap:3px; overflow:hidden; }
+.cells i { aspect-ratio:1; border-radius:3px; background:var(--accent-color); }
 .plainwrap { background:#fff; padding:14px; border-radius:8px; text-align:center; color:#333; }
 </style>
 <script>window.pycmd=(m)=>{document.title=m};</script>
@@ -20,8 +22,12 @@ h3 { font-size:13px; color:var(--fg-subtle); margin:18px 0 8px; }
   <div class="external-widget-container" style="grid-area:1/4/span 1/span 1"><div class="okw" role="button" tabindex="0"><script type="application/json" class="okw-data">{"guests": 7, "nextIn": 3, "reviews": 142, "focusDone": 2, "stats": {"total": 48213, "days": 312, "average": 155, "bestStreak": 47}, "mon": 186, "pet": {"species": "cat", "name": "Tama", "tummy": 70, "love": 85, "energy": 70, "stage": 1}, "theme": "#D49083", "timer": {"pomo": {"phase": "idle", "rounds": 1, "cycle": 4}, "sound": false}}</script><div class="okw-in"><canvas class="okw-scene" width="64" height="40"></canvas><div class="okw-info"></div></div></div></div>
   <div class="external-widget-container" style="grid-area:2/1/span 2/span 2" id="w22"><div class="okw" role="button" tabindex="0"><script type="application/json" class="okw-data">{"guests": 0, "nextIn": 3, "reviews": 142, "focusDone": 2, "stats": {"total": 48213, "days": 312, "average": 155, "bestStreak": 47}, "mon": 186, "pet": {"species": "puffle", "name": "Puff", "tummy": 70, "love": 85, "energy": 70, "stage": 1}, "puffleColor": "#f28dbb", "theme": "#D49083", "timer": {"pomo": {"phase": "focus", "endsAt": 0, "remaining": 1101000, "paused": true, "rounds": 1, "cycle": 4}}}</script><div class="okw-in"><canvas class="okw-scene" width="64" height="40"></canvas><div class="okw-info"></div></div></div></div>
   <div class="external-widget-container" style="grid-area:2/3/span 2/span 1"><div class="okw" role="button" tabindex="0"><script type="application/json" class="okw-data">{"guests": 7, "nextIn": 3, "reviews": 142, "focusDone": 2, "stats": {"total": 48213, "days": 312, "average": 155, "bestStreak": 47}, "mon": 186, "pet": {"species": "bird", "name": "Tama", "tummy": 70, "love": 85, "energy": 70, "stage": 1}, "theme": "#D49083", "timer": {"pomo": {"phase": "idle", "rounds": 1, "cycle": 4}, "sound": false}}</script><div class="okw-in"><canvas class="okw-scene" width="64" height="40"></canvas><div class="okw-info"></div></div></div></div>
-  <div class="onigiri-widget-container fake" style="grid-area:2/4/span 2/span 1"><span class="lbl">Heatmap</span></div>
+  <div class="onigiri-widget-container fake heat" style="grid-area:2/4/span 2/span 1"><span class="lbl">Heatmap</span><div class="cells" id="heat"></div></div>
 </div>
+<script>{ // a stand-in for Onigiri's heatmap: 12 weeks of made-up study days
+  let x = 7; const heat = document.getElementById('heat');
+  for (let i = 0; i < 168; i++) { x = (x * 48271) % 2147483647; const v = x % 5;
+    const c = document.createElement('i'); c.style.opacity = v ? 0.2 + v * 0.2 : 0.08; heat.appendChild(c); } }</script>
 <h3>Plain Anki (no Onigiri), under the deck list</h3>
 <div class="plainwrap">[deck list]<div class="okw okw-plain" role="button" tabindex="0"><script type="application/json" class="okw-data">{"guests": 7, "nextIn": 3, "reviews": 142, "focusDone": 2, "stats": {"total": 48213, "days": 312, "average": 155, "bestStreak": 47}, "mon": 186, "pet": {"species": "cat", "name": "Tama", "tummy": 70, "love": 85, "energy": 70, "stage": 1}, "theme": "#D49083", "timer": {"pomo": {"phase": "idle", "rounds": 1, "cycle": 4}, "sound": false}}</script><div class="okw-in"><canvas class="okw-scene" width="64" height="40"></canvas><div class="okw-info"></div></div></div></div>
 </body></html>

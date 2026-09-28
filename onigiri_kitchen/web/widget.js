@@ -215,11 +215,11 @@
     const ctx = canvas.getContext('2d');
     const w = { el, d, ctx };
     widgets.push(w);
+    renderInfo(el, d); // first, so the scene is measured at its final size
     fitCanvas(canvas);
     drawScene(ctx, d, performance.now() / 1000);
     el.addEventListener('click', () => send('open'));
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); send('open'); } });
-    renderInfo(el, d);
   }
 
   function scan() {
