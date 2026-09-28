@@ -36,6 +36,8 @@
     if (!r.width || !r.height) return;
     const want = Math.max(40, Math.min(200, Math.round((H * r.width) / r.height)));
     if (canvas.width !== want) canvas.width = want;
+    // narrow widgets lay their text over the scene (see widget.css)
+    canvas.okwOverlay = getComputedStyle(canvas).position === 'absolute';
   }
 
   function drawScene(ctx, d, time) {
@@ -105,7 +107,8 @@
     const p = d.pet || {};
     const phase = (d.timer && d.timer.pomo && d.timer.pomo.phase) || 'idle';
     const sleepy = p.energy < 35 || phase === 'focus' || hour >= 23.5 || hour < 5.5;
-    const tx = W >= 84 ? Math.round(W * 0.42) : Math.min(14, dx - 10);
+    // the pet stands on the right when text covers the left of the scene
+    const tx = ctx.canvas.okwOverlay ? W - (W > 50 ? 9 : 6) : W >= 84 ? Math.round(W * 0.42) : Math.min(14, dx - 10);
     if (!p.species) {
       // no pet chosen yet
     } else if (p.species === 'puffle') {
