@@ -86,15 +86,29 @@ def _on_timer_change() -> None:
     push_timer()
 
 
+def _special_cheer(specials: Dict[str, Any]) -> bool:
+    """True once a day, the first time the kitchen learns that today's
+    special is done in Onigiri (the chef cheers and makes it for the tray)."""
+    t = specials.get("today")
+    today = state.data["today"]
+    if not (t and t.get("done")) or today.get("special_cheered"):
+        return False
+    today["special_cheered"] = True
+    state.save_soon()
+    return True
+
+
 def _focus_credit() -> Dict[str, Any]:
     """Credit a finished focus session, and tell the kitchen what it earned:
     the daruma's wish (4th session today) and whether today's special is
     done in Onigiri (golden guests tip more for it)."""
     daruma = state.focus_completed()
     _specials_cache["value"] = None  # re-read Onigiri for the golden guest's order
-    today = cached_specials().get("today")
+    specials = cached_specials()
+    today = specials.get("today")
     return {
         "daruma": daruma,
+        "specialCheer": _special_cheer(specials),
         "focusDone": int(state.data["today"].get("focus_done", 0)),
         "mon": state.data["mon"],
         "specialDone": bool(today and today.get("done")),
@@ -273,6 +287,7 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     seen = state.data.get("menu_seen")
     new_dishes = [n for n in names if n not in seen] if isinstance(seen, list) else []
     state.data["menu_seen"] = names
+    special_cheer = _special_cheer(specials)
     progress = restaurant_progress()
     last_level = state.data.get("last_level")
     state.data["last_level"] = int(progress.get("level", 0))
@@ -304,6 +319,7 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
         "specials": specials,
         "levelUp": level_up,
         "newDishes": new_dishes,
+        "specialCheer": special_cheer,
         "goalParty": goal_party,
         "state": state.snapshot(),
         "takeout": state.pop_takeout(),

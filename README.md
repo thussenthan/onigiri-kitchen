@@ -21,7 +21,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **Your Onigiri Specials are on the menu.** Guests order dishes from your Onigiri Specials Book (every Daily
   Special you've finished), so the menu grows as your Book does, and golden guests order today's Daily Special.
   Rarer specials tip more (+1 mon for Uncommon up to +6 for Legendary), and once you've finished today's
-  special in Onigiri, golden guests tip +3 more for it. The chef cooks each order (tap him to make
+  special in Onigiri, golden guests tip +3 more for it, the 本日 tag gets a 済 (done) seal, and the chef
+  cheers and makes it for the tray. The chef cooks each order (tap him to make
   dishes ahead for the tray), and the menu tags on the wall show your newest specials. Collecting specials earns
   rewards: a specials board at 10 (tap it for a お品書き menu of everything the kitchen serves), a golden headband for the chef at 25, a golden frame for your first Epic and a
   legendary knife for your first Legendary. When you finish a new special, the chef announces it (and makes one)

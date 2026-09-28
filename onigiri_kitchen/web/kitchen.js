@@ -869,7 +869,7 @@
     const t = SPECIALS.today;
     if (!t) return `<b>本日</b> Today's special\n${S.today.reviews || 0} cards reviewed today`;
     const d = MENU_DISHES.today;
-    return `<b>本日</b> Today's special: ${esc(t.name)}\n${t.done ? '✓ Prepared in Onigiri!' : `${t.progress}/${t.target} cards in Onigiri`} · golden guests order it\n${esc(d.desc || '')}`;
+    return `<b>本日</b> Today's special: ${esc(t.name)}\n${t.done ? `✓ Prepared in Onigiri! Golden guests tip +${TODAY_DONE_BONUS} more for it` : `${t.progress}/${t.target} cards in Onigiri · golden guests order it (finish it for +${TODAY_DONE_BONUS})`}\n${esc(d.desc || '')}`;
   }
   function drawMenu() {
     R(102, 20, 66, 2, C.woodDk);
@@ -881,6 +881,10 @@
       R(x + sw, 22, 10, 28, C.woodDk);
       R(x + 1 + sw, 23, 8, 26, paper);
       R(x + 1 + sw, 48, 8, 1, shade(paper, -0.15));
+      if (i === 4 && todayDone()) { // 済 seal: today's special is done in Onigiri
+        R(x + 2 + sw, 41, 6, 6, '#fff8ee');
+        R(x + 2 + sw, 41, 6, 1, '#f3e6d2');
+      }
       const label = i === 4 ? specialTag() : tag ? `${tag.label}\nClick to play a note ♪` : `<b>${m.jp}</b> ${m.en}`;
       regions.push({ x, y: 22, w: 10, h: 28, label, click: () => { shake['menu' + i] = 0.4; OKSound.pluck(3 + i); } });
     });
@@ -1347,6 +1351,7 @@
     }
     if (SPECIALS.today && typeof info.specialDone === 'boolean') SPECIALS.today.done = info.specialDone;
     updateStatus();
+    if (info.specialCheer) setTimeout(specialCheer, info.daruma ? 3400 : 400);
     if (info.daruma) {
       shake.daruma = 1.2;
       OKSound.coin();
@@ -3605,11 +3610,18 @@
       const tag = i < 4 ? MENU_TAGS[i] : null;
       v.fillStyle = i === 4 ? '#fff8ee' : tag && tag.locked ? 'rgba(43,38,34,0.35)' : '#2b2622';
       const chars = (tag ? tag.jp : m.jp).split('');
+      const sealed = i === 4 && todayDone(); // 本日 moves up to make room for the 済 seal
       // up to four characters fit on a tag (ネギトロ), a little smaller when long
-      const step = chars.length > 3 ? 6 : chars.length > 2 ? 7.5 : chars.length > 1 ? 9 : 0;
+      const step = chars.length > 3 ? 6 : chars.length > 2 ? 7.5 : chars.length > 1 ? (sealed ? 7 : 9) : 0;
       if (chars.length > 2) v.font = `700 ${Math.round(4.4 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
-      chars.forEach((ch, k) => v.fillText(ch, (x + sw) * s, (36 + (k - (chars.length - 1) / 2) * step) * s));
+      chars.forEach((ch, k) => v.fillText(ch, (x + sw) * s, ((sealed ? 31.5 : 36) + (k - (chars.length - 1) / 2) * step) * s));
       if (chars.length > 2) v.font = `700 ${Math.round(5.2 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
+      if (sealed) {
+        v.fillStyle = C.shu;
+        v.font = `700 ${Math.round(4.4 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
+        v.fillText('済', (x + sw) * s, 44.2 * s);
+        v.font = `700 ${Math.round(5.2 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
+      }
     });
     if (has('kakejiku')) {
       v.fillStyle = '#2b2622';
@@ -4883,6 +4895,23 @@
       chef.dish = first;
     }
   }
+  // Today's special is done in Onigiri: the chef cheers (once a day) and makes
+  // it for the tray, for the next golden guest.
+  function specialCheer() {
+    const d = MENU_DISHES.today;
+    if (!d) return;
+    OKSound.fanfare();
+    chef.lineT = 10;
+    say(['本日の品、できました!', `${d.name}, fresh from Onigiri! Golden guests tip +${TODAY_DONE_BONUS} today.`]);
+    spawnHearts(121, 74, 2);
+    shake.menu4 = 0.4;
+    if (chef.state === 'idle' && trayDishes.length < 6) {
+      chef.state = 'make';
+      chef.t = 0;
+      chef.target = null;
+      chef.dish = d;
+    }
+  }
   // Onigiri's restaurant levelled up since you were last here: the chef cheers.
   function levelUpCheer(lu) {
     const seatsThen = clamp(2 + Math.floor(lu.from / 5), 2, 5);
@@ -4976,6 +5005,7 @@
     const news = [];
     if (INIT.levelUp) news.push(() => levelUpCheer(INIT.levelUp));
     if ((INIT.newDishes || []).length) news.push(() => newDishCheer(INIT.newDishes));
+    if (INIT.specialCheer) news.push(specialCheer);
     if (INIT.goalParty) news.push(() => goalParty(INIT.goalParty));
     news.forEach((fn, i) => setTimeout(fn, 250 + i * 3400));
     if (INIT.setBonusNow) { setBonusModal(500); return; }
