@@ -171,14 +171,15 @@
       const c = time % 3;
       const zc = '#d8c8ab';
       const right = tx + 20 <= W;
-      [4, 5, 6].forEach((n, k) => {
-        if (c < k * 0.6) return;
-        const zx = right ? tx + 3 + k * 5 : tx - 3 - k * 5 - n + 4;
-        const zy = 23 - k * 5 - (n - 4);
-        R(zx, zy, n, 1, zc);
-        for (let j = 1; j <= n - 2; j++) R(zx + n - 1 - j, zy + j, 1, 1, zc);
-        R(zx, zy + n - 1, n, 1, zc);
-      });
+      // 5x5 (the smallest that reads as a Z), a pixel apart, rising gently
+      for (let k = 0; k < 3; k++) {
+        if (c < k * 0.6) continue;
+        const zx = right ? tx + 3 + k * 6 : tx - 8 - k * 6;
+        const zy = 21 - k * 4;
+        R(zx, zy, 5, 1, zc);
+        for (let j = 1; j <= 3; j++) R(zx + 4 - j, zy + j, 1, 1, zc);
+        R(zx, zy + 4, 5, 1, zc);
+      }
     }
     if (night) {
       ctx.fillStyle = 'rgba(22,14,40,0.22)';

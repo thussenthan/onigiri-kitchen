@@ -2056,9 +2056,8 @@
   function sleepZ(x, y) {
     const c = time % 3;
     if (c >= 2.4) return;
-    [4, 4, 5].forEach((n, k) => {
-      if (c >= k * 0.6) zGlyph(x - 1 + k * 5, Math.round(y - 1 - k * 5 - (n - 4)), n, '#8b7b69');
-    });
+    // 5x5 (the smallest that reads as a Z), a pixel apart, rising gently
+    for (let k = 0; k < 3; k++) if (c >= k * 0.6) zGlyph(x - 1 + k * 6, y - 1 - k * 4, 5, '#8b7b69');
   }
   // Pets without a kotatsu head-poke sleep on top of it instead.
   function bedTop(x) {
