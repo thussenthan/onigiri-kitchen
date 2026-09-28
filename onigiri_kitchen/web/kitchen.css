@@ -873,3 +873,172 @@ body { background-image: none !important; font-family: var(--sans); }
 .ok-panel-head { flex: none; }
 
 .ok-pet-actions button.on { border-color: var(--shu); background: color-mix(in srgb, var(--shu) 14%, var(--card)); }
+
+/* ------------------------------------------- sound icon, pet tabs, shop */
+.ok-foot-btn.ok-icon-only { display: inline-flex; align-items: center; justify-content: center; width: 36px; padding: 0; }
+.ok-icon-only svg { width: 18px; height: 18px; }
+.ok-icon-only .ok-snd-off, .ok-icon-only.off .ok-snd-on { display: none; }
+.ok-icon-only.off .ok-snd-off { display: block; }
+.ok-foot-btn.ok-icon-only.off { opacity: 0.7; }
+
+.ok-pet-stage { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ok-pet-traitchip {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+/* segmented tabs: Care / Style / Keepsakes */
+.ok-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin: 12px 18px 0;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--paper-2);
+}
+.ok-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 6px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-2);
+  font: 700 13px var(--sans);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.ok-tabs button .jp { font-size: 12px; color: var(--ink-3); }
+.ok-tabs button span { font-weight: 600; font-size: 11.5px; opacity: 0.7; }
+.ok-tabs button:hover { color: var(--ink); background: color-mix(in srgb, var(--card) 55%, transparent); }
+.ok-tabs button.on { background: var(--card); color: var(--shu); box-shadow: 0 1px 3px rgba(40, 24, 10, 0.18); }
+.ok-tabs button.on .jp { color: var(--shu); }
+.ok-tab { display: flex; flex-direction: column; gap: 12px; }
+.ok-tab[hidden] { display: none; }
+.ok-meter { grid-template-columns: 82px auto; grid-template-rows: auto; }
+.ok-meter-label { grid-row: auto; }
+.ok-pet-happy { font-size: 11.5px; }
+.ok-chip-more { border-style: dashed; color: var(--ink-3); }
+
+.ok-color-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.ok-color {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px 6px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+.ok-color canvas { width: 36px; height: 34px; image-rendering: pixelated; }
+.ok-color span { font-size: 11.5px; font-weight: 700; }
+.ok-color small { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--ink-3); font-weight: 600; }
+.ok-color small svg { width: 12px; height: 12px; }
+.ok-color:hover { border-color: var(--shu); }
+.ok-color.on { border-color: var(--matcha); box-shadow: inset 0 0 0 1px var(--matcha); }
+.ok-color[disabled] { opacity: 0.45; cursor: default; border-color: var(--line); }
+
+/* ------------------------------------------------- starter chooser */
+.ok-starter { z-index: 40; }
+.ok-starter-card { width: min(520px, calc(100vw - 40px)); }
+.ok-starter-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.ok-starter-opts[hidden] { display: none; }
+.ok-starter-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.ok-starter-opt canvas {
+  width: 100px;
+  height: 75px;
+  image-rendering: pixelated;
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 115%, #cdbb7e 0 45%, transparent 46%), linear-gradient(180deg, #8a5a34, #7a4d2c);
+}
+.ok-starter-opt b { font-size: 13px; }
+.ok-starter-opt b .jp { color: var(--shu); margin-right: 2px; }
+.ok-starter-opt small { font-size: 11px; line-height: 1.35; color: var(--ink-3); }
+.ok-starter-opt:hover { border-color: var(--shu); }
+.ok-starter-opt.on { border-color: var(--shu); background: color-mix(in srgb, var(--shu) 8%, var(--card)); }
+.ok-starter-colors { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 16px; }
+.ok-starter-colors[hidden] { display: none; }
+.ok-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--card);
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.ok-swatch.on { box-shadow: 0 0 0 2px var(--shu); transform: scale(1.12); }
+@media (max-width: 560px) {
+  .ok-starter-opts { grid-template-columns: 1fr; }
+  .ok-starter-opt { flex-direction: row; text-align: left; }
+  .ok-starter-opt canvas { width: 64px; height: 48px; flex: none; }
+}
+
+/* panels open right above (or below) the button that opened them */
+.ok-panel { animation: ok-rise-panel 0.22s ease-out; }
+@keyframes ok-rise-panel { from { transform: translateY(8px); opacity: 0; } }
+#ok-decor { height: auto; }
+.ok-decor-grid { min-height: 0; }
+.ok-icon-btn svg { width: 15px; height: 15px; display: block; }
+
+/* rename by double-clicking the name */
+.ok-pet-namewrap h2 { cursor: text; border-radius: 6px; padding: 0 3px; margin-left: -3px; }
+.ok-pet-namewrap h2:hover { background: var(--paper-2); }
+.ok-pet-namewrap.editing h2 { display: none; }
+.ok-pet-namewrap form input { width: 150px; }
+
+/* shop pets: the perk shows as a small popup on hover */
+.ok-item.ok-animal { position: relative; }
+.ok-item.ok-animal .ok-perk {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 8px;
+  z-index: 2;
+  flex: none;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg, 0 10px 30px rgba(40, 24, 10, 0.25));
+  font-size: 11.5px;
+  line-height: 1.4;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.ok-item.ok-animal:hover .ok-perk { opacity: 1; transform: none; }
+.ok-perk-hint { font-size: 11px; font-weight: 700; color: var(--shu); }
+
+/* pet card: even buttons and a tidy header, whatever the labels say */
+.ok-pet-actions button { justify-content: center; min-height: 54px; }
+.ok-pet-actions small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ok-pet-actions b { line-height: 1.1; }
+.ok-pet-stage { row-gap: 4px; }
+.ok-pet-grow { margin-top: 8px; }
+.ok-pet-happy { display: flex; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+.ok-acc-row > div { align-items: center; }
+.ok-gift { justify-content: center; }

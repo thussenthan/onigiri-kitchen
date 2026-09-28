@@ -106,7 +106,29 @@
     const phase = (d.timer && d.timer.pomo && d.timer.pomo.phase) || 'idle';
     const sleepy = p.energy < 35 || phase === 'focus' || hour >= 23.5 || hour < 5.5;
     const tx = W >= 84 ? Math.round(W * 0.42) : Math.min(14, dx - 10);
-    if (sleepy) {
+    if (!p.species) {
+      // no pet chosen yet
+    } else if (p.species === 'puffle') {
+      // a tiny puffle: spiky outline, one white eye patch, a smile
+      const c = d.puffleColor || '#3d7fd6';
+      const o = shade(c, -0.62);
+      const rows = sleepy
+        ? ['...o.o.o...', '..ofofofo..', '.offfffffo.', 'offfffffffo', 'offoofoofo.', 'offfffffffo', 'offffmmfffo', '.offfffffo.', '..ooooooo..']
+        : ['...o.o.o...', '..ofofofo..', '.offfffffo.', 'offwwwwwffo', 'offwkwkwffo', 'offwwwwwffo', 'offffmmfffo', '.offfffffo.', '..ooooooo..'];
+      const pal = { o, f: c, w: '#ffffff', k: '#2a2320', m: o };
+      const up = sleepy ? 0 : Math.round(Math.abs(Math.sin(time * 4)) * 2);
+      rows.forEach((row, j) => {
+        for (let i = 0; i < row.length; i++) if (pal[row[i]]) R(tx - 5 + i, 37 - rows.length + j - up, 1, 1, pal[row[i]]);
+      });
+    } else if (p.species === 'bird') {
+      const hop = sleepy ? 0 : Math.floor(time * 3) % 4 === 0 ? 1 : 0;
+      const y = 37 - hop;
+      R(tx - 3, y - 4, 7, 3, '#8e939e'); R(tx - 2, y - 5, 5, 1, '#8e939e'); R(tx - 1, y - 2, 4, 1, '#c4b8be');
+      R(tx - 5, y - 4, 2, 1, '#2c2b31');
+      R(tx + 2, y - 8, 4, 3, sleepy ? '#fbfbf8' : '#232228'); R(tx + 3, y - 6, 3, 2, '#fbfbf8');
+      if (!sleepy) { R(tx + 6, y - 7, 2, 2, '#ee5667'); R(tx + 4, y - 7, 1, 1, '#e0485a'); }
+      R(tx, y - 1, 1, 1, '#e8a0a8'); R(tx + 2, y - 1, 1, 1, '#e8a0a8');
+    } else if (sleepy) {
       R(tx - 5, 33, 11, 4, '#fbf7ee');
       R(tx - 4, 33, 3, 2, '#e0a13a');
       R(tx + 2, 34, 3, 2, '#3b3030');
@@ -142,17 +164,24 @@
       ? `<b>${d.guests}</b> guest${d.guests === 1 ? '' : 's'} waiting`
       : `Next guest in <b>${d.nextIn}</b> review${d.nextIn === 1 ? '' : 's'}`;
     const p = d.pet || {};
-    // The pomodoro timer already lives in the corner chip, so the widget shows
-    // today's progress instead.
-    const today = `<span class="okw-jp">今日</span><b>${d.reviews || 0}</b> review${d.reviews === 1 ? '' : 's'}` +
-      (d.focusDone ? ` · <b>${d.focusDone}</b> focus` : '');
+    // Onigiri already shows today's count, so the widget shows all-time stats
+    // from Anki's review log (the timer lives in the corner chip).
+    const st = d.stats || {};
+    const num = (n) => (n >= 100000 ? Math.round(n / 1000) + 'k' : Number(n || 0).toLocaleString());
+    const stat = (v, label, tip) => `<span class="okw-stat" title="${tip}"><b>${v}</b><small>${label}</small></span>`;
+    const stats = d.stats
+      ? stat(num(st.total), 'reviews', `${Number(st.total || 0).toLocaleString()} reviews all time`) +
+        stat(num(st.average), 'per day', 'Average reviews on the days you studied') +
+        stat(num(st.days), st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
+        stat(`${st.bestStreak || 0}d`, 'best streak', 'Longest run of days in a row with reviews')
+      : '';
     info.innerHTML =
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
       `<div class="okw-big">${big}</div>` +
-      `<div class="okw-sub"><span>文 ${d.mon}</span><span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span></div>` +
+      `<div class="okw-sub"><span>文 ${d.mon}</span>${p.species ? `<span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span>` : ''}</div>` +
       `<div class="okw-row">` +
-      `<span class="okw-today">${today}</span>` +
-      `<span class="okw-spacer"></span>` +
+      `<span class="okw-stats">${stats}</span>` +
+      '' +
       `<button class="okw-btn okw-primary" data-act="open">Visit</button>` +
       `</div>`;
     info.querySelectorAll('.okw-btn').forEach((b) => b.addEventListener('click', (e) => {

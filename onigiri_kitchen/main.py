@@ -17,12 +17,12 @@ from aqt.webview import AnkiWebView
 from . import onigiri_link
 from . import pet as petmod
 from .pomodoro import Pomodoro
-from .state import CATALOG, KitchenState
+from .state import CATALOG, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
 
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.5.8"
+VERSION = "1.6.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -166,9 +166,9 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
     pomo.on_review()
     grew = getattr(state, "pet_grew", None)
     if grew is not None:
-        stage = petmod.STAGES[grew]
+        stage = state.pet.stages()[grew]
         name = state.pet.d.get("name", "Tama")
-        tooltip(f"🐾 {name} grew up! She's now a {stage['jp']} {stage['name']}.", period=5000)
+        tooltip(f"🐾 {name} grew up! Now a {stage['jp']} {stage['name']}.", period=5000)
         _eval_kitchen(f"window.OK && OK.onPet({json.dumps(state.pet.snapshot())}, true)")
     if new_guest:
         _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
@@ -227,7 +227,10 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
         "reason": reason,
         "pet": state.pet.snapshot(),
         "petAway": away,
-        "petStages": petmod.STAGES,
+        "petStages": state.pet.stages(),
+        "petSpecies": petmod.species_payload(),
+        "puffleColors": PUFFLE_COLORS,
+        "puffleColorPrice": PUFFLE_COLOR_PRICE,
         "petGifts": petmod.GIFTS,
         "petRareGifts": petmod.RARE_GIFTS,
         "petMilestones": {k: {"kind": v[0], "need": v[1]} for k, v in petmod.MILESTONES.items()},
@@ -413,6 +416,17 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         except ValueError:
             info = {}
         return state.pet_style(str(info.get("key", "")), info.get("value"))
+    if cmd == "choose":
+        try:
+            info = json.loads(arg or "{}")
+        except ValueError:
+            info = {}
+        ok = state.choose_starter(str(info.get("species", "")), str(info.get("color", "")))
+        return {"ok": ok, "pet": state.pet.snapshot(), "stages": state.pet.stages(), "state": state.snapshot()}
+    if cmd == "pufflecolor":
+        result = state.puffle_color(arg)
+        result["state"] = state.snapshot()
+        return result
     if cmd == "bump":
         state.bump(arg)
         return None
@@ -468,6 +482,48 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
 
 
 # --------------------------------------------------- Onigiri home-screen widget
+_stats_cache: Dict[str, Any] = {"key": None, "value": None}
+
+
+def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
+    """All-time reviews, days studied, the average per study day and the
+    longest streak, from Anki's review log. Days follow Anki's own rollover.
+    Cached until today's review count (or the day) changes."""
+    try:
+        cutoff = int(mw.col.sched.day_cutoff)
+    except Exception:
+        return None
+    key = (cutoff, today_total)
+    if _stats_cache["key"] == key:
+        return _stats_cache["value"]
+    try:
+        # +100000 keeps the day index positive so the integer cast floors it.
+        rows = mw.col.db.all(
+            "select cast((id / 1000 - ?) / 86400.0 + 100000 as integer) as d, count() "
+            "from revlog where type in (0, 1, 2, 3) group by d order by d",
+            cutoff,
+        )
+    except Exception as e:
+        print(f"Onigiri Kitchen: couldn't read review history: {e}")
+        return None
+    total = sum(int(c) for _, c in rows)
+    days = len(rows)
+    best = run = 0
+    prev = None
+    for d, _ in rows:
+        run = run + 1 if prev is not None and d == prev + 1 else 1
+        best = max(best, run)
+        prev = d
+    value = {
+        "total": total,
+        "days": days,
+        "average": round(total / days) if days else 0,
+        "bestStreak": best,
+    }
+    _stats_cache.update(key=key, value=value)
+    return value
+
+
 def widget_payload() -> Dict[str, Any]:
     _sync_with_log()
     progress = onigiri_link.read_progress()
@@ -479,8 +535,10 @@ def widget_payload() -> Dict[str, Any]:
         "nextIn": max(1, per - int(best)),
         "reviews": int(state.data["today"].get("reviews", 0)),
         "focusDone": int(state.data["today"].get("focus_done", 0)),
+        "stats": lifetime_stats(int(state.data["today"].get("reviews", 0))),
         "mon": int(state.data.get("mon", 0)),
         "pet": state.pet.snapshot(),
+        "puffleColor": (PUFFLE_COLORS_BY_ID.get(state.data.get("puffle_color") or "blue") or PUFFLE_COLORS[0])["hex"],
         "theme": progress.get("themeColor") or onigiri_link.DEFAULT_THEME_COLOR,
         "timer": timer_payload(),
     }

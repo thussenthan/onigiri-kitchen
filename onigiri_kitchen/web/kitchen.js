@@ -130,7 +130,6 @@
   const DOOR_X = 277;
 
   let time = 0;
-  let lanternsOn = true;
   let hover = null;
   let regions = [];
   let customers = [];
@@ -201,6 +200,7 @@
     return 'winter';
   }
   function isRaining() {
+    if (window.OK_DEBUG_RAIN != null) return !!window.OK_DEBUG_RAIN;
     const d = new Date();
     const key = d.toDateString() + '|' + Math.floor(d.getHours() / 3);
     return (hash(key) % 100) < 18;
@@ -507,6 +507,19 @@
     R(ix, iy + inh - 6, iw, 1, night ? '#4a4450' : '#cbbca2');
     // walkers outside
     for (const wk of walkers) {
+      if (wk.penguin) {
+        // a little coloured penguin, waddling side to side
+        const sway = Math.floor(time * 5 + wk.p) % 2;
+        const bx = ix + wk.x + sway;
+        const by = iy + inh - 10;
+        R(bx + 1, by, 3, 2, wk.c); R(bx, by + 2, 5, 3, wk.c);
+        R(bx + 1 + (wk.dir > 0 ? 1 : 0), by + 2, 2, 3, '#fbfbf8');
+        P(bx + (wk.dir > 0 ? 3 : 1), by + 1, '#fbfbf8');
+        P(bx + (wk.dir > 0 ? 5 : -1), by + 1, '#f0a020');
+        R(bx + sway, by + 5, 2, 1, '#f0a020'); R(bx + 3 - sway, by + 5, 2, 1, '#f0a020');
+        if (raining) { R(bx - 2, by - 3, 9, 1, wk.u); R(bx - 1, by - 4, 7, 1, wk.u); R(bx + 2, by - 2, 1, 2, C.woodDk); }
+        continue;
+      }
       const bob = Math.floor(time * 6 + wk.p) % 2;
       const bx = ix + wk.x;
       const by = iy + inh - 10 - bob;
@@ -539,54 +552,105 @@
   }
 
   // -------------------------------------------------------------- lanterns
-  function chochin(cx, top, h, body, lit) {
+  // Every lantern (and the igloo lamp) has its own candle. Click one to light
+  // or snuff it: the flame grows and fades, with sparks on lighting and a curl
+  // of smoke when it goes out. At dusk they light themselves one by one.
+  const LAMP_IDS = ['s0', 's1', 's2', 's3', 's4', 'f0', 'f1', 'f2', 'f3', 'f4', 'aka', 'kama'];
+  const lamps = {};
+  {
+    const dark = darkness(hourNow()) > 0.05;
+    LAMP_IDS.forEach((id, i) => { lamps[id] = { on: dark, glow: dark ? 1 : 0, delay: 0, seed: i * 1.7 }; });
+  }
+  function updateLamps(dt) {
+    for (const id of LAMP_IDS) {
+      const l = lamps[id];
+      if (l.delay > 0) { l.delay -= dt; continue; }
+      if (l.on && l.glow < 1) l.glow = Math.min(1, l.glow + dt * 1.6);
+      else if (!l.on && l.glow > 0) l.glow = Math.max(0, l.glow - dt * 1.1);
+    }
+  }
+  // flame height wobbles a little, like a real candle
+  const flicker = (l) => 0.82 + 0.1 * Math.sin(time * 11 + l.seed) + 0.08 * Math.sin(time * 23 + l.seed * 3);
+  function lampOn(id, on, x, y, delay) {
+    const l = lamps[id];
+    if (l.on === on) return;
+    l.on = on;
+    l.delay = delay || 0;
+    if (delay) return;
+    if (on) {
+      for (let i = 0; i < 5; i++) particles.push({ x: x + rand(-1, 1), y, vx: rand(-10, 10), vy: -rand(6, 16), life: rand(0.3, 0.6), c: pick(['#ffd27a', '#fff3c4', '#f7a23a']), type: 'spark' });
+      OKSound.pluck(9);
+    } else {
+      for (let i = 0; i < 4; i++) particles.push({ x: x + rand(-1, 1), y: y - 1, vx: rand(-2, 2), vy: -rand(4, 8), life: rand(0.9, 1.6), c: 'rgba(214,210,224,0.75)', type: 'steam' });
+      OKSound.pop();
+    }
+  }
+  function toggleLamp(id, x, y) { lampOn(id, !lamps[id].on, x, y); }
+  // A little candle flame: (cx, base) is its bottom centre; h its full height.
+  function flame(cx, base, h, l) {
+    if (l.glow <= 0.02) return;
+    const fh = Math.max(1, Math.round(h * l.glow * flicker(l)));
+    const sway = Math.round(Math.sin(time * 7 + l.seed) * 0.6);
+    const a = gRef.globalAlpha;
+    gRef.globalAlpha = a * Math.min(1, l.glow * 1.4);
+    for (let j = 0; j < fh; j++) {
+      const f = j / fh;
+      const x = cx + (f > 0.5 ? sway : 0);
+      const w = f < 0.4 && fh > 2 ? 3 : 1;
+      R(x - Math.floor(w / 2), base - j, w, 1, f < 0.34 ? '#f59a3a' : f < 0.72 ? '#ffd27a' : '#fff3c4');
+    }
+    gRef.globalAlpha = a;
+  }
+  function chochin(cx, top, h, body, l) {
+    const glow = l ? l.glow * flicker(l) : 0;
+    const paper = glow > 0 ? mix(body, '#ffd98a', 0.38 * glow) : body;
     const rx = Math.round(h * 0.42);
     R(cx - 2, top, 5, 2, C.woodDk);
     for (let r = 0; r < h; r++) {
       const t = (r + 0.5) / h * 2 - 1;
       const hw = Math.max(1, Math.round(rx * Math.sqrt(1 - t * t * 0.85)));
-      R(cx - hw, top + 2 + r, hw * 2 + 1, 1, lit ? shade(body, 0.12) : body);
+      // lit from inside: brightest in the middle rows
+      const warm = glow > 0 ? mix(paper, '#fff0c0', 0.3 * glow * (1 - Math.abs(t))) : paper;
+      R(cx - hw, top + 2 + r, hw * 2 + 1, 1, warm);
     }
     for (let r = 2; r < h; r += 3) {
       const t = (r + 0.5) / h * 2 - 1;
       const hw = Math.max(1, Math.round(rx * Math.sqrt(1 - t * t * 0.85)));
-      R(cx - hw, top + 2 + r, hw * 2 + 1, 1, shade(body, -0.18));
+      R(cx - hw, top + 2 + r, hw * 2 + 1, 1, shade(paper, -0.18));
     }
     R(cx - 2, top + 2 + h, 5, 2, C.woodDk);
-    if (lit) R(cx - 1, top + 4, 1, h - 4, 'rgba(255,245,200,0.45)');
+    if (l) flame(cx, top + 1 + h - Math.max(1, Math.round(h * 0.2)), Math.max(2, Math.round(h * 0.45)), l);
   }
+  const lampTip = (l, what) => `${what}\n${l.on ? 'Click to snuff the candle' : 'Click to light the candle'}`;
 
   const STRING_LANTERNS = [110, 136, 162, 188, 214];
   const FESTIVAL_LANTERNS = [[10, '#c8412f'], [30, '#f3e6c8'], [50, '#3b6ea5'], [70, '#e0a13a'], [88, '#c8412f']];
-  function drawLanterns(lit) {
+  function drawLanterns() {
     // rope
     for (let x = 100; x < 232; x++) P(x, 5 + Math.round(Math.sin((x - 100) / 26 * Math.PI) * 2), '#2b1c12');
     STRING_LANTERNS.forEach((x, i) => {
       const sway = Math.round(Math.sin(time * 1.3 + i) * 0.6);
+      const l = lamps['s' + i];
       R(x, 6, 1, 2, '#2b1c12');
-      chochin(x + sway, 8, 7, i % 2 ? '#f3e6c8' : '#e8c897', lit);
+      chochin(x + sway, 8, 7, i % 2 ? '#f3e6c8' : '#e8c897', l);
+      regions.push({ x: x - 5, y: 6, w: 11, h: 13, label: lampTip(l, '<b>提灯</b> Paper lantern'), click: () => toggleLamp('s' + i, x, 12) });
     });
-    regions.push({ x: 100, y: 4, w: 132, h: 16, label: '<b>提灯</b> Paper lanterns\nClick to switch them ' + (lanternsOn ? 'off' : 'on'), click: toggleLanterns });
     // festival string (decor)
     if (has('matsuri')) {
       for (let x = 0; x < 98; x++) P(x, 4 + Math.round(Math.sin(x / 24 * Math.PI) * 2), '#2b1c12');
       FESTIVAL_LANTERNS.forEach(([x, col], i) => {
         const sway = Math.round(Math.sin(time * 1.1 + i * 2) * 0.6);
+        const l = lamps['f' + i];
         R(x, 5, 1, 2, '#2b1c12');
-        chochin(x + sway, 6, 6, col, lit);
+        chochin(x + sway, 6, 6, col, l);
+        regions.push({ x: x - 5, y: 4, w: 11, h: 12, label: lampTip(l, '<b>祭り提灯</b> Festival lantern'), click: () => toggleLamp('f' + i, x, 10) });
       });
-      regions.push({ x: 0, y: 2, w: 98, h: 14, label: '<b>祭り提灯</b> Festival lanterns', click: toggleLanterns });
     }
     // big red akachochin by the door
     const sway = Math.round(Math.sin(time * 0.9) * 0.7);
     R(245, 14, 1, 6, '#2b1c12');
-    chochin(245 + sway, 20, 16, '#c8412f', lit);
-    regions.push({ x: 237, y: 18, w: 17, h: 22, label: '<b>赤提灯</b> Akachōchin\nThe red lantern of a cozy eatery', click: toggleLanterns });
-  }
-
-  function toggleLanterns() {
-    lanternsOn = !lanternsOn;
-    OKSound.blip();
+    chochin(245 + sway, 20, 16, '#c8412f', lamps.aka);
+    regions.push({ x: 237, y: 18, w: 17, h: 22, label: lampTip(lamps.aka, '<b>赤提灯</b> Akachōchin, the red lantern of a cozy eatery'), click: () => toggleLamp('aka', 245, 30) });
   }
 
   // ------------------------------------------------------------ menu tags
@@ -684,7 +748,24 @@
     radio: { x: 217, y: 46, w: 16, h: 12, draw: drawRadio },
     matsuri: { x: 0, y: 2, w: 98, h: 14, draw: () => {} },
     tanuki: { x: 302, y: 104, w: 17, h: 24, draw: drawTanuki },
+    kamakura: { x: 83, y: 93, w: 15, h: 11, draw: drawKamakura },
   };
+
+  // かまくら: a snow hut on the counter; the candle inside glows after dark
+  function drawKamakura(x, y) {
+    ellipse(x + 7, y + 7, 7, 5, '#f4f8fc');
+    R(x, y + 7, 15, 4, '#f4f8fc');
+    R(x + 1, y + 10, 13, 1, '#d3dde8');
+    for (let i = 0; i < 3; i++) R(x + 2 + i * 4, y + 4 + (i % 2), 3, 1, '#dbe5ef');
+    R(x + 1, y + 8, 12, 1, '#dbe5ef');
+    const l = lamps.kama;
+    const inside = mix('#5a6878', '#f7c86a', l.glow * flicker(l));
+    ellipse(x + 7, y + 9, 3, 2, inside);
+    R(x + 4, y + 9, 7, 2, inside);
+    if (l.glow > 0.05) R(x + 5, y + 10, 5, 1, mix(inside, '#ffe39a', l.glow));
+    flame(x + 7, y + 10, 3, l);
+    P(x + 3, y + 3, '#ffffff'); P(x + 4, y + 2, '#ffffff');
+  }
 
   function drawBonsai(x, y) {
     R(x, y + 20, 24, 2, C.woodDk); R(x + 2, y + 22, 2, 2, C.woodDk); R(x + 20, y + 22, 2, 2, C.woodDk);
@@ -780,6 +861,7 @@
   function decorLabel(id) {
     const item = catalog.find((c) => c.id === id);
     if (!item) return '';
+    if (id === 'kamakura') return lampTip(lamps.kama, `<b>${item.jp}</b> ${item.name}`);
     return `<b>${item.jp}</b> ${item.name}\n${item.desc}`;
   }
 
@@ -812,7 +894,7 @@
     }
   }
   function drawCounterDecor() {
-    for (const id of ['maneki', 'kingyo']) {
+    for (const id of ['maneki', 'kingyo', 'kamakura']) {
       if (!has(id)) continue;
       const d = DECOR[id];
       d.draw(d.x, d.y, time);
@@ -846,6 +928,7 @@
         OKSound.pop();
         break;
       case 'kakejiku': OKSound.pluck(2); toast('継続は力なり · Consistency is power'); break;
+      case 'kamakura': toggleLamp('kama', d.x + 7, d.y + 8); break;
       default: break;
     }
   }
@@ -972,7 +1055,35 @@
     { name: 'Tama', tummy: 60, love: 60, energy: 60, stage: 0, stageJp: '子猫', stageName: 'Kitten', trait: 'classic', fish: 0, gifts: {}, studyDays: 0 },
     INIT.pet || {}
   );
-  const PET_STAGES = INIT.petStages || [];
+  let PET_STAGES = INIT.petStages || [];
+  // Starter species: cat, puffle or Java sparrow (buncho). Same needs and
+  // gifts for all; only the drawing and the words change.
+  const SPECIES = INIT.petSpecies || { cat: { jp: '猫', name: 'Cat', they: 'she', them: 'her', their: 'her', food: 'fish', foodJp: '魚', toy: 'Feather toy', idle: 'Purring', tricks: ['Paw wave', 'Beckon', 'Roll over'] } };
+  const sp = () => SPECIES[pet.species || 'cat'] || SPECIES.cat;
+  // Puffle extras (penguins outside, the igloo lamp, puffle colours)
+  // only appear once you have a puffle, as your starter or from the shop.
+  const hasPuffle = () => pet.species === 'puffle' || S.owned.includes('puffle');
+  const foods = () => sp().foods || sp().food + 's';
+  const They = () => sp().they[0].toUpperCase() + sp().they.slice(1);
+  const PUFFLE_COLORS = INIT.puffleColors || [{ id: 'blue', name: 'Blue', jp: '青', hex: '#3d7fd6', starter: true }];
+  const PUFFLE_COLOR_PRICE = INIT.puffleColorPrice || 250;
+  const RAINBOW = ['#e0463a', '#f08a2e', '#f2cf3a', '#4fb04a', '#3d7fd6', '#9a5bc8'];
+  function puffleCols(id) {
+    const c = PUFFLE_COLORS.find((x) => x.id === (id || S.puffleColor)) || PUFFLE_COLORS[0];
+    return { id: c.id, a: c.hex, d: shade(c.hex, -0.3), l: shade(c.hex, 0.35) };
+  }
+  // Draw with a stand-in pet (shop icons, companions, the starter chooser).
+  function withPet(tmp, fn) {
+    const real = pet;
+    pet = Object.assign({ stage: 2, trait: 'classic', style: {}, unlocks: {} }, tmp);
+    try { fn(); } finally { pet = real; }
+  }
+  function voice(species) {
+    const s0 = species || pet.species || 'cat';
+    if (s0 === 'puffle') OKSound.squeak();
+    else if (s0 === 'bird') OKSound.chirp();
+    else OKSound.meow();
+  }
   const PET_GIFTS = INIT.petGifts || [];
   const PET_RARE = INIT.petRareGifts || [];
   const PET_MILESTONES = INIT.petMilestones || {};
@@ -980,9 +1091,15 @@
   const STAGE_SCALE = [0.72, 0.84, 1, 1.08];
   const FLOOR_Y = 174; // Tama's feet on the front strip of tatami
   const BED_X = 17;
-  const BOWL_X = 38;
+  // The bed grows a spot for every pet who lives here (the crane sleeps
+  // standing by the door); the food dish sits just past its end.
+  const SLOT = 19;
+  let bedSlots = 1;
+  let BOWL_X = 38;
+  const slotX = (i) => BED_X + i * SLOT;
+  const bedExtra = () => (bedSlots - 1) * SLOT;
   const SUN_X = 64;
-  const tama = { x: BED_X, dir: 1, state: 'sleep', t: 0, dur: rand(8, 16), target: null, then: null, hop: 0, paw: 0, blink: 2, wantsFish: false };
+  const tama = { x: BED_X, y: FLOOR_Y, air: null, flap: null, dir: 1, state: 'sleep', t: 0, dur: rand(8, 16), target: null, then: null, hop: 0, paw: 0, blink: 2, wantsFish: false };
   let feather = null;
   let floorGifts = [];
   let giftTimer = 9;
@@ -1026,24 +1143,32 @@
     }
     // bed: zabuton, fancy cushion or kotatsu (care milestones)
     const bed = petStyle().bed || 'zabuton';
+    const ex = bedExtra();
     if (bed === 'kotatsu') drawKotatsu();
     else if (bed === 'fancy') {
-      R(BED_X - 12, FLOOR_Y - 4, 25, 5, '#3b4a8a');
-      R(BED_X - 12, FLOOR_Y - 4, 25, 1, '#56679c');
-      for (let i = -10; i <= 10; i += 4) { P(BED_X + i, FLOOR_Y - 2, C.gold); P(BED_X + i + 2, FLOOR_Y - 1, '#c9a24a'); }
-      [[-13, -4], [13, -4], [-13, 0], [13, 0]].forEach(([dx, dy]) => P(BED_X + dx, FLOOR_Y + dy, C.gold));
+      R(BED_X - 12, FLOOR_Y - 4, 25 + ex, 5, '#3b4a8a');
+      R(BED_X - 12, FLOOR_Y - 4, 25 + ex, 1, '#56679c');
+      for (let i = -10; i <= 10 + ex; i += 4) { P(BED_X + i, FLOOR_Y - 2, C.gold); P(BED_X + i + 2, FLOOR_Y - 1, '#c9a24a'); }
+      [[-13, -4], [13 + ex, -4], [-13, 0], [13 + ex, 0]].forEach(([dx, dy]) => P(BED_X + dx, FLOOR_Y + dy, C.gold));
     } else {
-      R(BED_X - 11, FLOOR_Y - 3, 23, 4, '#8e3b46');
-      R(BED_X - 11, FLOOR_Y - 3, 23, 1, '#ad5561');
-      P(BED_X - 11, FLOOR_Y - 3, '#6b2a33'); P(BED_X + 11, FLOOR_Y - 3, '#6b2a33');
-      P(BED_X, FLOOR_Y - 2, '#e0a13a');
+      // a row of zabuton, one per pet
+      for (let i = 0; i < bedSlots; i++) {
+        const cx = slotX(i);
+        const w = i === 0 ? 23 : SLOT + 1;
+        const x0 = i === 0 ? cx - 11 : cx - 8 + 3;
+        R(x0, FLOOR_Y - 3, w, 4, '#8e3b46');
+        R(x0, FLOOR_Y - 3, w, 1, '#ad5561');
+        P(x0, FLOOR_Y - 3, '#6b2a33'); P(x0 + w - 1, FLOOR_Y - 3, '#6b2a33');
+        P(i === 0 ? cx : cx + 3, FLOOR_Y - 2, '#e0a13a');
+      }
     }
+    regions.push({ x: BED_X - 13, y: FLOOR_Y - 11, w: 27 + ex, h: 13, label: `<b>寝床</b> Bed\nTap to tuck ${residents.some((a) => a.slot != null) ? 'everyone' : esc(pet.name)} in`, click: bedtime });
     // food bowl
     R(BOWL_X - 4, FLOOR_Y - 2, 9, 3, '#3b6ea5');
     R(BOWL_X - 3, FLOOR_Y - 2, 7, 1, '#dff2f7');
     R(BOWL_X - 4, FLOOR_Y - 2, 9, 1, '#5a8cc4');
     if (tama.state === 'eat') R(BOWL_X - 2, FLOOR_Y - 3, 5, 1, '#e8b8a0');
-    regions.push({ x: BOWL_X - 5, y: FLOOR_Y - 5, w: 11, h: 7, label: `<b>ごはん皿</b> ${esc(pet.name)}'s food dish\n${pet.fish} fish saved · tap to feed`, click: () => petAction('feed') });
+    regions.push({ x: BOWL_X - 5, y: FLOOR_Y - 5, w: 11, h: 7, label: `<b>ごはん皿</b> ${esc(pet.name)}'s food dish\n${pet.fish} ${pet.fish === 1 ? sp().food : foods()} saved · tap to feed`, click: () => petAction('feed') });
   }
 
   function esc(s) {
@@ -1152,13 +1277,14 @@
 
   function drawKotatsu() {
     // quilted blanket with a little table on top
+    const ex = bedExtra();
     for (let y = 0; y < 8; y++) {
       const w = 22 + Math.round(y * 0.6);
-      R(BED_X - Math.floor(w / 2), FLOOR_Y - 8 + y, w, 1, y % 3 === 0 ? '#e0a13a' : '#c8412f');
+      R(BED_X - Math.floor(w / 2), FLOOR_Y - 8 + y, w + ex, 1, y % 3 === 0 ? '#e0a13a' : '#c8412f');
     }
-    for (let x = -10; x <= 10; x += 5) R(BED_X + x, FLOOR_Y - 8, 1, 8, '#a8322a');
-    R(BED_X - 13, FLOOR_Y - 10, 27, 2, '#8a5a34');
-    R(BED_X - 13, FLOOR_Y - 10, 27, 1, '#a8743f');
+    for (let x = -10; x <= 10 + ex; x += 5) R(BED_X + x, FLOOR_Y - 8, 1, 8, '#a8322a');
+    R(BED_X - 13, FLOOR_Y - 10, 27 + ex, 2, '#8a5a34');
+    R(BED_X - 13, FLOOR_Y - 10, 27 + ex, 1, '#a8743f');
     // a mikan on top, of course
     R(BED_X + 5, FLOOR_Y - 12, 2, 2, '#f08a2e'); P(BED_X + 6, FLOOR_Y - 13, '#4f7a3a');
   }
@@ -1213,12 +1339,405 @@
     face(cx - rx, by - r(3), 1, { mood: 'happy', blush: '#f7b9b0' });
   }
 
+  // ------------------------------------------------------------ puffle
+  // A round ball of fluff with a tuft on top. Front view; it bounces instead
+  // of walking. (cx, by) is the bottom centre. o: squash, sleep, blink,
+  // happy, look, flip (upside down mid-backflip), color (colour id).
+  // The body shape (round, with a crown of spiky tufts that curl a little
+  // clockwise) is built once per size as a pixel mask; the dark outline is
+  // traced around it, so tufts and body share one clean line.
+  const puffleMasks = {};
+  function puffleMask(rx, ry, scrappy) {
+    const key = `${rx},${ry},${scrappy ? 1 : 0}`;
+    if (puffleMasks[key]) return puffleMasks[key];
+    const L = Math.max(rx, ry) + 6;
+    const w = L * 2 + 1;
+    const h = L * 2 + 1;
+    const inside = new Uint8Array(w * h);
+    const scale = rx / 6.5;
+    // [angle in degrees (-90 = straight up), length, base half-width in radians]
+    const tufts = [[-165, 2.4, 0.2], [-138, 3.4, 0.24], [-110, 4.2, 0.24], [-80, 4.4, 0.24], [-52, 3.6, 0.24], [-24, 3, 0.22], [4, 2.2, 0.2], [172, 2, 0.2]];
+    if (scrappy) tufts.push([-95, 5, 0.12], [-35, 4, 0.14], [26, 2.4, 0.18]);
+    const tri = tufts.map(([deg, len, hw]) => {
+      const a0 = (deg * Math.PI) / 180;
+      const edge = (t) => [Math.cos(t) * rx * 0.92, Math.sin(t) * ry * 0.92];
+      const lean = 0.2; // tips curl clockwise
+      const tip = [Math.cos(a0 + lean) * (rx + len * scale), Math.sin(a0 + lean) * (ry + len * scale)];
+      return [edge(a0 - hw), edge(a0 + hw), tip];
+    });
+    const inTri = (px, py, [p0, p1, p2]) => {
+      const d = (ax, ay, bx, by2, cx0, cy0) => (ax - cx0) * (by2 - cy0) - (bx - cx0) * (ay - cy0);
+      const d1 = d(px, py, p0[0], p0[1], p1[0], p1[1]);
+      const d2 = d(px, py, p1[0], p1[1], p2[0], p2[1]);
+      const d3 = d(px, py, p2[0], p2[1], p0[0], p0[1]);
+      return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+    };
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const dx = x - L;
+        const dy = y - L;
+        // slightly wider low down, like a settled ball of fluff
+        const ryy = dy > 0 ? ry * 0.98 : ry;
+        const rxx = rx + (dy > 0 ? 0.4 : 0);
+        let hit = (dx * dx) / (rxx * rxx) + (dy * dy) / (ryy * ryy) <= 1.02;
+        if (!hit) hit = tri.some((t) => inTri(dx, dy, t));
+        inside[y * w + x] = hit ? 1 : 0;
+      }
+    }
+    const at = (x, y) => (x >= 0 && y >= 0 && x < w && y < h ? inside[y * w + x] : 0);
+    const kind = new Uint8Array(w * h); // 0 none, 1 outline, 2 fur, 3 shade, 4 light
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (at(x, y)) {
+          const low = y - L > ry * 0.35 && (!at(x, y + 2) || !at(x + 2, y + 1));
+          const high = y - L < -ry * 0.25 && x - L < rx * 0.2 && (!at(x - 1, y - 2) || !at(x - 2, y - 1));
+          kind[y * w + x] = low ? 3 : high ? 4 : 2;
+        } else if (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1) || at(x - 1, y - 1) || at(x + 1, y - 1) || at(x - 1, y + 1) || at(x + 1, y + 1)) {
+          kind[y * w + x] = 1;
+        }
+      }
+    }
+    // top of the tallest tuft, where the two little hairs grow from
+    let topY = L;
+    for (let y = 0; y < h && topY === L; y++) for (let x = L - 3; x <= L + 3; x++) if (at(x, y)) { topY = y; break; }
+    return (puffleMasks[key] = { w, h, L, kind, topY: topY - L });
+  }
+
+  function drawPuffle(cx, by, o) {
+    o = o || {};
+    const col = puffleCols(o.color);
+    const line0 = col.id === 'black' ? '#121216' : col.id === 'white' ? '#7d8796' : shade(col.a, -0.62);
+    const chub = pet.trait === 'chubby' ? 1 : 0;
+    const rx = r(6.5) + chub + (o.squash ? 1 : 0);
+    const ry = Math.max(4, r(6) - (o.squash ? 1 : 0));
+    const cy = by - ry - 1;
+    const flip = !!o.flip;
+    const m = puffleMask(rx, ry, pet.trait === 'scrappy');
+    const pal = [null, line0, col.a, col.d, col.l];
+    for (let y = 0; y < m.h; y++) {
+      const dy = y - m.L;
+      const py = flip ? cy - dy : cy + dy;
+      for (let x = 0; x < m.w; x++) {
+        const kd = m.kind[y * m.w + x];
+        if (!kd) continue;
+        let c = pal[kd];
+        if (col.id === 'rainbow' && kd > 1) c = RAINBOW[clamp(Math.floor(((dy + ry) / (2 * ry + 1)) * 6), 0, 5)];
+        R(cx + x - m.L, py, 1, 1, c);
+      }
+    }
+    // two thin hairs out of the top tuft
+    const up = flip ? 1 : -1;
+    const hy = cy + up * -m.topY;
+    P(cx + 1, hy + up, line0); P(cx + 1, hy + up * 2, line0); P(cx, hy + up * 3, line0);
+    P(cx + 2, hy + up, line0); P(cx + 3, hy + up * 2, line0);
+    if (col.id === 'gold' && Math.floor(time * 3) % 3 === 0) P(cx + rx - 1, cy - ry + 1, '#fff6cc');
+    if (pet.trait === 'night') P(cx + rx - 3, cy + up * (ry - 3), '#ffe27a');
+
+    // one big white eye patch: two joined ovals, notched top and bottom
+    const erx = Math.max(2, Math.round(rx * 0.32));
+    const ery = Math.max(2, Math.round(ry * 0.42));
+    const ex = Math.max(2, Math.round(rx * 0.3));
+    const ey = cy + up * Math.max(1, Math.round(ry * 0.2));
+    if (o.sleep || o.blink) {
+      [-1, 1].forEach((sd) => { R(cx + sd * ex - 1, ey + 1, 3, 1, line0); P(cx + sd * ex - 2, ey, line0); P(cx + sd * ex + 2, ey, line0); });
+    } else {
+      [-1, 1].forEach((sd) => ellipse(cx + sd * ex, ey, erx + 1, ery + 1, C.ink));
+      [-1, 1].forEach((sd) => ellipse(cx + sd * ex, ey, erx, ery, '#ffffff'));
+      R(cx - ex, ey - ery + 1, ex * 2 + 1, ery * 2 - 1, '#ffffff');
+      P(cx, ey - ery, C.ink); P(cx, ey - ery + 1, C.ink);
+      P(cx, ey + ery, C.ink);
+      R(cx - ex - erx + 1, ey + ery - 1, erx, 1, '#d6dae4');
+      R(cx + ex, ey + ery - 1, erx, 1, '#d6dae4');
+      if (o.happy) {
+        [-1, 1].forEach((sd) => { P(cx + sd * ex - 1, ey + 1, C.ink); P(cx + sd * ex, ey, C.ink); P(cx + sd * ex + 1, ey + 1, C.ink); });
+      } else {
+        // tall oval pupils with a glint, set a little inward
+        const lk = clamp(o.look || 0, -1, 1);
+        const big = rx >= 7;
+        [-1, 1].forEach((sd) => {
+          const px = cx + sd * (ex - 1) + lk - (big ? (sd < 0 ? 0 : 1) : 0);
+          R(px, ey - 1, big ? 2 : 1, big ? 3 : 2, C.ink);
+          if (big) P(px, ey - 1, '#ffffff');
+        });
+      }
+    }
+    // a lopsided smile under the eyes
+    if (!o.sleep) {
+      const my = flip ? ey - ery - 2 : ey + ery + 2;
+      const d = flip ? -1 : 1;
+      if (o.happy || o.open) {
+        R(cx - 1, my, 5, 1, line0); R(cx, my + d, 3, 1, '#e8546a'); P(cx - 2, my - d, line0); P(cx + 4, my - d, line0);
+      } else {
+        P(cx - 1, my, line0); R(cx, my + d, 3, 1, line0); P(cx + 3, my, line0); P(cx + 4, my - d, line0);
+      }
+    }
+    // accessories: a bow in the fur, a bandana, the bell, a tiny crown
+    if (!flip && showCollar()) {
+      const bx = cx + rx - 4;
+      const byy = cy - ry + 1;
+      R(bx, byy, 2, 2, collarColor()); R(bx + 3, byy, 2, 2, collarColor()); P(bx + 2, byy + 1, shade(collarColor(), -0.3));
+    }
+    if (!flip && petStyle().bandana) {
+      R(cx - 4, cy + ry - 1, 9, 1, '#2e3f7a'); R(cx - 1, cy + ry, 3, 1, '#2e3f7a'); P(cx - 3, cy + ry - 1, '#ffffff');
+    }
+    if (!flip && petStyle().bell) bellPx(cx - rx + 2, cy + ry - 1);
+    if (pet.stage >= 3 && !flip) {
+      const t0 = hy - 5;
+      R(cx - 3, t0, 5, 1, C.gold); P(cx - 3, t0 - 1, C.gold); P(cx - 1, t0 - 1, C.gold); P(cx + 1, t0 - 1, C.gold);
+    }
+  }
+
+  // ------------------------------------------------------- Java sparrow
+  // Side view facing `dir`: grey body, black cap, white cheeks, pink beak.
+  // o: hop, sleep, blink, happy, wing ('up' | 'flap'), beakOpen, headDown.
+  const BIRD = { body: '#8e939e', wing: '#6f7480', wingDk: '#4e525c', tip: '#2f3038', belly: '#c4b8be', cap: '#232228', cheek: '#fbfbf8', beak: '#ee5667', ring: '#e0485a', tail: '#2c2b31', foot: '#e8a0a8' };
+  function drawBird(cx, by, dir, o) {
+    o = o || {};
+    const chub = pet.trait === 'chubby' ? 1 : 0;
+    const bx = Math.round(cx);
+    const y0 = by - (o.hop || 0);
+    const brx = r(5) + chub;
+    const bry = r(3.6) + (o.sleep ? 1 : 0);
+    const bcy = y0 - r(2) - bry;
+    // feet
+    if (!o.flying) { P(bx - 1, y0 - 1, BIRD.foot); P(bx + 1, y0 - 1, BIRD.foot); R(bx - 2, y0 - 1 + 0, 1, 1, BIRD.foot); }
+    if (!o.flying) { R(bx - 1, y0 - r(2), 1, r(2) - 1, BIRD.foot); R(bx + 1, y0 - r(2), 1, r(2) - 1, BIRD.foot); }
+    // tail
+    const tx = bx - brx * dir;
+    for (let i = 0; i < r(4); i++) P(tx - i * dir, bcy - 1 + Math.round(i * 0.5), BIRD.tail);
+    P(tx - dir, bcy, BIRD.tail);
+    // body
+    ellipse(bx, bcy, brx, bry, BIRD.body);
+    ellipse(bx + dir, bcy + Math.round(bry / 2), Math.max(1, brx - 2), Math.max(1, Math.round(bry / 2)), BIRD.belly);
+    // wing: folded, up, held out (glide) or down; flapping cycles up, out, down
+    const wing = o.wing === 'flap' ? ['up', 'glide', 'down', 'glide'][Math.floor(time * (o.flying ? 16 : 10)) % 4] : o.wing;
+    // mirrored helper for wing strokes: dx counts backwards from the shoulder
+    const wr = (dx, dy, w, c) => R(dir > 0 ? bx - dx - w + 1 : bx + dx, bcy + dy, w, 1, c);
+    if (wing === 'up') {
+      // raised high behind the head, the tip feathers darkest
+      const n = r(6);
+      for (let i = 0; i < n; i++) wr(Math.round(i * 0.7), -2 - i, Math.max(2, 4 - Math.floor(i / 2)), i > n - 3 ? BIRD.tip : i > 1 ? BIRD.wingDk : BIRD.wing);
+    } else if (wing === 'down') {
+      // swept down under the body
+      const n = r(5);
+      for (let i = 0; i < n; i++) wr(1 + Math.round(i * 0.5), 1 + i, Math.max(2, 4 - Math.floor(i / 2)), i > n - 3 ? BIRD.tip : BIRD.wingDk);
+    } else if (wing === 'glide') {
+      // held out long and flat, fingertip primaries at the end
+      const n = r(9);
+      wr(0, -2, n, BIRD.wingDk);
+      wr(1, -1, n - 2, BIRD.wing);
+      wr(n - 2, -3, 2, BIRD.tip);
+      wr(n - 1, -2, 1, BIRD.tip);
+    } else {
+      ellipse(bx - dir, bcy - 1, Math.max(2, brx - 2), Math.max(1, bry - 2), BIRD.wing);
+    }
+    // head
+    const hr = r(3.2);
+    const hx = bx + (o.sleep ? r(2) : r(3.5)) * dir;
+    const hy = bcy - bry - hr + 3 + (o.headDown ? r(3) : 0) + (o.sleep ? 2 : 0);
+    ellipse(hx, hy, hr, hr, BIRD.cap);
+    ellipse(hx + dir, hy + 1, Math.max(1, hr - 1), Math.max(1, hr - 1), BIRD.cheek);
+    R(hx - hr, hy - hr, hr * 2 + 1, Math.max(1, hr - 1), BIRD.cap);
+    if (pet.trait === 'night') P(hx - dir, hy - hr, '#ffe27a');
+    if (pet.trait === 'scrappy') { P(hx - dir, hy - hr - 1, BIRD.cap); P(hx, hy - hr - 2, BIRD.cap); }
+    // eye with its red ring
+    const ex = hx + dir;
+    const ey = hy - 1;
+    if (o.sleep || o.blink) R(ex - 1, ey, 2, 1, C.ink);
+    else if (o.happy) { P(ex - 1, ey, C.ink); P(ex, ey - 1, C.ink); P(ex + 1, ey, C.ink); }
+    else { P(ex, ey, C.ink); P(ex - dir, ey, BIRD.ring); P(ex, ey + 1, BIRD.ring); }
+    // beak
+    if (!o.sleep) {
+      const kx = hx + (hr + 1) * dir;
+      R(dir > 0 ? kx - 1 : kx - 1, hy - 1, 2, 2, BIRD.beak);
+      P(kx + dir, hy + (o.beakOpen ? -1 : 0), BIRD.beak);
+      if (o.beakOpen) P(kx + dir, hy + 1, BIRD.beak);
+    }
+    // accessories
+    if (showCollar()) {
+      const nx = bx + Math.round(brx * 0.55) * dir;
+      R(nx - 1, bcy - bry + 1, 3, 1, collarColor());
+      bellPx(nx, bcy - bry + 2);
+    }
+    if (petStyle().bandana) { R(bx + (brx - 3) * dir - 1, bcy - bry + 2, 3, 2, '#2e3f7a'); P(bx + (brx - 3) * dir, bcy - bry + 2, '#ffffff'); }
+    if (pet.stage >= 3) { R(hx - 1, hy - hr - 2, 3, 1, C.gold); P(hx - 1, hy - hr - 3, C.gold); P(hx + 1, hy - hr - 3, C.gold); }
+    if (o.sleep && Math.floor(time) % 3 === 0) {
+      const zy = hy - 6 - (time % 1) * 5;
+      R(hx + 3, zy, 3, 1, '#8b7b69'); P(hx + 4, zy + 1, '#8b7b69'); R(hx + 3, zy + 2, 3, 1, '#8b7b69');
+    }
+  }
+
+  function sleepZ(x, y) {
+    if (Math.floor(time) % 3 !== 0) return;
+    const zy = y - (time % 1) * 5;
+    R(x, zy, 3, 1, '#8b7b69'); P(x + 1, zy + 1, '#8b7b69'); R(x, zy + 2, 3, 1, '#8b7b69');
+  }
+  // Pets without a kotatsu head-poke sleep on top of it instead.
+  function bedTop(x) {
+    return petStyle().bed === 'kotatsu' && Math.abs(x - BED_X) < 5 ? 10 : 0;
+  }
+
+  function drawPuffleTama(x, by, st) {
+    const blink = tama.blink < 0.12;
+    const trick = st === 'trick' || st === 'beckon';
+    if (st === 'sleep') {
+      const lift = bedTop(x);
+      drawPuffle(x, by - lift, { squash: true, sleep: true });
+      sleepZ(x + 7, by - lift - 16);
+    } else if (st === 'walk' || st === 'play-run') {
+      const b = Math.abs(Math.sin(time * 9));
+      drawPuffle(x, by - Math.round(b * 4), { squash: b < 0.2, look: tama.dir });
+    } else if (st === 'eat') {
+      drawPuffle(x, by, { squash: Math.floor(tama.t * 4) % 2 === 0, look: tama.dir, open: true });
+    } else if (st === 'roll') {
+      // backflip: up, upside down at the top, and back down
+      const f = clamp(tama.t / tama.dur, 0, 1);
+      const up = Math.round(Math.sin(f * Math.PI) * 14);
+      drawPuffle(x, by - up, { flip: f > 0.3 && f < 0.7, happy: true });
+    } else if (trick) {
+      const s0 = pet.stage || 0;
+      if (s0 >= 2 && st === 'trick') {
+        // spin: it looks left and right very fast
+        drawPuffle(x, by, { look: Math.floor(tama.t * 10) % 2 ? 1 : -1, squash: Math.floor(tama.t * 10) % 4 === 0, happy: tama.t > tama.dur - 0.5 });
+      } else {
+        const b = Math.abs(Math.sin(tama.t * 7));
+        drawPuffle(x, by - Math.round(b * 7), { squash: b < 0.15, happy: true });
+      }
+      if (st === 'beckon' && Math.floor(time * 4) % 5 === 0) P(x + rand(-8, 8), by - rand(10, 22), '#fff6cc');
+    } else {
+      const breathe = Math.floor(time * 1.2) % 4 === 0;
+      drawPuffle(x, by, { squash: breathe, blink, happy: st === 'purr' || st === 'groom', look: st === 'watch' || st === 'beg' ? -1 : 0 });
+    }
+  }
+
+  // ----------------------------------------------------- 文鳥 flight
+  // Birds fly in smooth arcs between perches around the room: they flap on
+  // the way up, glide on the way down, flutter to land, and sometimes take a
+  // lap of the room first. Works for any object with x, y (feet), dir, air.
+  const PERCHES = [
+    { x: 30, y: 76 }, { x: 74, y: 76 }, // window sill
+    { x: 117, y: 20 }, { x: 155, y: 20 }, // menu rail
+    { x: 290, y: 19 }, // top of the door frame
+    { x: 183, y: 104 }, // counter
+    { x: 66, y: 146 }, { x: 214, y: 146 }, // tables
+  ];
+  const aloft = (o) => (o.y == null ? FLOOR_Y : o.y) < FLOOR_Y - 0.5;
+  function freePerch(o, other) {
+    const opts = PERCHES.filter((p) => Math.hypot(p.x - o.x, p.y - o.y) > 30 && !(other && Math.hypot(p.x - other.x, p.y - (other.y || FLOOR_Y)) < 16));
+    return pick(opts.length ? opts : PERCHES);
+  }
+  // A few loose waypoints for a lap of the room.
+  function lap() {
+    const n = 1 + Math.floor(Math.random() * 2);
+    return Array.from({ length: n }, () => ({ x: rand(30, 290), y: rand(34, 120) }));
+  }
+  function flyTo(o, pts, then) {
+    const [p, ...rest] = pts;
+    const a = { x: o.x, y: o.y == null ? FLOOR_Y : o.y };
+    const dx = p.x - a.x;
+    const dist = Math.hypot(dx, p.y - a.y);
+    // the arc peaks a little above the higher end, more for longer flights
+    const top = Math.max(12, Math.min(a.y, p.y) - (8 + dist * 0.18 + rand(0, 8)));
+    o.air = {
+      a, b: { x: p.x, y: p.y },
+      c1: { x: a.x + dx * 0.15, y: top + (a.y - top) * 0.15 },
+      c2: { x: p.x - dx * 0.3, y: top },
+      t: 0,
+      dur: 0.7 + dist / rand(46, 58),
+      last: rest.length === 0,
+      then: rest.length ? () => flyTo(o, rest, then) : then,
+    };
+  }
+  function bez(f, u) {
+    const v = 1 - u;
+    const k0 = v * v * v, k1 = 3 * v * v * u, k2 = 3 * v * u * u, k3 = u * u * u;
+    return { x: k0 * f.a.x + k1 * f.c1.x + k2 * f.c2.x + k3 * f.b.x, y: k0 * f.a.y + k1 * f.c1.y + k2 * f.c2.y + k3 * f.b.y };
+  }
+  function updateFlight(o, dt) {
+    const f = o.air;
+    if (!f) return;
+    f.t += dt;
+    const u = clamp(f.t / f.dur, 0, 1);
+    // ease in and out, gentler between the waypoints of a lap
+    const e = f.last ? u * u * (3 - 2 * u) : u * (0.6 + 0.4 * u);
+    const q = bez(f, e);
+    const vx = q.x - o.x;
+    const vy = q.y - o.y;
+    o.x = q.x;
+    o.y = q.y;
+    if (Math.abs(vx) > 0.04) o.dir = vx > 0 ? 1 : -1;
+    // flap to climb, take off and land; glide when coasting down
+    o.flap = vy < -0.12 || u < 0.15 || (f.last && u > 0.82) ? 'flap' : 'glide';
+    if (u >= 1) {
+      o.air = null;
+      o.y = f.b.y;
+      o.flap = null;
+      if (f.then) f.then();
+    }
+  }
+  // a faint shadow on the tatami under a bird flying low
+  function flightShadow(x, y) {
+    if (y < 118 || y > FLOOR_Y - 3) return;
+    g.fillStyle = `rgba(40,25,10,${0.1 + 0.12 * ((y - 118) / (FLOOR_Y - 118))})`;
+    ellipseRaw(Math.round(x), FLOOR_Y, 4, 1);
+  }
+
+  // The pet sparrow's outings: to a perch, sometimes by way of a lap.
+  function birdOuting() {
+    const other = residents.find((a) => a.id === 'buncho');
+    const perch = freePerch(tama, other);
+    const pts = Math.random() < 0.3 ? [...lap(), perch] : [perch];
+    tama.state = 'fly';
+    flyTo(tama, pts, () => { tamaSet('perch', rand(7, 16)); if (Math.random() < 0.4) voice(); });
+  }
+  function birdLand(x, then) {
+    tama.state = 'fly';
+    flyTo(tama, [{ x: clamp(x, 8, 300), y: FLOOR_Y }], () => { if (then) then(); else tamaSet('sit', 4); });
+  }
+
+  function drawBirdTama(x, by, st) {
+    const blink = tama.blink < 0.12;
+    const d = tama.dir;
+    if (tama.air || st === 'play-fly' || st === 'play-hover') {
+      flightShadow(x, by);
+      drawBird(x, by + Math.round(Math.sin(time * 16) * 0.6), d, { flying: true, wing: st === 'play-hover' ? 'flap' : tama.flap || 'flap', happy: st !== 'fly' });
+    } else if (st === 'perch') {
+      // looks around, sings now and then, preens
+      const ph = Math.floor(tama.t * 1.2) % 8;
+      drawBird(x, by, ph === 2 || ph === 3 ? -d : d, { blink, beakOpen: ph === 5 && Math.floor(tama.t * 6) % 2 === 0, wing: ph === 7 ? 'up' : null });
+      if (ph === 5 && Math.floor(tama.t * 3) !== Math.floor((tama.t - 1 / 30) * 3)) particles.push({ x: x + d * 6, y: by - 16, vx: d * 5, vy: -7, life: 0.9, c: C.ink, type: 'note' });
+    } else if (st === 'sleep') {
+      drawBird(x, by - bedTop(x), d, { sleep: true });
+    } else if (st === 'walk' || st === 'play-run') {
+      drawBird(x, by, d, { hop: Math.floor(time * 8) % 2 ? 2 : 0 });
+    } else if (st === 'eat') {
+      drawBird(x, by, d, { headDown: Math.floor(tama.t * 5) % 2 === 0 });
+    } else if (st === 'roll') {
+      // a little loop through the air
+      const f = clamp(tama.t / tama.dur, 0, 1);
+      drawBird(x + Math.round(Math.sin(f * Math.PI * 2) * 8), by, f < 0.5 ? d : -d, { hop: Math.round(Math.sin(f * Math.PI) * 16), wing: 'flap', flying: f > 0.05 && f < 0.95, happy: true });
+    } else if (st === 'trick' || st === 'beckon') {
+      const s0 = pet.stage || 0;
+      if (s0 >= 2 && st === 'trick') {
+        drawBird(x, by, d, { beakOpen: Math.floor(tama.t * 6) % 2 === 0, happy: true });
+        if (Math.floor(tama.t * 3) !== Math.floor((tama.t - 1 / 30) * 3)) particles.push({ x: x + d * 6, y: by - 16, vx: d * 6, vy: -8, life: 1, c: C.ink, type: 'note' });
+      } else {
+        drawBird(x, by, d, { wing: 'flap', happy: true, hop: Math.floor(tama.t * 6) % 2 });
+      }
+    } else {
+      drawBird(x, by, d, { blink, happy: st === 'purr' || st === 'groom', wing: st === 'groom' ? 'up' : null });
+    }
+  }
+
   function drawTama() {
+    if (!pet.species) return; // not chosen yet
     const x = Math.round(tama.x);
-    const by = FLOOR_Y - Math.round(tama.hop);
+    const by = Math.round(tama.y == null ? FLOOR_Y : tama.y) - Math.round(tama.hop);
     const st = tama.state;
     const walkFrame = Math.floor(time * 8) % 4;
-    if (st === 'sleep') catSleep(x, by);
+    if (pet.species === 'puffle') drawPuffleTama(x, by, st);
+    else if (pet.species === 'bird') drawBirdTama(x, by, st);
+    else if (st === 'sleep') catSleep(x, by);
     else if (st === 'walk' || st === 'play-run') catSide(x, by, tama.dir, walkFrame);
     else if (st === 'stretch') catSide(x, by, tama.dir, 0, { low: true, happy: true });
     else if (st === 'eat') catSide(x, by, tama.dir, 0, { headDown: Math.floor(tama.t * 4) % 2 === 0 });
@@ -1236,8 +1755,8 @@
         paw: groom || trick ? (groom ? -1 : 1) : 0,
         pawUp,
       });
-      if (st === 'beg' || tama.wantsFish) drawThought(x + 6, by - 26);
     }
+    if (st !== 'sleep' && st !== 'walk' && (st === 'beg' || tama.wantsFish)) drawThought(x + 6, by - 26);
     if (feather) drawFeather();
     regions.push({ x: x - 12, y: by - 20, w: 24, h: 21, label: tamaLabel(), click: () => petAction('pet') });
   }
@@ -1245,15 +1764,32 @@
   function drawThought(x, y) {
     R(x, y, 11, 7, C.ink); R(x + 1, y + 1, 9, 5, '#fffaf0');
     P(x + 1, y + 7, C.ink); P(x, y + 8, C.ink);
-    // tiny fish
-    R(x + 3, y + 3, 4, 1, '#6a9ac4'); R(x + 4, y + 2, 2, 3, '#6a9ac4'); P(x + 7, y + 2, '#6a9ac4'); P(x + 7, y + 4, '#6a9ac4'); P(x + 3, y + 3, C.ink);
+    if (pet.species === 'puffle') {
+      // a puffle O
+      R(x + 4, y + 2, 3, 1, '#c98a4a'); R(x + 4, y + 4, 3, 1, '#c98a4a'); P(x + 3, y + 3, '#c98a4a'); P(x + 7, y + 3, '#c98a4a');
+    } else if (pet.species === 'bird') {
+      // millet spray
+      P(x + 3, y + 5, '#8a9a4a'); P(x + 4, y + 4, '#8a9a4a');
+      [[5, 3], [6, 2], [7, 3], [6, 4], [5, 2], [7, 1]].forEach(([dx, dy]) => P(x + dx, y + dy, '#e8c25a'));
+    } else {
+      // tiny fish
+      R(x + 3, y + 3, 4, 1, '#6a9ac4'); R(x + 4, y + 2, 2, 3, '#6a9ac4'); P(x + 7, y + 2, '#6a9ac4'); P(x + 7, y + 4, '#6a9ac4'); P(x + 3, y + 3, C.ink);
+    }
   }
 
   function drawFeather() {
     const fx = Math.round(feather.x);
     const fy = Math.round(feather.y);
     line(fx, fy, fx + 8, fy - 14, '#8a5a34');
-    R(fx - 1, fy, 3, 3, '#e8546a'); P(fx, fy + 3, '#f7c6d4'); P(fx - 2, fy + 1, '#f7c6d4'); P(fx + 2, fy + 2, '#3b6ea5');
+    if (pet.species === 'puffle') {
+      // bouncy ball
+      ellipse(fx, fy + 1, 2, 2, '#e8546a'); R(fx - 2, fy + 1, 5, 1, '#fbf7ee'); P(fx - 1, fy, '#fbf7ee');
+    } else if (pet.species === 'bird') {
+      // little bell
+      R(fx - 1, fy, 3, 3, C.gold); P(fx, fy + 3, C.goldDk); P(fx - 1, fy, '#fff6cc');
+    } else {
+      R(fx - 1, fy, 3, 3, '#e8546a'); P(fx, fy + 3, '#f7c6d4'); P(fx - 2, fy + 1, '#f7c6d4'); P(fx + 2, fy + 2, '#3b6ea5');
+    }
   }
 
   function meterDots(v) {
@@ -1261,12 +1797,13 @@
     return '●'.repeat(n) + '○'.repeat(5 - n);
   }
   function tamaLabel() {
-    const mood = tama.state === 'beckon' ? 'Beckoning guests in (+1 tip)' : tama.state === 'sleep' ? 'Sound asleep' : tama.state === 'play-run' || tama.state === 'play-sit' ? 'Playing!' : tama.wantsFish ? 'Hoping for a fish…' : petHappy() ? 'Very happy (+1 tip)' : 'Purring';
+    const mood = tama.state === 'beckon' ? 'Beckoning guests in (+1 tip)' : tama.state === 'sleep' ? 'Sound asleep' : tama.state === 'play-run' || tama.state === 'play-sit' ? 'Playing!' : tama.wantsFish ? `Hoping for a ${sp().food}…` : petHappy() ? 'Very happy (+1 tip)' : sp().idle;
     return `<b>${esc(pet.name)}</b> · ${pet.stageJp} ${pet.stageName}\n${mood}. Tap to pet.\nお腹 ${meterDots(pet.tummy)}  愛情 ${meterDots(pet.love)}  元気 ${meterDots(pet.energy)}`;
   }
 
   // ------------------------------------------------------- Tama behaviour
   function tamaGo(x, then) {
+    if (pet.species === 'bird' && (aloft(tama) || Math.abs(x - tama.x) > 70)) { birdLand(x, then); return; }
     tama.target = clamp(x, 8, 300);
     tama.then = then;
     tama.state = 'walk';
@@ -1282,8 +1819,19 @@
     const h = hourNow();
     const sleepy = pet.energy < 35 || timer.phase === 'focus' || h >= 23.5 || h < 5.5;
     tama.wantsFish = pet.tummy < 40 && pet.fish > 0;
+    if (pet.species === 'bird' && !sleepy && !tama.wantsFish) {
+      if (aloft(tama)) {
+        // from a perch: hop to another, take a lap and land, or glide down
+        const roll0 = Math.random();
+        if (roll0 < 0.45) birdOuting();
+        else if (roll0 < 0.65) { tama.state = 'fly'; flyTo(tama, [...lap(), { x: rand(20, 290), y: FLOOR_Y }], () => tamaSet('sit', rand(4, 8))); }
+        else birdLand(rand(20, 290), () => tamaSet('sit', rand(4, 8)));
+        return;
+      }
+      if (Math.random() < 0.4) { birdOuting(); return; }
+    }
     if (tama.wantsFish && Math.random() < 0.5) {
-      tamaGo(BOWL_X + 12, () => { tama.dir = -1; tamaSet('beg', rand(6, 10)); if (Math.random() < 0.5) OKSound.meow(); });
+      tamaGo(BOWL_X + 12, () => { tama.dir = -1; tamaSet('beg', rand(6, 10)); if (Math.random() < 0.5) voice(); });
       return;
     }
     if (sleepy && Math.random() < 0.75) {
@@ -1310,6 +1858,32 @@
     tama.blink -= dt;
     if (tama.blink < 0) tama.blink = rand(2.5, 5);
     tama.hop = Math.max(0, tama.hop - dt * 20);
+
+    if (feather && pet.species === 'bird') {
+      // the sparrow chases the bell toy through the air
+      feather.t -= dt;
+      if (feather.t <= 0) { endPlay(); return; }
+      tama.air = null;
+      const tx = clamp(feather.x, 10, 300);
+      const ty = clamp(feather.y + 10, 26, FLOOR_Y);
+      const dx = tx - tama.x;
+      const dy = ty - tama.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 3) {
+        const step = Math.min(d, (40 + d * 0.8) * dt);
+        tama.x += (dx / d) * step;
+        tama.y += (dy / d) * step;
+        if (Math.abs(dx) > 1) tama.dir = dx > 0 ? 1 : -1;
+        tama.flap = dy < -0.5 || tama.y < FLOOR_Y - 1 ? 'flap' : 'glide';
+        tama.state = tama.y < FLOOR_Y - 1 ? 'play-fly' : 'play-run';
+      } else {
+        tama.state = tama.y < FLOOR_Y - 1 ? 'play-hover' : 'play-sit';
+        if (Math.random() < dt * 0.8) spawnHearts(tama.x, tama.y - 16, 1);
+      }
+      return;
+    }
+    if (tama.air) { updateFlight(tama, dt); return; }
+    if (tama.state === 'perch' && Math.random() < dt * 0.04 && timer.phase !== 'focus') voice();
 
     if (feather) {
       feather.t -= dt;
@@ -1361,8 +1935,9 @@
   }
 
   function tamaReact(kind) {
-    if (tama.state === 'walk' || feather) return;
-    if (kind === 'pet') { tamaSet('purr', 3.5); spawnHearts(tama.x, 158, 2); OKSound.meow(); }
+    if (tama.state === 'walk' || tama.air || feather) return;
+    const hy = (tama.y == null ? FLOOR_Y : tama.y) - 16;
+    if (kind === 'pet') { tamaSet(aloft(tama) ? 'perch' : 'purr', 3.5); spawnHearts(tama.x, hy, 2); voice(); }
     else if (kind === 'brush') {
       tamaSet('purr', 4);
       for (let i = 0; i < 8; i++) particles.push({ x: tama.x + rand(-6, 6), y: FLOOR_Y - rand(4, 12), vx: rand(-8, 8), vy: -rand(2, 8), life: rand(0.8, 1.6), c: '#fbf7ee', type: 'steam' });
@@ -1374,7 +1949,7 @@
       if (s >= 3) { tamaSet('roll', 2.5); }
       else { tamaSet('trick', 2.4); }
       OKSound.pluck(6 + s);
-      setTimeout(() => spawnHearts(tama.x, 156, 2), 800);
+      setTimeout(() => spawnHearts(tama.x, (tama.y == null ? FLOOR_Y : tama.y) - 18, 2), 800);
     }
   }
 
@@ -1403,7 +1978,7 @@
       $('ok-pet').hidden = true;
       feather = { x: tama.x + 20, y: 160, t: 20 };
       renderPlayButton();
-      toast('遊ぼう! Wave the feather with your mouse. Press Esc to stop');
+      toast(`遊ぼう! Wave the ${sp().toy.toLowerCase()} with your mouse. Press Esc to stop`);
       OKSound.pluck(7);
     });
   }
@@ -1411,9 +1986,10 @@
     if (!feather) return;
     feather = null;
     renderPlayButton();
-    tamaSet('sit', 3);
-    spawnHearts(tama.x, 156, 2);
-    OKSound.meow();
+    spawnHearts(tama.x, (tama.y == null ? FLOOR_Y : tama.y) - 18, 2);
+    if (pet.species === 'bird' && aloft(tama)) { tamaSet('fly', 99); birdOuting(); }
+    else { tama.y = FLOOR_Y; tamaSet('sit', 3); }
+    voice();
   }
 
   // ---------------------------------------------------------------- gifts
@@ -1460,7 +2036,7 @@
       const gx = clamp(tama.x + (tama.dir > 0 ? 10 : -10), 16, 296);
       floorGifts.push({ gift: res.gift, x: gx, t: 0 });
       tamaSet('sit', 5);
-      OKSound.meow();
+      voice();
       say([`${pet.name}が何か持ってきた!`, `${pet.name} brought you something!`], { x: tama.x, y: 150 });
     });
   }
@@ -1512,21 +2088,27 @@
 
   // ----------------------------------------------------------- pet panel
   function drawPortrait(canvas) {
-    canvas.width = 30;
-    canvas.height = 25;
+    canvas.width = 36;
+    canvas.height = 30;
     const ctx = canvas.getContext('2d');
     const prev = gRef;
     gRef = ctx;
-    catSit(14, 23, { happy: true });
+    if (pet.species === 'puffle') drawPuffle(18, 27, { happy: true });
+    else if (pet.species === 'bird') drawBird(18, 27, 1, { happy: true });
+    else catSit(17, 27, { happy: true });
     gRef = prev;
   }
 
+  let petTab = 'care';
   function renderPetPanel() {
+    renderPetButton();
     const panel = $('ok-pet');
     if (!panel || panel.hidden) return;
+    const P0 = sp();
     drawPortrait($('ok-pet-portrait'));
     $('ok-pet-name').textContent = pet.name;
-    $('ok-pet-stage').textContent = `${pet.stageJp} ${pet.stageName}`;
+    const ti = pet.traitInfo || { jp: '', name: '', desc: '' };
+    $('ok-pet-stage').innerHTML = `${pet.stageJp} ${pet.stageName}<span class="ok-pet-traitchip" title="${esc(ti.desc)}">${ti.jp} ${ti.name}</span>`;
     const next = pet.nextStageDays;
     const prevDays = (PET_STAGES[pet.stage] || { days: 0 }).days;
     if (next) {
@@ -1537,89 +2119,91 @@
       $('ok-pet-grow').style.width = '100%';
       $('ok-pet-growtext').textContent = `${pet.studyDays} study days · fully grown`;
     }
-    const ti = pet.traitInfo || { jp: '三毛', name: 'Classic calico', desc: '' };
-    $('ok-pet-trait').innerHTML = `<b>${ti.jp}</b> ${ti.name} <span>${ti.desc}</span>`;
+    $('ok-pet-portrait').title = `${They()} eats while you review, gets a ${P0.food} for every guest you serve, and perks up after focus sessions. ${They()} never gets sick or runs away.`;
+    document.querySelectorAll('#ok-pet-tabs [data-tab]').forEach((t) => t.classList.toggle('on', t.dataset.tab === petTab));
+    document.querySelectorAll('#ok-pet .ok-tab').forEach((t) => { t.hidden = t.dataset.tab !== petTab; });
+
+    // care: compact meters (the hint lives in the tooltip)
     const meters = [
-      ['tummy', 'お腹', 'Tummy', pet.tummy, pet.tummy < 40 ? 'Peckish. Reviews and fish help.' : pet.tummy > 85 ? 'Full and happy.' : 'Content.'],
+      ['tummy', 'お腹', 'Tummy', pet.tummy, pet.tummy < 40 ? `Peckish. Reviews and ${foods()} help.` : pet.tummy > 85 ? 'Full and happy.' : 'Content.'],
       ['love', '愛情', 'Love', pet.love, pet.love < 40 ? 'Would love some attention.' : pet.love > 85 ? 'Adores you.' : 'Fond of you.'],
-      ['energy', '元気', 'Energy', pet.energy, pet.energy < 35 ? 'Sleepy. Focus sessions perk her up.' : pet.energy > 85 ? 'Bouncing off the walls.' : 'Lively.'],
+      ['energy', '元気', 'Energy', pet.energy, pet.energy < 35 ? `Sleepy. Focus sessions perk ${P0.them} up.` : pet.energy > 85 ? 'Bouncing off the walls.' : 'Lively.'],
     ];
     $('ok-pet-meters').innerHTML = meters.map(([id, jp, en, val, hint]) => {
       const n = Math.round(clamp(val, 0, 100) / 10);
       let segs = '';
       for (let i = 0; i < 10; i++) segs += `<i class="${i < n ? 'on' : ''}"></i>`;
-      return `<div class="ok-meter ok-meter-${id}"><span class="ok-meter-label"><b class="jp">${jp}</b> ${en}</span><span class="ok-meter-bar">${segs}</span><span class="ok-meter-hint">${hint}</span></div>`;
+      return `<div class="ok-meter ok-meter-${id}" title="${hint}"><span class="ok-meter-label"><b class="jp">${jp}</b> ${en}</span><span class="ok-meter-bar">${segs}</span></div>`;
     }).join('');
-    // happy-cat bonus
     const happy = petHappy();
     $('ok-pet-happy').className = 'ok-pet-happy' + (happy ? ' on' : '');
     $('ok-pet-happy').innerHTML = happy
-      ? '<b class="jp">招き猫モード</b> Happy cat! She beckons guests in: <b>+1 tip</b> from every guest.'
-      : '<b class="jp">招き猫モード</b> Keep all three needs at 70+ and she\'ll beckon guests in for <b>+1 tip</b> each.';
-    renderAccessories();
+      ? `<b>✦ Happy!</b> ${They()} beckons guests in: +1 tip each.`
+      : '✦ All three at 70+ gives <b>+1 tip</b> from every guest.';
+    $('ok-pet-foodjp').textContent = P0.foodJp;
     $('ok-pet-fish').textContent = pet.fish;
+    document.querySelector('[data-pet="feed"]').title = `Feed ${P0.them} a ${P0.food} (${pet.fish} saved)`;
     renderPlayButton();
     const trickBtn = document.querySelector('[data-pet="trick"]');
-    const trickNames = ['', 'Paw wave', 'Beckon', 'Roll over'];
-    trickBtn.querySelector('small').textContent = pet.stage >= 1 ? trickNames[Math.min(3, pet.stage)] : 'At 若猫';
+    trickBtn.querySelector('small').textContent = pet.stage >= 1 ? P0.tricks[Math.min(3, pet.stage) - 1] : 'Trick';
+    trickBtn.title = pet.stage >= 1 ? '' : `Learns tricks at ${(PET_STAGES[1] || {}).jp || 'the next stage'}`;
     trickBtn.disabled = pet.stage < 1;
-    // keepsake box
-    const box = $('ok-pet-gifts');
-    box.innerHTML = '';
+
+    // style
+    renderAccessories();
+
+    // keepsakes
     const found = PET_GIFTS.filter((gf) => pet.gifts && pet.gifts[gf.id]).length;
-    $('ok-pet-giftcount').textContent = `${found} / ${PET_GIFTS.length}`;
-    for (const gf of PET_GIFTS) {
-      const count = (pet.gifts || {})[gf.id] || 0;
-      const cell = document.createElement('div');
-      cell.className = 'ok-gift' + (count ? '' : ' unknown');
-      if (count) {
-        const cv = document.createElement('canvas');
-        cv.width = 7;
-        cv.height = 7;
-        drawGiftSprite(gf.id, 0, 0, cv.getContext('2d'));
-        cell.appendChild(cv);
-        cell.title = `${gf.jp} ${gf.name}: ${gf.desc}`;
-        cell.insertAdjacentHTML('beforeend', `<span>${gf.jp}</span>${count > 1 ? `<em>×${count}</em>` : ''}`);
-      } else {
-        cell.innerHTML = '<b>?</b><span>???</span>';
-        cell.title = 'Not found yet. A happy, well-fed cat brings gifts now and then.';
+    $('ok-pet-giftcount').textContent = `${found}/${PET_GIFTS.length}`;
+    const fill = (box, list, rare) => {
+      box.innerHTML = '';
+      for (const gf of list) {
+        const count = (pet.gifts || {})[gf.id] || 0;
+        const cell = document.createElement('div');
+        cell.className = 'ok-gift' + (rare ? ' ok-gift-rare' : '') + (count ? '' : ' unknown');
+        if (count) {
+          const cv = document.createElement('canvas');
+          cv.width = 7;
+          cv.height = 7;
+          drawGiftSprite(gf.id, 0, 0, cv.getContext('2d'));
+          cell.appendChild(cv);
+          cell.title = `${gf.jp} ${gf.name}: ${gf.desc}`;
+          cell.insertAdjacentHTML('beforeend', `<span>${gf.jp}</span>${count > 1 ? `<em>×${count}</em>` : ''}`);
+        } else {
+          cell.innerHTML = rare ? '<b>★</b>' : '<b>?</b>';
+          cell.title = rare ? 'A rare keepsake. Only brought when love is 90 or more.' : 'Not found yet. A happy, well-fed pet brings gifts now and then.';
+        }
+        box.appendChild(cell);
       }
-      box.appendChild(cell);
-    }
+    };
+    fill($('ok-pet-gifts'), PET_GIFTS, false);
+    fill($('ok-pet-rare'), PET_RARE, true);
     $('ok-pet-setnote').innerHTML = pet.setBonus
       ? '<b class="jp">宝物</b> Complete! The treasure shelf is on your wall.'
-      : `Find all ${PET_GIFTS.length} for a one-time <b>+500 mon</b> and a treasure shelf.`;
-    // rare keepsakes
-    const rare = $('ok-pet-rare');
-    rare.innerHTML = '';
-    for (const gf of PET_RARE) {
-      const count = (pet.gifts || {})[gf.id] || 0;
-      const cell = document.createElement('div');
-      cell.className = 'ok-gift ok-gift-rare' + (count ? '' : ' unknown');
-      if (count) {
-        const cv = document.createElement('canvas');
-        cv.width = 7;
-        cv.height = 7;
-        drawGiftSprite(gf.id, 0, 0, cv.getContext('2d'));
-        cell.appendChild(cv);
-        cell.title = `${gf.jp} ${gf.name}: ${gf.desc}`;
-        cell.insertAdjacentHTML('beforeend', `<span>${gf.jp}</span>${count > 1 ? `<em>×${count}</em>` : ''}`);
-      } else {
-        cell.innerHTML = '<b>★</b><span>???</span>';
-        cell.title = 'A rare keepsake. She only brings these when her love is 90 or more.';
-      }
-      rare.appendChild(cell);
-    }
+      : `Find all ${PET_GIFTS.length} for <b>+500 mon</b> and a treasure shelf.`;
+  }
+  document.querySelectorAll('#ok-pet-tabs [data-tab]').forEach((t) => t.addEventListener('click', () => {
+    petTab = t.dataset.tab;
+    OKSound.blip();
+    renderPetPanel();
+  }));
+
+  // Footer: 猫 / パフル / 文鳥 Pet
+  function renderPetButton() {
+    const el = $('ok-pet-jp');
+    if (el) el.textContent = sp().jp;
+    $('ok-b-pet').title = pet.species ? `${pet.name}, your ${sp().name.toLowerCase()}` : 'Your pet';
   }
 
-  // 遊ぶ ⇄ やめる: the feather toy button is a toggle
+  // 遊ぶ ⇄ やめる: the toy button is a toggle
   function renderPlayButton() {
     const b = document.querySelector('[data-pet="play"]');
     if (!b) return;
     b.classList.toggle('on', !!feather);
+    b.title = feather ? '' : sp().toy;
     b.innerHTML = feather
-      ? '<b class="jp">やめる</b><small>Stop playing</small>'
-      : '<b class="jp">遊ぶ</b><small>Feather toy</small>';
+      ? '<b class="jp">やめる</b><small>Stop</small>'
+      : '<b class="jp">遊ぶ</b><small>Play</small>';
   }
 
   // 身だしなみ: accessories unlocked by care milestones
@@ -1630,15 +2214,21 @@
     const have = { pets: pet.petPoints || 0, fish: pet.fishFed || 0 };
     const prog = (key) => {
       const m = PET_MILESTONES[key] || { kind: 'pets', need: 0 };
-      const verb = m.kind === 'pets' ? 'Pet her' : 'Feed her';
-      return `${verb} ${Math.min(have[m.kind], m.need)} / ${m.need}${m.kind === 'fish' ? ' fish' : ''}`;
+      const verb = m.kind === 'pets' ? 'Pets' : `${foods()[0].toUpperCase()}${foods().slice(1)} fed`;
+      return `${verb} ${Math.min(have[m.kind], m.need)}/${m.need}`;
     };
     const chip = (key, value, label, on, swatch) =>
       `<button class="ok-chip${on ? ' on' : ''}" data-style="${key}" data-value="${value}">${swatch ? `<i style="background:${swatch}"></i>` : ''}${label}</button>`;
     const locked = (label, key) => `<span class="ok-acc-lock">🔒 ${label} <em>${prog(key)}</em></span>`;
     let html = '';
-    html += '<div class="ok-acc-row"><b class="jp">首輪</b><span>Collar</span><div>' +
-      (un.collar ? Object.keys(COLLAR).map((c) => chip('collar', c, c[0].toUpperCase() + c.slice(1), st.collar === c || (!st.collar && c === 'red'), COLLAR[c])).join('') : locked('Collar colours', 'collar')) +
+    if (pet.species === 'puffle') {
+      const owned = S.puffleColors || [];
+      html += '<div class="ok-acc-row"><b class="jp">色</b><span>Colour</span><div>' +
+        PUFFLE_COLORS.filter((c) => owned.includes(c.id)).map((c) => `<button class="ok-chip${S.puffleColor === c.id ? ' on' : ''}" data-color="${c.id}"><i style="background:${c.id === 'rainbow' ? `linear-gradient(${RAINBOW.join(',')})` : c.hex}"></i>${c.name}</button>`).join('') +
+        '<button class="ok-chip ok-chip-more" data-shop="1">+ More in the shop</button></div></div>';
+    }
+    html += `<div class="ok-acc-row"><b class="jp">${pet.species === 'cat' || !pet.species ? '首輪' : 'リボン'}</b><span>${pet.species === 'puffle' ? 'Bow' : 'Collar'}</span><div>` +
+      (un.collar ? Object.keys(COLLAR).map((c) => chip('collar', c, c[0].toUpperCase() + c.slice(1), st.collar === c || (!st.collar && c === 'red'), COLLAR[c])).join('') : locked(pet.species === 'puffle' ? 'Bow colours' : 'Collar colours', 'collar')) +
       '</div></div>';
     html += '<div class="ok-acc-row"><b class="jp">手ぬぐい</b><span>Bandana</span><div>' +
       (un.bandana ? chip('bandana', st.bandana ? '0' : '1', st.bandana ? 'Wearing it ✓' : 'Put it on', !!st.bandana) : locked('Bandana', 'bandana')) +
@@ -1652,8 +2242,10 @@
       (un.fancy_bed ? chip('bed', 'fancy', '豪華座布団 Fancy cushion', bed === 'fancy') : locked('Fancy cushion', 'fancy_bed')) +
       (un.kotatsu ? chip('bed', 'kotatsu', 'こたつ Kotatsu', bed === 'kotatsu') : locked('Kotatsu', 'kotatsu')) +
       '</div></div>';
-    html += `<div class="ok-acc-note">Petting counts toward these up to ${PETS_PER_DAY} times a day (${pet.petsToday || 0} today). Fish count every time you feed her.</div>`;
+    html += `<div class="ok-acc-note">Unlocked by caring: pets count up to ${PETS_PER_DAY} a day (${pet.petsToday || 0} today).</div>`;
     box.innerHTML = html;
+    box.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => setPuffleColor(b.dataset.color)));
+    box.querySelectorAll('[data-shop]').forEach((b) => b.addEventListener('click', () => { togglePanel('ok-decor'); setTimeout(() => { const el = $('ok-colors-head'); if (el) el.scrollIntoView({ block: 'start' }); }, 30); }));
     box.querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', () => {
       const key = b.dataset.style;
       let value = b.dataset.value;
@@ -1669,31 +2261,35 @@
 
   document.querySelectorAll('[data-pet]').forEach((b) => b.addEventListener('click', () => petAction(b.dataset.pet)));
   $('ok-b-pet').addEventListener('click', () => { togglePanel('ok-pet'); renderPetPanel(); });
-  $('ok-pet-rename').addEventListener('click', () => {
-    const wrap = $('ok-pet-namewrap');
-    wrap.classList.add('editing');
+  // Double-click the name to rename: Enter or clicking away saves, Esc cancels.
+  $('ok-pet-name').addEventListener('dblclick', () => {
+    $('ok-pet-namewrap').classList.add('editing');
     const input = $('ok-pet-nameinput');
     input.value = pet.name;
     input.focus();
     input.select();
   });
-  $('ok-pet-nameform').addEventListener('submit', (e) => {
-    e.preventDefault();
+  function saveName(keep) {
+    const wrap = $('ok-pet-namewrap');
+    if (!wrap.classList.contains('editing')) return;
+    wrap.classList.remove('editing');
     const name = $('ok-pet-nameinput').value.trim();
-    $('ok-pet-namewrap').classList.remove('editing');
-    if (!name || name === pet.name) return;
-    send('petname', name, (p) => { if (p) { pet = p; renderPetPanel(); OKSound.meow(); } });
-  });
+    if (!keep || !name || name === pet.name) return;
+    send('petname', name, (p) => { if (p) { pet = p; renderPetPanel(); voice(); } });
+  }
+  $('ok-pet-nameform').addEventListener('submit', (e) => { e.preventDefault(); saveName(true); });
+  $('ok-pet-nameinput').addEventListener('blur', () => saveName(true));
 
   function greetOnOpen() {
     const away = INIT.petAway || 0;
     if (away < 3600) return false;
     tama.x = 262;
     tama.dir = -1;
+    if (pet.species === 'bird') tama.y = 70;
     tamaGo(150, () => {
       tamaSet('purr', 4);
       spawnHearts(150, 156, 3);
-      OKSound.meow();
+      voice();
       const days = Math.floor(away / 86400);
       say(['おかえり!', days >= 2 ? `Welcome back! ${pet.name} missed you.` : 'Welcome back!'], { x: 150, y: 150 });
     });
@@ -1708,6 +2304,29 @@
   }
 
   const ANIMAL_ART = {
+    // The three starter pets, as shop companions (drawn with a stand-in pet).
+    mike(cx, by, dir, pose, f) {
+      withPet({ species: 'cat', stage: 2, style: { collar: 'indigo' } }, () => {
+        if (pose === 'rest' || pose === 'sleep') catSleep(cx, by);
+        else if (pose === 'react') catSit(cx, by, { happy: true, fastTail: true });
+        else catSide(cx, by, dir, f ? 1 : 2);
+      });
+    },
+    puffle(cx, by, dir, pose, f) {
+      withPet({ species: 'puffle', stage: 2 }, () => {
+        if (pose === 'walk') { const b = Math.abs(Math.sin(time * 9 + cx)); drawPuffle(cx, by - Math.round(b * 4), { squash: b < 0.2, look: dir }); }
+        else if (pose === 'react') { const b = Math.abs(Math.sin(time * 8)); drawPuffle(cx, by - Math.round(b * 7), { happy: true, squash: b < 0.15 }); }
+        else drawPuffle(cx, by, { blink: Math.floor(time * 10 + cx) % 41 === 0, squash: pose === 'sleep' || Math.floor(time * 1.2 + cx) % 4 === 0, sleep: pose === 'sleep' });
+      });
+    },
+    buncho(cx, by, dir, pose, f, a) {
+      withPet({ species: 'bird', stage: 2 }, () => {
+        if (pose === 'fly') { flightShadow(cx, by); drawBird(cx, by, dir, { flying: true, wing: (a && a.flap) || 'flap' }); }
+        else if (pose === 'walk') drawBird(cx, by, dir, { hop: f ? 2 : 0 });
+        else if (pose === 'react') drawBird(cx, by, dir, { wing: 'flap', happy: true, beakOpen: Math.floor(time * 6) % 2 === 0 });
+        else drawBird(cx, by, dir, { sleep: pose === 'sleep', blink: Math.floor(time * 10 + cx) % 43 === 0 });
+      });
+    },
     usagi(cx, by, dir, pose, f) {
       const r = mr(cx, by, dir);
       const W = '#fbf7ee';
@@ -1833,24 +2452,54 @@
     },
   };
 
-  const ANIMAL_SPEED = { usagi: 20, kuro: 16, shiba: 22, kitsune: 24, tanuki_friend: 10, tsuru: 8 };
+  const SLEEP_ART = new Set(['mike', 'puffle', 'buncho']); // others sleep in their rest pose
+  const ANIMAL_SPEED = { usagi: 20, kuro: 16, shiba: 22, kitsune: 24, tanuki_friend: 10, tsuru: 8, mike: 16, puffle: 18, buncho: 14 };
+  const isCompanion = (c) => c.kind === 'animal' || c.kind === 'pet';
   const residents = [];
 
   function syncResidents() {
-    const want = catalog.filter((c) => c.kind === 'animal' && has(c.id)).map((c) => c.id);
+    const want = catalog.filter((c) => isCompanion(c) && has(c.id)).map((c) => c.id);
     for (let i = residents.length - 1; i >= 0; i--) if (!want.includes(residents[i].id)) residents.splice(i, 1);
+    setTimeout(assignSlots, 0);
     want.forEach((id, i) => {
       if (residents.some((a) => a.id === id)) return;
       residents.push({
         id,
         x: id === 'tsuru' ? 296 : 70 + ((i * 47) % 200),
         dir: Math.random() < 0.5 ? 1 : -1,
+        y: FLOOR_Y,
         pose: 'rest',
         t: 0,
         dur: rand(2, 6),
         target: null,
       });
     });
+  }
+
+  // One bed spot per pet (after your own pet's), in shop order.
+  function assignSlots() {
+    let n = 1;
+    for (const a of residents) a.slot = a.id === 'tsuru' ? null : n++;
+    bedSlots = n;
+    BOWL_X = BED_X + 11 + bedExtra() + 10;
+  }
+
+  // おやすみ: everyone heads to bed and sleeps for a while.
+  function sendToBed(a, dur) {
+    const sleep = () => { a.pose = 'sleep'; a.t = 0; a.dur = dur || rand(40, 70); };
+    if (a.slot == null) { sleep(); return; }
+    const x = slotX(a.slot);
+    if (a.id === 'buncho' && (aloft(a) || Math.abs(a.x - x) > 40)) { a.pose = 'fly'; flyTo(a, [{ x, y: FLOOR_Y }], sleep); return; }
+    if (Math.abs(a.x - x) < 2 && !aloft(a)) { sleep(); return; }
+    a.air = null; a.y = FLOOR_Y;
+    a.target = x; a.pose = 'walk'; a.t = 0; a.then = sleep;
+  }
+  function bedtime() {
+    if (feather) endPlay();
+    if (tama.state !== 'sleep') tamaGo(BED_X, () => tamaSet('sleep', rand(40, 70)));
+    residents.forEach((a) => sendToBed(a));
+    OKSound.phraseDown();
+    say(['おやすみ…', residents.length ? 'Good night, everyone.' : `Good night, ${pet.name}.`], { x: BED_X + 30 + bedExtra() / 2, y: 150 });
   }
 
   function animalInfo(id) {
@@ -1860,23 +2509,38 @@
   function updateResidents(dt) {
     for (const a of residents) {
       a.t += dt;
+      if (a.air) { updateFlight(a, dt); continue; }
       if (a.pose === 'walk') {
         const speed = ANIMAL_SPEED[a.id] || 14;
         const dx = a.target - a.x;
         a.dir = dx >= 0 ? 1 : -1;
-        if (Math.abs(dx) <= speed * dt) { a.x = a.target; a.pose = 'rest'; a.t = 0; a.dur = rand(4, 10); }
+        if (Math.abs(dx) <= speed * dt) {
+          a.x = a.target;
+          const then = a.then;
+          a.then = null;
+          if (then) then(); else { a.pose = 'rest'; a.t = 0; a.dur = rand(4, 10); }
+        }
         else a.x += a.dir * speed * dt;
         continue;
       }
       if (a.t < a.dur) continue;
       // decide what to do next
       if (timer.phase === 'focus' || darkness(hourNow()) > 0.3 && Math.random() < 0.5) {
-        a.pose = 'rest'; a.t = 0; a.dur = rand(10, 25);
+        // focus time and night time: off to bed
+        sendToBed(a, rand(20, 45));
+        continue;
+      }
+      if (a.id === 'buncho') {
+        // the shop sparrow flits between perches (and back down to the floor)
+        const up = aloft(a);
+        a.pose = 'fly';
+        const dest = up && Math.random() < 0.4 ? { x: rand(52, 300), y: FLOOR_Y } : freePerch(a, tama);
+        flyTo(a, Math.random() < 0.25 ? [...lap(), dest] : [dest], () => { a.pose = 'rest'; a.t = 0; a.dur = rand(6, 14); });
         continue;
       }
       let target;
       if (a.id === 'tsuru') target = rand(276, 306);
-      else if (a.id === 'kuro' && tama.state === 'sleep' && Math.random() < 0.6) target = clamp(tama.x + 16, 12, 300);
+      else if (a.id === 'kuro' && tama.state === 'sleep' && Math.random() < 0.6) { sendToBed(a, rand(20, 40)); continue; }
       else target = rand(52, 300);
       a.target = target;
       a.pose = 'walk';
@@ -1891,12 +2555,16 @@
   }
 
   function reactResident(a) {
+    if (a.air) return;
+    a.then = null;
     a.pose = 'react';
     a.t = 0;
     a.dur = 1.3;
-    spawnHearts(a.x, FLOOR_Y - 22, 1);
+    spawnHearts(a.x, (a.y == null ? FLOOR_Y : a.y) - 22, 1);
     if (a.id === 'usagi') OKSound.pluck(9);
-    else if (a.id === 'kuro') OKSound.meow();
+    else if (a.id === 'kuro' || a.id === 'mike') OKSound.meow();
+    else if (a.id === 'puffle') OKSound.squeak();
+    else if (a.id === 'buncho') OKSound.chirp();
     else if (a.id === 'shiba') { OKSound.pop(); setTimeout(() => OKSound.pop(), 140); }
     else if (a.id === 'kitsune') OKSound.koto(880, 0, 0.3);
     else if (a.id === 'tanuki_friend') { OKSound.koto(98, 0, 0.35); OKSound.koto(98, 0.18, 0.35); }
@@ -1910,10 +2578,13 @@
       if (!art) continue;
       const pose = a.pose === 'react' && a.t > a.dur ? 'rest' : a.pose;
       if (a.pose === 'react' && a.t > a.dur) { a.pose = 'rest'; a.t = 0; a.dur = rand(3, 8); }
-      art(Math.round(a.x), FLOOR_Y, a.dir, pose, walkFrame);
+      const ay = Math.round(a.y == null ? FLOOR_Y : a.y);
+      const asleep = pose === 'sleep' && !a.air;
+      art(Math.round(a.x), ay, a.dir, a.air ? 'fly' : asleep && !SLEEP_ART.has(a.id) ? 'rest' : pose, walkFrame, a);
+      if (asleep) sleepZ(Math.round(a.x) + 5, ay - (a.id === 'tsuru' ? 32 : 20));
       const info = animalInfo(a.id);
       const h = a.id === 'tsuru' ? 27 : a.id === 'usagi' ? 17 : 17;
-      regions.push({ x: a.x - 10, y: FLOOR_Y - h, w: 20, h, label: `<b>${info.jp}</b> ${info.name}\n${info.perk}`, click: () => reactResident(a) });
+      regions.push({ x: a.x - 10, y: ay - h, w: 20, h, label: `<b>${info.jp}</b> ${info.name}\n${info.perk}`, click: () => reactResident(a) });
     }
   }
 
@@ -2343,23 +3014,30 @@
   // ---------------------------------------------------------------- lights
   function drawLighting(h) {
     const d = darkness(h);
-    const dim = d > 0 ? d + (lanternsOn ? 0 : 0.18) : 0;
+    // the room gets darker the fewer candles are lit
+    const main = ['s0', 's1', 's2', 's3', 's4', 'aka'].map((id) => lamps[id].glow);
+    const lit = main.reduce((a, b) => a + b, 0) / main.length;
+    const dim = d > 0 ? d + 0.18 * (1 - lit) : 0;
     if (dim > 0) {
       g.fillStyle = `rgba(22,14,40,${dim})`;
       g.fillRect(0, 0, W, H);
     }
-    if (lanternsOn && d > 0.05) {
-      g.globalCompositeOperation = 'lighter';
-      const glows = STRING_LANTERNS.map((x) => [x, 12, 16]).concat([[245, 30, 26]]);
-      if (has('matsuri')) FESTIVAL_LANTERNS.forEach(([x]) => glows.push([x, 10, 12]));
-      for (const [x, y, r] of glows) {
-        for (let k = 3; k >= 1; k--) {
-          g.fillStyle = `rgba(255,160,70,${0.05 * d / 0.34})`;
-          ellipseRaw(x, y, (r * k) / 3, (r * k) / 3.4);
-        }
+    // each lit candle throws its own warm halo (faint by day)
+    const glows = STRING_LANTERNS.map((x, i) => ['s' + i, x, 12, 16]).concat([['aka', 245, 30, 26]]);
+    if (has('matsuri')) FESTIVAL_LANTERNS.forEach(([x], i) => glows.push(['f' + i, x, 10, 12]));
+    if (has('kamakura')) glows.push(['kama', 90, 101, 9]);
+    const strength = Math.max(0.3, d / 0.34);
+    g.globalCompositeOperation = 'lighter';
+    for (const [id, x, y, r] of glows) {
+      const l = lamps[id];
+      if (l.glow <= 0.02) continue;
+      const f = l.glow * flicker(l);
+      for (let k = 3; k >= 1; k--) {
+        g.fillStyle = `rgba(255,160,70,${0.05 * strength * f})`;
+        ellipseRaw(x, y, (r * k * (0.9 + 0.1 * f)) / 3, (r * k) / 3.4);
       }
-      g.globalCompositeOperation = 'source-over';
     }
+    g.globalCompositeOperation = 'source-over';
   }
   function ellipseRaw(cx, cy, rx, ry) {
     rx = Math.round(rx);
@@ -2520,9 +3198,11 @@
     if (walkerTimer <= 0) {
       walkerTimer = rand(9, 22);
       const dir = Math.random() < 0.5 ? 1 : -1;
-      walkers.push({ x: dir > 0 ? -6 : WIN.w - 2, dir, p: Math.random() * 10, c: pick(['#efe6d4', '#e8d4b0', '#f6d7c8']), u: pick(['#c8412f', '#3b6ea5', '#e0a13a']) });
+      // now and then a penguin waddles by instead (more of them in winter)
+      const penguin = hasPuffle() && Math.random() < (SEASON === 'winter' ? 0.45 : 0.15);
+      walkers.push({ x: dir > 0 ? -6 : WIN.w - 2, dir, p: Math.random() * 10, penguin, c: penguin ? pick(['#3d7fd6', '#d8403a', '#4fb04a', '#f28dbb', '#34343c']) : pick(['#efe6d4', '#e8d4b0', '#f6d7c8']), u: pick(['#c8412f', '#3b6ea5', '#e0a13a']) });
     }
-    walkers.forEach((wk) => { wk.x += wk.dir * dt * 9; });
+    walkers.forEach((wk) => { wk.x += wk.dir * dt * (wk.penguin ? 6 : 9); });
     walkers = walkers.filter((wk) => wk.x > -8 && wk.x < WIN.w + 2);
 
     windTimer -= dt;
@@ -2540,13 +3220,13 @@
     updateParticles(dt);
     updateSparrow(dt);
     updateRadio(dt);
+    updateLamps(dt);
   }
 
   function render() {
     regions = [];
     const h = hourNow();
     lanternsAuto();
-    const lit = lanternsOn && darkness(h) > 0.05;
     g.drawImage(bg, 0, 0);
     drawWindow(h);
     drawSparrow();
@@ -2555,7 +3235,7 @@
     drawMeyasubako();
     drawTreasureShelf();
     drawDoor(h);
-    drawLanterns(lit);
+    drawLanterns();
     drawChef();
     drawCounter();
     drawCounterDecor();
@@ -2583,13 +3263,14 @@
     positionBubble();
   }
 
-  let lanternAutoState = null;
+  let lanternAutoState = darkness(hourNow()) > 0.05;
   function lanternsAuto() {
-    // Lanterns switch themselves on at dusk (unless the user toggled them).
+    // At dusk the candles light themselves one after another, and at dawn
+    // they go out (anything you toggled in between stays as you left it).
     const on = darkness(hourNow()) > 0.05;
     if (lanternAutoState !== on) {
       lanternAutoState = on;
-      if (on) lanternsOn = true;
+      LAMP_IDS.forEach((id, i) => lampOn(id, on, 0, 0, 0.4 + i * 0.35));
     }
   }
 
@@ -2771,7 +3452,7 @@
       modal('完売', 'Sold out!',
         `Served <b>${count}</b> guest${count === 1 ? '' : 's'}${extras.length ? ' (' + extras.join(', ') + ')' : ''}` +
         `${deckCount ? ` from <b>${deckCount}</b> deck${deckCount === 1 ? '' : 's'}` : ''}.<br>` +
-        `Tips: <b>+${res.mon} mon</b> · ${esc(pet.name)} got <b>${Math.min(count, 20)}</b> fish saved.`,
+        `Tips: <b>+${res.mon} mon</b> · ${esc(pet.name)} got <b>${Math.min(count, 20)}</b> ${Math.min(count, 20) === 1 ? sp().food : foods()} saved.`,
         [['やった!<small>Nice</small>', 'ok-hanko ok-hanko-wide', null]]);
     });
   }
@@ -2883,6 +3564,28 @@
     toast('Cycle reset');
   });
 
+  // Panels open right next to their button: above the footer buttons (Pet,
+  // Shop), below the timer's ⚙. Centred on the button, kept on screen.
+  const PANEL_BTN = { 'ok-pet': 'ok-b-pet', 'ok-decor': 'ok-b-decor', 'ok-settings': 'ok-t-set' };
+  function placePanel(el) {
+    const btn = $(PANEL_BTN[el.id]);
+    if (!btn || el.hidden) return;
+    const b = btn.getBoundingClientRect();
+    const gap = 8;
+    const above = b.top > window.innerHeight / 2;
+    el.style.right = 'auto';
+    if (above) {
+      el.style.top = 'auto';
+      el.style.bottom = window.innerHeight - b.top + gap + 'px';
+      el.style.maxHeight = Math.max(200, b.top - gap - 16) + 'px';
+    } else {
+      el.style.bottom = 'auto';
+      el.style.top = b.bottom + gap + 'px';
+      el.style.maxHeight = Math.max(200, window.innerHeight - b.bottom - gap - 16) + 'px';
+    }
+    const w = el.offsetWidth;
+    el.style.left = clamp(b.left + b.width / 2 - w / 2, 12, window.innerWidth - w - 12) + 'px';
+  }
   function togglePanel(id) {
     const el = $(id);
     const show = el.hidden;
@@ -2890,8 +3593,19 @@
     el.hidden = !show;
     if (show && id === 'ok-settings') fillForm();
     if (show && id === 'ok-decor') renderDecor();
+    if (show) placePanel(el);
   }
+  window.addEventListener('resize', () => document.querySelectorAll('.ok-panel:not([hidden])').forEach(placePanel));
   document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => { $(b.dataset.close).hidden = true; }));
+  // Clicking anywhere outside an open panel closes it. A click on the scene
+  // only closes the panel (it doesn't also pet or tap whatever is there).
+  document.addEventListener('click', (e) => {
+    const open = document.querySelector('.ok-panel:not([hidden])');
+    if (!open || open.contains(e.target)) return;
+    if (e.target.closest('#ok-b-pet, #ok-b-decor, #ok-t-set, .ok-modal, .ok-tour')) return;
+    open.hidden = true;
+    if (e.target === view) e.stopPropagation();
+  }, true);
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && (e.key === 'w' || e.key === 'W')) {
       e.preventDefault();
@@ -2904,6 +3618,8 @@
       if (e.key === 'ArrowLeft') { tourGo(tourIdx - 1); e.preventDefault(); return; }
     }
     if (e.key === 'Escape' && feather) { endPlay(); e.preventDefault(); e.stopPropagation(); return; }
+    if (e.key === 'Escape' && !$('ok-starter').hidden) { e.preventDefault(); e.stopPropagation(); return; }
+    if (e.key === 'Escape' && e.target === $('ok-pet-nameinput')) { saveName(false); e.preventDefault(); e.stopPropagation(); return; }
     if (e.key === 'Escape') {
       const open = document.querySelector('.ok-panel:not([hidden]), .ok-modal:not([hidden])');
       if (open) { open.hidden = true; e.preventDefault(); e.stopPropagation(); }
@@ -2943,8 +3659,10 @@
     if (conf.sound) OKSound.pluck(4);
   });
   function renderSoundBtn() {
-    $('ok-sound-label').textContent = conf.sound ? 'Sound on' : 'Sound off';
-    $('ok-b-sound').classList.toggle('off', !conf.sound);
+    const b = $('ok-b-sound');
+    b.classList.toggle('off', !conf.sound);
+    b.title = conf.sound ? 'Mute' : 'Unmute';
+    b.setAttribute('aria-label', b.title);
   }
   $('ok-b-decor').addEventListener('click', () => togglePanel('ok-decor'));
 
@@ -2955,7 +3673,8 @@
     grid.innerHTML = '';
     const level = onigiri.level || 0;
     const animals = catalog.filter((c) => c.kind === 'animal');
-    const decor = catalog.filter((c) => c.kind !== 'animal');
+    const pets = catalog.filter((c) => c.kind === 'pet' && c.species !== pet.species);
+    const decor = catalog.filter((c) => !isCompanion(c) && (!c.puffle || hasPuffle() || S.owned.includes(c.id)));
     const heading = (jp, en, sub) => {
       const h = document.createElement('div');
       h.className = 'ok-grid-head';
@@ -2963,10 +3682,12 @@
       grid.appendChild(h);
     };
     const ordered = [];
-    if (animals.length) ordered.push({ head: ['仲間', 'Companions', 'Milestone friends who move in, each with a perk'] }, ...animals);
+    if (pets.length || animals.length) ordered.push({ head: ['ペット', 'Pets', 'Friends who move in · hover one to see its perk'] }, ...pets, ...animals);
+    ordered.push({ colors: true });
     ordered.push({ head: ['飾り', 'Decor', 'Little touches for your restaurant'] }, ...decor);
     for (const item of ordered) {
       if (item.head) { heading(...item.head); continue; }
+      if (item.colors) { renderColorShop(grid, heading); continue; }
       const owned = S.owned.includes(item.id);
       const locked = !owned && level < item.level;
       const card = document.createElement('div');
@@ -2978,8 +3699,8 @@
       body.innerHTML =
         `<div class="ok-item-name"><span class="jp">${item.jp}</span><span>${item.name}</span></div>` +
         `<p>${item.desc}</p>` +
-        (item.perk ? `<p class="ok-perk">✦ ${item.perk}</p>` : '');
-      card.className += item.kind === 'animal' ? ' ok-animal' : '';
+        (item.perk ? `<p class="ok-perk">✦ ${item.perk}</p><span class="ok-perk-hint">✦ Perk</span>` : '');
+      card.className += isCompanion(item) ? ' ok-animal' : '';
       card.appendChild(body);
       const foot = document.createElement('div');
       foot.className = 'ok-item-foot';
@@ -3006,11 +3727,12 @@
             renderHeader();
             OKSound.fanfare();
             spawnHearts(160, 90, 3);
-            if (item.kind === 'animal') {
+            if (isCompanion(item)) {
               syncResidents();
               const a = residents.find((x) => x.id === item.id);
               if (a) { a.x = DOOR_X; a.target = 160; a.pose = 'walk'; }
               say([`${item.jp}が仲間になった!`, `${item.name} moved in!`], { x: 160, y: 150 });
+              if (item.id === 'puffle' && !(S.puffleColors || []).length) setTimeout(() => openChooser('color'), 700);
             }
           }
           toast(r.msg);
@@ -3021,6 +3743,53 @@
       card.appendChild(foot);
       grid.appendChild(card);
     }
+  }
+
+  // パフルの色: puffle colours. Shown once you have a puffle (starter or shop).
+  function renderColorShop(grid, heading) {
+    if (!hasPuffle()) return;
+    heading('パフルの色', 'Puffle colours', `${PUFFLE_COLOR_PRICE} mon each · swap any time once owned`);
+    grid.lastChild.id = 'ok-colors-head';
+    const owned = S.puffleColors || [];
+    const row = document.createElement('div');
+    row.className = 'ok-color-grid';
+    for (const c of PUFFLE_COLORS) {
+      const have = owned.includes(c.id);
+      const b = document.createElement('button');
+      b.className = 'ok-color' + (S.puffleColor === c.id ? ' on' : '') + (have ? ' owned' : '');
+      const cv = document.createElement('canvas');
+      cv.width = 18;
+      cv.height = 17;
+      const prev = gRef;
+      gRef = cv.getContext('2d');
+      withPet({ species: 'puffle', stage: 1 }, () => drawPuffle(9, 16, { color: c.id, happy: S.puffleColor === c.id }));
+      gRef = prev;
+      b.appendChild(cv);
+      const free = !owned.length && c.starter;
+      b.insertAdjacentHTML('beforeend', `<span>${c.jp} ${c.name}</span><small>${S.puffleColor === c.id ? '✓ Wearing' : have ? 'Owned' : free ? 'Free' : `${MON_SVG}${PUFFLE_COLOR_PRICE}`}</small>`);
+      b.disabled = !have && !free && S.mon < PUFFLE_COLOR_PRICE;
+      b.onclick = () => setPuffleColor(c.id);
+      row.appendChild(b);
+    }
+    grid.appendChild(row);
+  }
+
+  function setPuffleColor(id) {
+    const c = PUFFLE_COLORS.find((x) => x.id === id);
+    const owned = (S.puffleColors || []).includes(id);
+    if (!c || S.puffleColor === id) return;
+    send('pufflecolor', id, (r) => {
+      if (!r) return;
+      if (r.state) S = Object.assign(S, r.state);
+      if (r.ok) {
+        if (!owned) { dispMon = S.mon - coins.reduce((a, cn) => a + (cn.done ? 0 : cn.amount), 0); renderHeader(); OKSound.fanfare(); }
+        else OKSound.squeak();
+        spawnHearts(pet.species === 'puffle' ? tama.x : ((residents.find((a) => a.id === 'puffle') || {}).x || 160), 152, 2);
+      }
+      toast(r.msg);
+      if (!$('ok-decor').hidden) renderDecor();
+      renderPetPanel();
+    });
   }
 
   function drawIcon(canvas, id) {
@@ -3049,7 +3818,7 @@
     if (id === 'matsuri') {
       ctx.setTransform(1, 0, 0, 1, 0, 8);
       for (let x = 0; x < 60; x++) P(x, 1 + Math.round(Math.sin(x / 15 * Math.PI) * 2), '#2b1c12');
-      [[8, '#c8412f'], [22, '#f3e6c8'], [36, '#3b6ea5'], [50, '#e0a13a']].forEach(([x, c]) => chochin(x, 2, 6, c, false));
+      [[8, '#c8412f'], [22, '#f3e6c8'], [36, '#3b6ea5'], [50, '#e0a13a']].forEach(([x, c]) => chochin(x, 2, 6, c, null));
     } else {
       const savedTime = time;
       d.draw(d.x, d.y, savedTime);
@@ -3103,12 +3872,12 @@
   // ------------------------------------------------------------ tutorial
   const TOUR = [
     { jp: 'ようこそ', title: 'Welcome to your restaurant!', text: 'This little onigiri shop runs by itself. Watch it, or click around, since almost everything does something.' },
-    { jp: '音', title: 'Sound on: highly recommended!', text: 'The kitchen is best with sound: soft koto notes, wind chimes, Tama\'s meows and little celebration fanfares. Keep sound on for the full experience. It\'s on by default, and this button switches it any time.', dom: '#ok-b-sound' },
+    { jp: '音', title: 'Sound on: highly recommended!', text: 'The kitchen is best with sound: soft koto notes, wind chimes, your pet\'s little noises and celebration fanfares. It\'s on by default, and this speaker button mutes it any time.', dom: '#ok-b-sound' },
     { jp: 'お客さん', title: 'Guests come from studying', text: 'Every 10 reviews in a deck sends a guest from that deck. They wait outside the door until you visit, so nothing is lost if you study for a long time.', scene: () => ({ x: 254, y: 18, w: 48, h: 112 }) },
     { jp: '大将', title: 'The chef', text: 'Guests are served automatically. Tap the chef to prep onigiri for the tray so guests are served straight away.', scene: () => ({ x: 104, y: 72, w: 76, h: 34 }) },
     { jp: '文', title: 'Tips', text: 'Happy guests leave mon (文). Tap coins to collect them, or they collect themselves. Spend mon on decor.', dom: '.ok-purse' },
-    { jp: '飾り', title: 'Decor', text: 'Spend mon on decor and animal companions: big milestone buys that move in and bring a perk. Some unlock at higher Onigiri levels.', dom: '#ok-b-decor' },
-    { jp: 'タマ', title: 'Tama, the shop cat', text: 'A gentle virtual pet. She eats scraps while you review, gets a fish for every guest, and grows as you study. She can\'t get sick or run away.', scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
+    { jp: '店', title: 'The shop', text: 'Spend mon on decor and pets: the starters you didn\'t pick and big milestone friends who move in, each with a perk. Some unlock at higher Onigiri levels.', dom: '#ok-b-decor' },
+    { jp: () => sp().jp, title: () => `${pet.name}, your ${sp().name.toLowerCase()}`, text: () => `A gentle virtual pet. ${They()} eats while you review, gets a ${sp().food} for every guest, and grows as you study. ${They()} can't get sick or run away. The Pet button opens ${sp().their} care card.`, scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
     { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session.', dom: '#ok-timer' },
     { jp: '大入り', title: 'Big study sessions', text: 'Prefer to study in one go? Go ahead. When you come back, you can serve everyone at 4× speed or collect every tip at once.', dom: '#ok-status' },
     { jp: '目安箱', title: 'Ideas & bugs', text: 'Use the suggestion box on the wall (or ⚙ settings) to suggest features or report bugs. You can replay this tour from ⚙.', scene: () => ({ x: MEYASU.x - 3, y: MEYASU.y - 5, w: MEYASU.w + 6, h: MEYASU.h + 7 }) },
@@ -3143,9 +3912,10 @@
     tourIdx = i;
     const step = TOUR[i];
     $('ok-tour-step').textContent = `${i + 1} / ${TOUR.length}`;
-    $('ok-tour-jp').textContent = step.jp;
-    $('ok-tour-title').textContent = step.title;
-    $('ok-tour-text').textContent = step.text;
+    const val = (v) => (typeof v === 'function' ? v() : v);
+    $('ok-tour-jp').textContent = val(step.jp);
+    $('ok-tour-title').textContent = val(step.title);
+    $('ok-tour-text').textContent = val(step.text);
     $('ok-tour-back').disabled = i === 0;
     $('ok-tour-next').innerHTML = i === TOUR.length - 1 ? '始めよう<small>Let\'s start</small>' : '次へ<small>Next</small>';
     OKSound.pluck(2 + (i % 6));
@@ -3198,6 +3968,99 @@
   $('ok-tour-next').addEventListener('click', () => tourGo(tourIdx + 1));
   $('ok-tour-back').addEventListener('click', () => tourGo(tourIdx - 1));
   $('ok-tour-skip').addEventListener('click', endTour);
+
+  // ------------------------------------------------- 相棒 starter chooser
+  // First visit: pick a cat, a puffle (and its colour) or a Java sparrow.
+  // The same card picks the free first colour for a puffle bought later.
+  let chooser = null;
+  function openChooser(mode) {
+    chooser = { mode, species: mode === 'color' ? 'puffle' : 'cat', color: 'blue' };
+    const starter = mode !== 'color';
+    $('ok-starter-kanji').textContent = starter ? '相棒' : '色';
+    $('ok-starter-title').textContent = starter ? 'Choose your partner' : 'Pick your puffle\'s colour';
+    $('ok-starter-text').textContent = starter
+      ? 'Your pet lives in the restaurant and grows as you study. You can adopt the other two from the shop later.'
+      : 'The first colour is free. More colours are in the shop.';
+    const opts = $('ok-starter-opts');
+    opts.hidden = !starter;
+    opts.innerHTML = '';
+    if (starter) {
+      for (const id of ['cat', 'puffle', 'bird']) {
+        const info = SPECIES[id] || {};
+        const b = document.createElement('button');
+        b.className = 'ok-starter-opt';
+        b.dataset.species = id;
+        b.innerHTML = `<canvas width="40" height="30"></canvas><b><span class="jp">${info.jp}</span> ${info.name}</b><small>${info.desc || ''}</small>`;
+        b.onclick = () => { chooser.species = id; voice(id); renderChooser(); };
+        opts.appendChild(b);
+      }
+    }
+    const cols = $('ok-starter-colors');
+    cols.innerHTML = PUFFLE_COLORS.filter((c) => c.starter).map((c) =>
+      `<button class="ok-swatch" data-color="${c.id}" title="${c.jp} ${c.name}" style="background:${c.hex}"></button>`).join('');
+    cols.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => { chooser.color = b.dataset.color; OKSound.squeak(); renderChooser(); }));
+    $('ok-starter').hidden = false;
+    renderChooser();
+  }
+  function renderChooser() {
+    if (!chooser || $('ok-starter').hidden) return;
+    const bounce = (tt) => Math.round(Math.abs(Math.sin(tt * 5)) * 3);
+    document.querySelectorAll('.ok-starter-opt').forEach((b) => {
+      const id = b.dataset.species;
+      const on = chooser.species === id;
+      b.classList.toggle('on', on);
+      const cv = b.querySelector('canvas');
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      const prev = gRef;
+      gRef = ctx;
+      withPet({ species: id, stage: 1 }, () => {
+        const up = on ? bounce(time) : 0;
+        if (id === 'puffle') drawPuffle(20, 28 - up, { color: chooser.color, happy: on, squash: on && up === 0 });
+        else if (id === 'bird') drawBird(20, 28, 1, { hop: up, happy: on, wing: on && up > 1 ? 'up' : null });
+        else catSit(20, 28 - up, { happy: on, fastTail: on });
+      });
+      gRef = prev;
+    });
+    const cols = $('ok-starter-colors');
+    cols.hidden = chooser.species !== 'puffle';
+    cols.querySelectorAll('[data-color]').forEach((b) => b.classList.toggle('on', b.dataset.color === chooser.color));
+    const c = PUFFLE_COLORS.find((x) => x.id === chooser.color);
+    const name = chooser.mode === 'color' ? `${c.jp} ${c.name}` : (SPECIES[chooser.species] || {}).name;
+    $('ok-starter-go').innerHTML = `この子にする<small>${chooser.mode === 'color' ? name : `Choose ${chooser.species === 'puffle' ? `${c.name.toLowerCase()} puffle` : name.toLowerCase()}`}</small>`;
+  }
+  setInterval(renderChooser, 100);
+  $('ok-starter-go').addEventListener('click', () => {
+    if (!chooser) return;
+    const { mode, species, color } = chooser;
+    if (mode === 'color') {
+      $('ok-starter').hidden = true;
+      chooser = null;
+      setPuffleColor(color);
+      return;
+    }
+    send('choose', JSON.stringify({ species, color }), (res) => {
+      if (!res || !res.pet) return;
+      pet = res.pet;
+      if (res.stages) PET_STAGES = res.stages;
+      if (res.state) S = Object.assign(S, res.state);
+      $('ok-starter').hidden = true;
+      chooser = null;
+      renderPetButton();
+      // your new partner walks in from the door
+      tama.x = DOOR_X;
+      tama.dir = -1;
+      if (pet.species === 'bird') tama.y = 70;
+      tamaGo(150, () => {
+        tamaSet('purr', 4);
+        spawnHearts(150, 156, 3);
+        voice();
+        say(['よろしくね!', `${pet.name} the ${sp().name.toLowerCase()} moved in!`], { x: 150, y: 150 });
+      });
+      OKSound.fanfare();
+      if (!S.tutorialDone) setTimeout(startTour, 2600);
+    });
+  });
 
   // --------------------------------------------------------------- modals
   function modal(kanji, title, body, buttons) {
@@ -3288,6 +4151,7 @@
   OKSound.configure({ sound: conf.sound !== false, volume: conf.volume != null ? conf.volume : 0.5 });
   paintBackground();
   syncResidents();
+  renderPetButton();
   renderSeigaiha();
   renderHeader();
   renderTimer();
@@ -3295,12 +4159,20 @@
   updateStatus();
   resize();
   window.addEventListener('resize', () => { resize(); positionBubble(); positionTour(); });
+  // dev preview only: draw sprites onto a test canvas
+  if (window.OK_DEBUG_HOOKS) {
+    window.OKD = {
+      tama, birdOuting, residents, bedtime,
+      draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, withPet }); } finally { gRef = prev; } },
+    };
+  }
   if (window.OK_DEBUG_FF) for (let i = 0; i < window.OK_DEBUG_FF * 30; i++) update(1 / 30);
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 
   setTimeout(() => {
     const t = INIT.takeout || {};
     if (t.count) toast(`Yesterday's ${t.count} waiting guest${t.count === 1 ? '' : 's'} took their food to go (+${t.mon} mon)`);
+    if (!pet.species) { openChooser('starter'); return; }
     if (INIT.setBonusNow) { setBonusModal(500); return; }
     if (!S.tutorialDone && INIT.reason !== 'break') { startTour(); return; }
     const greeted = greetOnOpen();

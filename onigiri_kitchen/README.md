@@ -21,19 +21,23 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
   study in one big batch and catch up later: serve everyone at 4× or collect all tips at once.
   Each deck has its own look. Getting a leech card right sends a grumpy sour-plum guest who
   cheers up once fed. Finishing a focus session sends a golden guest.
-- **Guests tip in 文 (mon):** use mon to buy decor. Some pieces unlock at higher Onigiri
-  restaurant levels.
+- **Guests tip in 文 (mon):** spend mon in the shop on decor and pets. Some pieces
+  unlock at higher Onigiri restaurant levels.
 - **The timer:** a pomodoro timer, with one dango per focus session. When a break starts, the
   restaurant opens. When the break ends, it nudges you back to your cards. A long break
   turns into a festival night with fireworks outside the window.
-- **Things to click:** the chef makes onigiri for the tray, Tama the cat enjoys being petted,
+- **Things to click:** the chef makes onigiri for the tray, your pet enjoys being petted,
   the menu tags play koto notes, the window calls a sparrow, and the lanterns switch
   on and off. The window follows your real clock and the season.
 
-## Companions & confetti
+## Pets, candles & confetti
 
-Save up mon for animal companions (rabbit, black cat, shiba, fox, tanuki, crane). They move into the
-restaurant and each has a perk. Finishing a deck right after reviewing sets off 紙吹雪 confetti (turn it off with
+Save up mon for more pets (rabbit, black cat, shiba, fox, tanuki, crane), or adopt the starter
+pets you didn't pick (1,000 mon each). They move into the restaurant and each has a perk (hover
+one in the shop to see it). Tap the bed to tuck everyone in; it grows a spot for each pet.
+Every lantern has a candle you can light or snuff with a click.
+Once you have a puffle, puffle colours (250 mon each), an igloo lamp and penguins passing the
+window appear too. Finishing a deck right after reviewing sets off 紙吹雪 confetti (turn it off with
 `celebrate_deck_finish` in the config).
 
 ## Home-screen widget
@@ -41,9 +45,12 @@ restaurant and each has a perk. Finishing a deck right after reviewing sets off 
 With Onigiri, add **Onigiri Kitchen · おにぎり食堂** to your main menu from Onigiri's layout editor.
 Without Onigiri, the widget shows under your decks (toggle `show_home_widget_without_onigiri` in the config).
 
-## Tama, the shop cat 🐾
+## Your shop pet 🐾
 
-Tama is a gentle virtual pet. Open her panel with the **猫 Tama** button.
+On your first visit you choose a starter: **Tama the cat**, a **puffle** (pick its colour) or a
+**文鳥 Java sparrow** (it flies between perches around the restaurant). They all work the same
+way; the notes below use Tama. Open your pet's
+card with the **Pet** button (Care, Style and Keepsakes tabs). Double-click the name to rename it.
 
 - **Needs:** お腹 tummy, 愛情 love and 元気 energy. She eats scraps while you review,
   gets a fish for every guest you serve, and perks up after focus sessions. Pet her,

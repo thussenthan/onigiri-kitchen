@@ -72,8 +72,23 @@ if "--plain" not in os.sys.argv:
     else:
         print("note: Onigiri not found locally, so the sign uses the plain fallback")
 
+# The real catalog, species and puffle colours, so the preview matches the add-on.
+import json
+import sys
+sys.path.insert(0, os.path.join(ROOT, "dev"))
+import anki_stub  # noqa: E402
+_env = anki_stub.setup()
+_state = _env.import_("state")
+_pet = _env.import_("pet")
+data = {"catalog": _state.CATALOG, "petSpecies": _pet.species_payload(),
+        "puffleColors": _state.PUFFLE_COLORS, "puffleColorPrice": _state.PUFFLE_COLOR_PRICE}
+open(os.path.join(ROOT, "dev", "preview_data.js"), "w", encoding="utf-8").write(
+    "window.OK_PREVIEW_DATA = " + json.dumps(data, ensure_ascii=False) + ";\n")
+print("wrote dev/preview_data.js")
+
 pre = open(os.path.join(ROOT, "dev", "preview.html"), encoding="utf-8").read()
-init = pre[pre.index("<script>") + 8:pre.index("</script>")]
+_i = pre.index("<script>") + 8
+init = pre[_i:pre.index("</script>", _i)]
 body = open(os.path.join(ROOT, "onigiri_kitchen", "web", "kitchen.html"), encoding="utf-8").read()
 
 page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Kitchen preview (Anki load order)</title>
@@ -82,13 +97,15 @@ page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Kitchen previ
 {theme}
 <script src="../onigiri_kitchen/web/sound.js"></script>
 <script src="../onigiri_kitchen/web/kitchen.js"></script>
+<script src="preview_data.js"></script>
 <script>{init}</script>
 <script>if (q.get('night')) document.documentElement.className='nightMode';</script>
 </head><body>{body}
 <script>if (q.get('night')) document.body.className='nightMode';
 window.addEventListener('load',()=>setTimeout(()=>{{ if(q.get('panel')) document.getElementById(q.get('panel')).click();
   for (let i = 1; i < parseInt(q.get('tourstep') || '1'); i++) document.getElementById('ok-tour-next').click();
-  if (q.has('play')) {{ document.getElementById('ok-b-pet').click(); document.querySelector('[data-pet="play"]').click(); }} }},900));</script>
+  if (q.has('play')) {{ document.getElementById('ok-b-pet').click(); document.querySelector('[data-pet="play"]').click(); }}
+  if (q.get('js')) eval(q.get('js')); }},900));</script>
 </body></html>"""
 open(os.path.join(ROOT, "dev", "anki_order.html"), "w", encoding="utf-8").write(page)
 print("wrote dev/anki_order.html")

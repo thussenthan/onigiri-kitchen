@@ -16,9 +16,7 @@
   text-align: left;
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.15s ease;
 }
-.okw:hover { transform: translateY(-1px); }
 .okw-in { display: flex; align-items: stretch; gap: 12px; height: 100%; }
 .nightMode .okw, .night_mode .okw, .night-mode .okw {
   background: var(--canvas-inset, #2a2522);
@@ -70,9 +68,12 @@
 }
 .okw-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .okw-spacer { flex: 1; }
-.okw-today { font-size: 12px; color: var(--fg-subtle, #8b7b69); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.okw-today b { color: var(--fg, #2b2622); }
-.nightMode .okw-today b, .night_mode .okw-today b, .night-mode .okw-today b { color: var(--fg, #efe6d6); }
+/* all-time stats: total, daily average, days studied, best streak */
+.okw-stats { flex: 1; min-width: 0; display: flex; gap: 9px; overflow: hidden; }
+.okw-stat { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.okw-stat b { font-size: 13px; font-weight: 800; color: var(--fg, #2b2622); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.okw-stat small { font-size: 10px; font-weight: 600; color: var(--fg-subtle, #8b7b69); white-space: nowrap; }
+.nightMode .okw-stat b, .night_mode .okw-stat b, .night-mode .okw-stat b { color: var(--fg, #efe6d6); }
 .okw-btn {
   all: unset;
   cursor: pointer;
@@ -100,7 +101,7 @@
     background: linear-gradient(180deg, transparent 20%, rgba(20, 12, 6, 0.72));
   }
   .okw-top, .okw-sub { color: rgba(255, 246, 230, 0.85); }
-  .okw-sub span:last-child, .okw-today { display: none; }
+  .okw-sub span:last-child, .okw-stats { display: none; }
   .okw-big { font-size: 13px; }
   .okw-big b { font-size: 16px; }
   .okw-btn { border-color: rgba(255, 255, 255, 0.45); padding: 3px 8px; }
@@ -110,6 +111,10 @@
   .okw-in { flex-direction: column; gap: 8px; }
   .okw-scene { flex: 1 1 0; min-height: 0; width: 100%; height: auto; aspect-ratio: auto; }
   .okw-info { flex: 0 0 auto; }
+}
+/* Not much width: keep the first two stats */
+@container (max-width: 420px) {
+  .okw-stat:nth-child(n + 3) { display: none; }
 }
 /* Single row: drop the small title so everything fits */
 @container (max-height: 100px) {

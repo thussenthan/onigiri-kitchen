@@ -87,6 +87,46 @@
       osc.start(t);
       osc.stop(t + 0.5);
     },
+    // Puffle: a quick rising "boing" squeak.
+    squeak() {
+      const a = audio();
+      if (!a) return;
+      const t = a.currentTime;
+      const osc = a.createOscillator();
+      const g = a.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(380, t);
+      osc.frequency.exponentialRampToValueAtTime(1150, t + 0.09);
+      osc.frequency.exponentialRampToValueAtTime(760, t + 0.2);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.09, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(t);
+      osc.stop(t + 0.28);
+    },
+    // Java sparrow: two little high chirps.
+    chirp() {
+      const a = audio();
+      if (!a) return;
+      [0, 0.13].forEach((d) => {
+        const t = a.currentTime + d;
+        const osc = a.createOscillator();
+        const g = a.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2600, t);
+        osc.frequency.exponentialRampToValueAtTime(3900, t + 0.05);
+        osc.frequency.exponentialRampToValueAtTime(3000, t + 0.09);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.12, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+        osc.connect(g);
+        g.connect(master);
+        osc.start(t);
+        osc.stop(t + 0.12);
+      });
+    },
     pop() { note(520 + Math.random() * 80, 0, 0.12, 'sine', 0.3); },
     blip() { note(880, 0, 0.08, 'sine', 0.18); },
     // Phrase used when a focus session ends or a break starts.

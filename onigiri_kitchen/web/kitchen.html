@@ -16,6 +16,7 @@
       </div>
       <div class="ok-timer-btns">
         <button class="ok-hanko" id="ok-t-main">開始<small>Start</small></button>
+        <button class="ok-icon-btn" id="ok-t-reset" title="Reset the cycle" aria-label="Reset the cycle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12a6.5 6.5 0 1 0 2-4.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4.5 4.5v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button class="ok-icon-btn" id="ok-t-skip" title="Skip to the next step">&#x23ED;&#xFE0E;</button>
         <button class="ok-icon-btn" id="ok-t-set" title="Timer settings">&#x2699;&#xFE0E;</button>
       </div>
@@ -41,16 +42,19 @@
     <div class="ok-status" id="ok-status"></div>
     <div class="ok-foot-btns">
       <button class="ok-foot-btn ok-rush" id="ok-b-rush" hidden><span class="jp">急</span> Serve faster</button>
-      <button class="ok-foot-btn" id="ok-b-pet"><span class="jp">猫</span> Tama</button>
-      <button class="ok-foot-btn" id="ok-b-decor"><span class="jp">飾り</span> Decor</button>
-      <button class="ok-foot-btn" id="ok-b-sound"><span class="jp">音</span> <span id="ok-sound-label">Sound on</span></button>
+      <button class="ok-foot-btn" id="ok-b-pet"><span class="jp" id="ok-pet-jp">猫</span> Pet</button>
+      <button class="ok-foot-btn" id="ok-b-decor"><span class="jp">店</span> Shop</button>
+      <button class="ok-foot-btn ok-icon-only" id="ok-b-sound" title="Mute" aria-label="Mute">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="ok-snd-on"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="ok-snd-off"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
     </div>
   </footer>
 
   <section class="ok-panel" id="ok-decor" hidden>
     <div class="ok-panel-head">
-      <h2><span class="jp">飾り</span> Decor</h2>
-      <p>Spend the mon your guests leave. Some pieces unlock at higher restaurant levels.</p>
+      <h2><span class="jp">店</span> Shop</h2>
+      <p>Spend the mon your guests leave on pets and decor. Some unlock at higher restaurant levels.</p>
       <button class="ok-close" data-close="ok-decor" title="Close">&times;</button>
     </div>
     <div class="ok-decor-grid" id="ok-decor-grid"></div>
@@ -61,9 +65,8 @@
       <canvas id="ok-pet-portrait" class="ok-pet-portrait" width="44" height="36"></canvas>
       <div class="ok-pet-id">
         <div class="ok-pet-namewrap" id="ok-pet-namewrap">
-          <h2 id="ok-pet-name">Tama</h2>
-          <button class="ok-ghost" id="ok-pet-rename" title="Rename">rename</button>
-          <form id="ok-pet-nameform"><input id="ok-pet-nameinput" maxlength="16" autocomplete="off"><button class="ok-ghost" type="submit">save</button></form>
+          <h2 id="ok-pet-name" title="Double-click to rename">Tama</h2>
+          <form id="ok-pet-nameform"><input id="ok-pet-nameinput" maxlength="16" autocomplete="off" aria-label="Pet name"></form>
         </div>
         <div class="ok-pet-stage" id="ok-pet-stage">子猫 Kitten</div>
         <div class="ok-pet-grow"><i id="ok-pet-grow"></i></div>
@@ -71,25 +74,32 @@
       </div>
       <button class="ok-close" data-close="ok-pet" title="Close">&times;</button>
     </div>
+    <nav class="ok-tabs" id="ok-pet-tabs" role="tablist">
+      <button data-tab="care" class="on" role="tab"><b class="jp">世話</b>Care</button>
+      <button data-tab="style" role="tab"><b class="jp">装い</b>Style</button>
+      <button data-tab="gifts" role="tab"><b class="jp">宝箱</b>Keepsakes <span id="ok-pet-giftcount"></span></button>
+    </nav>
     <div class="ok-pet-body">
-      <div class="ok-pet-trait" id="ok-pet-trait"></div>
-      <div class="ok-meters" id="ok-pet-meters"></div>
-      <div class="ok-pet-happy" id="ok-pet-happy"></div>
-      <div class="ok-pet-actions">
-        <button data-pet="pet"><b class="jp">なでる</b><small>Pet</small></button>
-        <button data-pet="brush"><b class="jp">ブラシ</b><small>Brush</small></button>
-        <button data-pet="feed"><b class="jp">魚</b><small>Feed · <span id="ok-pet-fish">0</span> left</small></button>
-        <button data-pet="play"><b class="jp">遊ぶ</b><small>Feather toy</small></button>
-        <button data-pet="trick"><b class="jp">芸</b><small>Trick</small></button>
+      <div class="ok-tab" data-tab="care">
+        <div class="ok-meters" id="ok-pet-meters"></div>
+        <div class="ok-pet-happy" id="ok-pet-happy"></div>
+        <div class="ok-pet-actions">
+          <button data-pet="pet"><b class="jp">なでる</b><small>Pet</small></button>
+          <button data-pet="brush"><b class="jp">ブラシ</b><small>Brush</small></button>
+          <button data-pet="feed"><b class="jp" id="ok-pet-foodjp">魚</b><small>Feed · <span id="ok-pet-fish">0</span></small></button>
+          <button data-pet="play"><b class="jp">遊ぶ</b><small>Play</small></button>
+          <button data-pet="trick"><b class="jp">芸</b><small>Trick</small></button>
+        </div>
       </div>
-      <div class="ok-pet-note">She eats scraps while you review, gets a fish for every guest you serve, and perks up after focus sessions. She never gets sick or runs away. Days off just make her sleepy.</div>
-      <div class="ok-pet-box-head"><b class="jp">身だしなみ</b> Accessories <span>unlocked by caring for her</span></div>
-      <div class="ok-pet-acc" id="ok-pet-acc"></div>
-      <div class="ok-pet-box-head"><b class="jp">宝箱</b> Keepsakes <span id="ok-pet-giftcount"></span></div>
-      <div class="ok-pet-gifts" id="ok-pet-gifts"></div>
-      <div class="ok-pet-setnote" id="ok-pet-setnote"></div>
-      <div class="ok-pet-box-head ok-rare-head"><b class="jp">稀</b> Rare keepsakes <span>only when she's very happy (love 90+)</span></div>
-      <div class="ok-pet-gifts ok-pet-rare" id="ok-pet-rare"></div>
+      <div class="ok-tab" data-tab="style" hidden>
+        <div class="ok-pet-acc" id="ok-pet-acc"></div>
+      </div>
+      <div class="ok-tab" data-tab="gifts" hidden>
+        <div class="ok-pet-gifts" id="ok-pet-gifts"></div>
+        <div class="ok-pet-setnote" id="ok-pet-setnote"></div>
+        <div class="ok-pet-box-head ok-rare-head"><b class="jp">稀</b> Rare <span>only when love is 90+</span></div>
+        <div class="ok-pet-gifts ok-pet-rare" id="ok-pet-rare"></div>
+      </div>
     </div>
   </section>
 
@@ -121,7 +131,6 @@
         </div>
       </div>
       <div class="ok-form-btns">
-        <button type="button" class="ok-ghost" id="ok-t-reset">Reset cycle</button>
         <button type="submit" class="ok-hanko ok-hanko-wide">保存<small>Save</small></button>
       </div>
     </form>
@@ -140,6 +149,18 @@
         <button class="ok-foot-btn" id="ok-tour-back">Back</button>
         <button class="ok-hanko" id="ok-tour-next">次へ<small>Next</small></button>
       </div>
+    </div>
+  </div>
+
+  <div class="ok-modal ok-starter" id="ok-starter" hidden>
+    <div class="ok-card ok-starter-card">
+      <div class="ok-card-seigaiha ok-seigaiha-band"></div>
+      <div class="ok-card-kanji" id="ok-starter-kanji">相棒</div>
+      <h3 id="ok-starter-title">Choose your partner</h3>
+      <p id="ok-starter-text">Your pet lives in the restaurant and grows as you study. You can adopt the other two from the shop later.</p>
+      <div class="ok-starter-opts" id="ok-starter-opts"></div>
+      <div class="ok-starter-colors" id="ok-starter-colors" hidden></div>
+      <div class="ok-card-btns"><button class="ok-hanko ok-hanko-wide" id="ok-starter-go">この子にする<small>Choose</small></button></div>
     </div>
   </div>
 

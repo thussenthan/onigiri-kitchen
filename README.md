@@ -25,38 +25,54 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   break ends, you get a gentle nudge back to your cards. Long breaks are festival nights with fireworks.
   A small dango timer sits in the corner of Anki's main screens. Focus only counts while you're actually reviewing:
   after 1 minute without activity it pauses (and gives that time back), then resumes on your next card.
-- **Tama, the shop cat.** A virtual pet with needs (tummy, love, energy) that your studying fills.
-  She grows with total study days (never streaks), develops a personality from your habits, learns tricks
+  The ↺ button next to the timer resets the cycle.
+- **Choose your starter pet.** The first time you open the kitchen, pick a partner: Tama the cat, a puffle
+  (in the colour of your choice) or a 文鳥 Java sparrow, who flies about the restaurant between perches on the
+  window sill, the menu rail, the door frame and the tables. The other two can be adopted later from the shop.
+
+  ![Choosing a starter pet](docs/starter.png)
+- **Your shop pet.** A virtual pet with needs (tummy, love, energy) that your studying fills.
+  Tama (or your puffle or sparrow) grows with total study days (never streaks), develops a personality from your habits, learns tricks
   and brings you gifts. **She can't get sick, run away or die.** Days off just make her sleepy.
   Caring for her pays off: keep all three needs at 70+ and she beckons guests in (+1 tip). Daily petting
   and feeding unlock accessories (collar colours, a bandana, a golden bell, a fancy cushion, a kotatsu).
   Finding all 12 keepsakes gives +500 mon and a treasure shelf, and a very happy Tama sometimes brings rare golden ones.
-- **Decor.** Guests tip in 文 (*mon*). Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish, radio
-  and more, some unlocked by your Onigiri restaurant level.
-- **Animal companions.** Big milestone purchases that move into the restaurant, each with a perk: a rabbit,
-  a black cat (Tama's best friend), a shiba, a fox, a tanuki and a red-crowned crane.
+  The **Pet** button opens its card (Care, Style and Keepsakes tabs); double-click the name to rename it.
+  Tap the bed to tuck everyone in: it grows a spot for every pet who lives with you.
+- **The shop.** Guests tip in 文 (*mon*). Spend it on a bonsai, wind chime, maneki-neko, daruma, goldfish, radio
+  and more, some unlocked by your Onigiri restaurant level. The pets you didn't pick are 1,000 文 each.
+- **Puffle extras.** Once you have a puffle, extra puffle colours (250 文 each, swap any time), an igloo lamp for
+  the counter and little penguins waddling past the window (more of them in winter) switch on too.
+- **More pets.** Big milestone purchases that move into the restaurant, each with a perk (hover one in the
+  shop to see it): a rabbit, a black cat (your pet's best friend), a shiba, a fox, a tanuki and a red-crowned crane.
+  At night and during focus sessions they all curl up on the bed.
+- **Candles you can light.** Every paper lantern has its own candle: click one to light or snuff it. They light
+  themselves one by one at dusk and go out at dawn.
 - **紙吹雪 confetti** when you finish a deck, with a little fanfare on the "Congratulations" screen.
-- **Home-screen widget.** A small live pixel scene with guests waiting, mon, Tama's mood and today's progress,
-  plus a Visit button. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
+- **Home-screen widget.** A small live pixel scene with guests waiting, mon, your pet's mood and all-time stats
+  (total reviews, daily average, days studied and longest streak), plus a Visit button. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
   your decks on Anki's main screen (you can turn it off in the add-on config).
 - **A guided tour** the first time you open it, which you can replay from ⚙.
 - **目安箱 suggestion box** on the wall (and in ⚙) for feature ideas and bug reports.
 - **Matches your Onigiri theme.** It uses your Onigiri colours, font and dark mode automatically.
-- Mostly idle and fully optional: the chef, the cat, the menu tags (they play koto notes), the window, the
-  lanterns and most decor all do something when clicked.
+- Mostly idle and fully optional: the chef, your pets, the menu tags (they play koto notes), the window, the
+  lanterns, the bed and most decor all do something when clicked.
 
-| Night & festival | Tama | Companions & decor |
+| Night & festival | Your pet | The shop |
 |---|---|---|
-| ![Night](docs/night.png) | ![Tama](docs/tama.png) | ![Companions and decor](docs/decor.png) |
+| ![Night](docs/night.png) | ![The pet card](docs/pet.png) | ![The shop](docs/shop.png) |
 
 ![Confetti when you finish a deck](docs/confetti.png)
 
-### Companions
+### Pets
 
-| Animal | Price | Needs | Perk |
+| Pet | Price | Needs | Perk |
 |---|---|---|---|
 | 兎 Rabbit | 1,500 文 | — | +5 mon for every finished focus session |
-| 黒猫 Black cat | 2,500 文 | Lv 3 | Tama's love never drops below 40 |
+| 三毛猫 Calico cat | 1,000 文 | — | An extra treat for your pet with every guest (if you didn't start with the cat) |
+| パフル Puffle | 1,000 文 | — | Your pet's energy never drops below 40 (if you didn't start with a puffle) |
+| 文鳥 Java sparrow | 1,000 文 | — | Your pet's tummy never drops below 40 (if you didn't start with the sparrow) |
+| 黒猫 Black cat | 2,500 文 | Lv 3 | Your pet's love never drops below 40 |
 | 柴犬 Shiba | 4,000 文 | Lv 5 | +1 tip from every guest |
 | 狐 Fox | 6,000 文 | Lv 10 | Sour-plum (leech) guests tip double |
 | 狸 Tanuki | 9,000 文 | Lv 15 | End-of-day takeout tips are doubled |
@@ -103,7 +119,7 @@ own expand view), click the shop-front icon next to Onigiri's buttons, click the
 onigiri_kitchen/      the add-on (what gets installed)
   main.py             hooks, kitchen window, bridge commands
   state.py            save file, guests, mon, decor catalog
-  pet.py              Tama's needs, growth, gifts
+  pet.py              the pet: species, needs, growth, gifts
   pomodoro.py         wall-clock pomodoro timer
   onigiri_link.py     read-only access to Onigiri's data & theme
   web/                kitchen.js (pixel engine), chip.js (timer + widget hook), sound.js, css
