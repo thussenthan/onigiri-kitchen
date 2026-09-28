@@ -167,9 +167,12 @@
 
     // a little Z floats up now and then while the pet naps (like in the kitchen)
     if (p.species && sleepy && Math.floor(time) % 3 === 0) {
-      const zx = Math.min(tx + 4, W - 4);
-      const zy = Math.round(24 - (time % 1) * 5);
-      R(zx, zy, 3, 1, '#8b7b69'); R(zx + 1, zy + 1, 1, 1, '#8b7b69'); R(zx, zy + 2, 3, 1, '#8b7b69');
+      const zx = Math.min(tx + 4, W - 6);
+      const zy = Math.round(22 - (time % 1) * 5);
+      const zc = '#d8c8ab';
+      R(zx, zy, 5, 1, zc);
+      for (let k = 1; k <= 3; k++) R(zx + 4 - k, zy + k, 1, 1, zc); // the diagonal
+      R(zx, zy + 4, 5, 1, zc);
     }
     if (night) {
       ctx.fillStyle = 'rgba(22,14,40,0.22)';
