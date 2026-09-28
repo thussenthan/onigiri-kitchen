@@ -18,6 +18,15 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   gets its own look. Getting a leech card right sends a grumpy sour-plum guest who cheers up once fed.
   Finishing a focus session sends a golden guest. Guests are counted from Anki's review log for the day, so
   reviews on your phone count too, once synced.
+- **Your Onigiri Specials are on the menu.** Guests order dishes from your Onigiri Specials Book (every Daily
+  Special you've finished), so the menu grows as your Book does, and golden guests order today's Daily Special.
+  Rarer specials tip more (+1 mon for Uncommon up to +6 for Legendary). The chef cooks each order (tap him to make
+  dishes ahead for the tray), and the menu tags on the wall show your newest specials. Collecting specials earns
+  rewards: a specials board at 10, a golden headband for the chef at 25, a golden frame for your first Epic and a
+  legendary knife for your first Legendary. When your Onigiri restaurant levels up, the chef cheers the next time
+  you visit. Without Onigiri, the house onigiri flavours unlock as your restaurant levels up.
+- **A daily goal party.** Set a daily card goal in ⚙ and your restaurant throws a little party with fireworks
+  when you reach it.
 - **Study in one big batch, catch up later.** There's no limit on waiting guests. After a big session you can
   serve everyone at 4× speed or collect every tip at once. Guests last until Anki's day rolls over, and anyone
   still waiting then takes takeout and still leaves a tip.
@@ -51,7 +60,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **Candles on the tables.** Click a candle to light or snuff it (with a little flame, sparks and a curl of smoke).
   The paper lanterns switch on and off together with a click. Lanterns and candles light themselves at dusk and
   go out at dawn.
-- **紙吹雪 confetti** when you finish a deck, with a little fanfare on the "Congratulations" screen.
+- **紙吹雪 confetti and sakura petals** when you finish a deck: confetti bursts in from the sides and petals drift
+  down from the top of the "Congratulations" screen, with a little fanfare.
 - **Home-screen widget.** A small live pixel scene with guests waiting, mon, your pet's mood and all-time stats
   (total reviews, daily average, days studied and longest streak), plus a Visit button. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
   your decks on Anki's main screen (you can turn it off in the add-on config).
@@ -65,7 +75,7 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 |---|---|---|
 | ![Night](docs/night.png) | ![The pet card](docs/pet.png) | ![The shop](docs/shop.png) |
 
-![Confetti when you finish a deck](docs/confetti.png)
+![Confetti and sakura petals when you finish a deck](docs/confetti.png)
 
 ### Pets
 

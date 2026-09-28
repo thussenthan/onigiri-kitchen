@@ -226,7 +226,7 @@ button { font: inherit; color: inherit; }
   margin-top: 3px;
   text-transform: uppercase;
 }
-.ok-hanko:hover { background: var(--shu); color: #fff8ee; }
+.ok-hanko:hover { background: var(--shu); color: var(--accent-fg); }
 .ok-hanko:active { transform: scale(0.96); }
 .ok-hanko[disabled] { opacity: 0.4; cursor: default; background: transparent; color: var(--shu); }
 .ok-hanko-wide { min-width: 96px; }
@@ -462,7 +462,7 @@ button { font: inherit; color: inherit; }
   font-weight: 700;
   cursor: pointer;
 }
-.ok-item button:hover { background: var(--shu); color: #fff8ee; }
+.ok-item button:hover { background: var(--shu); color: var(--accent-fg); }
 .ok-item button.ok-owned { border-color: var(--matcha); color: var(--matcha); }
 .ok-item button.ok-owned:hover { background: var(--matcha); color: #fff; }
 .ok-item button[disabled] { opacity: 0.4; cursor: default; background: transparent; color: var(--shu); }
@@ -1055,7 +1055,7 @@ body .ok-item button.ok-owned { border-color: var(--matcha); }
 .ok-tabs button.on { background: var(--card); box-shadow: 0 1px 3px rgba(40, 24, 10, 0.18); }
 .ok-tabs button:hover:not(.on) { background: color-mix(in srgb, var(--card) 55%, transparent); }
 .ok-icon-btn:hover, .ok-close:hover { background: var(--paper-2); }
-.ok-item button:hover { background: var(--shu); color: #fff8ee; }
+.ok-item button:hover { background: var(--shu); color: var(--accent-fg); }
 .ok-item button.ok-owned:hover { background: var(--matcha); color: #fff; }
 .ok-hanko:hover { background: var(--shu); }
 /* disabled: no hover change at all, no stray bottom border */
@@ -1100,3 +1100,10 @@ body .ok-item button.ok-owned { border-color: var(--matcha); }
 }
 .ok-hanko:active { transform: scale(0.97); }
 .ok-icon-btn svg { width: 16px; height: 16px; }
+
+/* the timer's main button: one width for Start / Pause / Resume, an icon for
+   the state, and an outlined look while paused (so it reads as "tap to go on") */
+#ok-t-main { min-width: 150px; justify-content: center; gap: 6px; }
+#ok-t-main svg { width: 11px; height: 11px; flex: none; }
+#ok-t-main.ok-t-paused { background: transparent; color: var(--shu); box-shadow: inset 0 0 0 2px var(--shu); }
+#ok-t-main.ok-t-paused:hover { background: color-mix(in srgb, var(--shu) 14%, transparent); color: var(--shu); box-shadow: inset 0 0 0 2px var(--shu), 0 0 0 3px color-mix(in srgb, var(--shu) 22%, transparent); }

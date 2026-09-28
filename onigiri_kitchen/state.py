@@ -129,7 +129,34 @@ ANIMALS: List[Dict[str, Any]] = [
      "desc": "An elegant red-crowned crane, a symbol of luck and long life.",
      "perk": "Every deck you finish brings a golden guest."},
 ]
-CATALOG += PETS + ANIMALS
+# Earned (not bought) by collecting Onigiri Daily Specials in its Specials Book.
+REWARDS: List[Dict[str, Any]] = [
+    {"id": "shinagaki", "kind": "reward", "name": "Specials board", "jp": "品書き", "level": 0, "price": 0,
+     "need": {"total": 10}, "desc": "A wooden board by the door listing how many specials you've collected."},
+    {"id": "kin_hachimaki", "kind": "reward", "name": "Golden headband", "jp": "金の鉢巻", "level": 0, "price": 0,
+     "need": {"total": 25}, "desc": "The chef ties on a golden hachimaki."},
+    {"id": "kin_gaku", "kind": "reward", "name": "Golden frame", "jp": "金の額", "level": 0, "price": 0,
+     "need": {"epic": 1}, "desc": "Your first Epic special, framed in gold on the wall."},
+    {"id": "densetsu_bocho", "kind": "reward", "name": "Legendary knife", "jp": "伝説の包丁", "level": 0, "price": 0,
+     "need": {"legendary": 1}, "desc": "A gleaming knife on display, for your first Legendary special."},
+]
+REWARDS_BY_ID = {r["id"]: r for r in REWARDS}
+
+
+def earned_rewards(book: List[Dict[str, Any]]) -> List[str]:
+    total = len(book)
+    count = {}
+    for d in book:
+        count[d.get("rarity")] = count.get(d.get("rarity"), 0) + 1
+    out = []
+    for r in REWARDS:
+        need = r["need"]
+        if all((total if k == "total" else count.get(k, 0)) >= v for k, v in need.items()):
+            out.append(r["id"])
+    return out
+
+
+CATALOG += PETS + ANIMALS + REWARDS
 CATALOG_BY_ID = {item["id"]: item for item in CATALOG}
 
 
@@ -172,6 +199,9 @@ class KitchenState:
         self.path: Optional[str] = None
         self.pet = petmod.Pet(self.data["pet"])
         self._save_timer: Optional[QTimer] = None
+        # Extra tip for what a guest orders (rarer Onigiri specials pay more);
+        # set by main.py, used when guests are served in bulk or take out.
+        self.menu_bonus: Optional[Any] = None
 
     # ------------------------------------------------------------------ io
     def load(self) -> None:
@@ -321,6 +351,8 @@ class KitchenState:
         item = CATALOG_BY_ID.get(item_id)
         if not item:
             return {"ok": False, "msg": "That item doesn't exist."}
+        if item.get("kind") == "reward":
+            return {"ok": False, "msg": "Earned by collecting specials in Onigiri, not bought."}
         if item_id in self.data["owned"]:
             return {"ok": False, "msg": "Already in your restaurant."}
         if item.get("puffle") and not self.has_puffle():
@@ -431,6 +463,11 @@ class KitchenState:
             amount += 1
         if self.pet.happy():
             amount += 1  # happy-cat bonus: Tama beckons guests in
+        if self.menu_bonus:
+            try:
+                amount += int(self.menu_bonus(guest))
+            except Exception:
+                pass
         return amount
 
     def apply_companion_perks(self) -> None:

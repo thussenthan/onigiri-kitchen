@@ -21,6 +21,12 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
   study in one big batch and catch up later: serve everyone at 4× or collect all tips at once.
   Each deck has its own look. Getting a leech card right sends a grumpy sour-plum guest who
   cheers up once fed. Finishing a focus session sends a golden guest.
+- **The menu:** guests order dishes from your Onigiri Specials Book (it grows with every Daily
+  Special you finish), and golden guests order today's special. Without Onigiri, onigiri
+  flavours unlock as your restaurant levels up. Tap the chef to make dishes ahead for the tray.
+  Rarer specials tip more, and collecting specials earns rewards (see the shop).
+- **Daily goal:** set `daily_card_goal` (or ⚙ in the kitchen) and reaching it starts a little
+  fireworks party.
 - **Guests tip in 文 (mon):** spend mon in the shop on decor and pets. Some pieces
   unlock at higher Onigiri restaurant levels.
 - **The timer:** a pomodoro timer, with one dango per focus session. When a break starts, the
@@ -39,7 +45,7 @@ Each table has a candle you can light or snuff with a click; lanterns and candle
 themselves at dusk and go out at dawn. Without Onigiri, the restaurant level (which unlocks
 some shop items) goes up every 3 days you've studied.
 Once you have a puffle, puffle colours (250 mon each), an igloo lamp and penguins passing the
-window appear too. Finishing a deck right after reviewing sets off 紙吹雪 confetti (turn it off with
+window appear too. Finishing a deck right after reviewing sets off 紙吹雪 confetti and falling sakura petals (turn it off with
 `celebrate_deck_finish` in the config).
 
 ## Home-screen widget

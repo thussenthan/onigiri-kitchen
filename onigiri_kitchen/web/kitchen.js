@@ -138,7 +138,7 @@
   let plates = [];
   let walkers = [];
   let orders = [];
-  let tray = 0;
+  let trayDishes = []; // dishes the chef made ahead, waiting on the tray
   let claiming = false;
   let spawnTimer = 2.5;
   let walkerTimer = rand(3, 8);
@@ -385,6 +385,160 @@
     R(x, y + 3, 5, 2, C.nori);
     P(x + 2, y + 1, flavorColor || C.shu);
     P(x + 4, y + 2, C.riceSh);
+  }
+
+  // ---------------------------------------------------------------- menu
+  // What guests order. With Onigiri, the menu is your Specials Book (every
+  // Daily Special you've finished), next to the house onigiri, so it grows as
+  // the Book does; golden guests order today's Daily Special. Without Onigiri,
+  // the house onigiri flavours unlock as your restaurant levels up.
+  const SPECIALS = INIT.specials || { found: false, book: [], today: null };
+  const FLAVOR_LEVELS = { shake: 0, ume: 0, kombu: 3, tuna: 6, okaka: 10, mentai: 15 };
+  const RARITY = {
+    // w: how often guests order it; bonus: extra mon it tips (same as state.py)
+    common: { jp: '並', name: 'Common', c: '#2fae5a', w: 1, bonus: 0 },
+    uncommon: { jp: '上', name: 'Uncommon', c: '#2f7fe0', w: 0.8, bonus: 1 },
+    rare: { jp: '特上', name: 'Rare', c: '#b23fd0', w: 0.6, bonus: 2 },
+    epic: { jp: '極', name: 'Epic', c: '#e0701f', w: 0.45, bonus: 4 },
+    legendary: { jp: '伝説', name: 'Legendary', c: '#d9a400', w: 0.3, bonus: 6 },
+  };
+  // the main ingredient decides the colour of the filling or topping
+  const INGREDIENTS = [
+    [/aburi toro|otoro|chutoro|\btoro\b/, '#e8909a'], [/maguro|tekka|spicy tuna|tuna|negitoro/, '#d8404f'],
+    [/sake|salmon|philadelphia|alaskan/, '#f08a6a'], [/hamachi|buri|yellowtail|kanpachi|negihama/, '#f3cdb0'],
+    [/amaebi|ebi|shrimp|tempura/, '#f59a7a'], [/unagi|eel/, '#7a4a2a'], [/tamago|egg|uzura|futomaki/, '#f2cf3a'],
+    [/ikura|tobiko|masago|tarako|mentai|red phoenix/, '#f06a3a'], [/uni|ankimo|kani miso/, '#e8a23a'],
+    [/kani|crab|california|spider/, '#f07a5a'], [/tako|octopus/, '#d85060'], [/saba|aji|mackerel/, '#9aa8b8'],
+    [/ika|hotate|scallop|tai\b|hirame|suzuki|engawa|shirako|boston/, '#f3efe6'],
+    [/kappa|cucumber|avocado|asparagus|zucchini|wakame|green|vegetable|caterpillar/, '#6fae4a'],
+    [/ume|plum/, '#c8304a'], [/oshinko|daikon/, '#e8d24a'], [/yamagobo|burdock|sweet potato|carrot/, '#e0843a'],
+    [/shiitake|natto|kanpyo|gourd/, '#6b4a2a'], [/red pepper|jalapeno|volcano/, '#d8403a'], [/nasu|eggplant/, '#5a3a6a'],
+    [/wagyu|foie/, '#c87a7a'], [/corn/, '#f2cf3a'], [/dragon/, '#4f9a4a'], [/rainbow/, '#e0508a'],
+    [/matcha|pistachio/, '#7fb35a'], [/vanilla|milk carton|cream|eggnog/, '#f3e6c0'], [/chocolate|cocoa|mocha|brown sugar|espresso|cold brew/, '#6b4028'],
+    [/raspberry|strawberry|candy cane|apple/, '#e0506a'], [/caramel|macchiato|gingerbread/, '#d89a4a'], [/rose/, '#f2a9c0'],
+    [/gold/, '#e8c25a'], [/taro/, '#b9a0d0'], [/thai/, '#e8a05a'], [/fruit/, '#f08a6a'], [/banana/, '#f2d64a'],
+    [/cheese/, '#f2cf5a'], [/cappuccino|latte|affogato|blue mountain|coffee/, '#b07a4a'], [/peppermint/, '#e8f0ea'],
+    [/cookie|croissant|baguette|pain|danish|sourdough|bread|opera|wedding|cake|tiramisu/, '#d49a52'],
+    [/truffle|oil/, '#b8902e'], [/milk tea|classic milk/, '#d8b48a'],
+    [/temaki/, '#f08a6a'], [/chirashi/, '#f06a3a'], [/inari/, '#d49a52'], [/uramaki/, '#f07a5a'], [/north pole/, '#f3e6c0'],
+  ];
+  function dishKind(name) {
+    const n = name.toLowerCase();
+    const rules = [
+      ['gunkan', /gunkan/], ['uramaki', /uramaki|roll$/], ['temaki', /temaki/], ['maki', /maki/], ['nigiri', /nigiri/],
+      ['bowl', /chirashi|bowl|don\b/], ['inari', /inari/], ['boba', /boba|milk tea|thai tea|fruit tea|cheese foam/],
+      ['macaron', /macaron/], ['sundae', /affogato|ice cream|parfait/], ['mochi', /mochi|dango/],
+      ['cake', /cake|tiramisu/], ['cup', /latte|espresso|cappuccino|macchiato|cocoa|mocha|frappe/], ['bread', /croissant|baguette|pain au|danish|sourdough|artisan bread|\bbread\b/], ['cookie', /cookie/],
+      ['milk', /milk carton/], ['cheese', /cheese/], ['bottle', /oil/], ['produce', /apple|banana|carrot/],
+      ['cup', /latte|espresso|cappuccino|brew|macchiato|coffee|cocoa|mocha|frappe|matcha|special|tea/],
+    ];
+    for (const [k, re] of rules) if (re.test(n)) return k;
+    return 'nigiri';
+  }
+  function dishColor(name) {
+    const n = name.toLowerCase();
+    for (const [re, c] of INGREDIENTS) if (re.test(n)) return c;
+    const pal = ['#f08a6a', '#d8404f', '#6fae4a', '#f2cf3a', '#e8a23a', '#9aa8b8'];
+    return pal[hash(n) % pal.length];
+  }
+  function makeDish(sp, from) {
+    return { name: sp.name, desc: sp.desc || '', rarity: RARITY[sp.rarity] ? sp.rarity : 'common', kind: dishKind(sp.name), c: dishColor(sp.name), from };
+  }
+  const flavorDish = (f) => ({ name: `${f.name} onigiri`, jp: f.jp, desc: '', rarity: 'common', kind: 'onigiri', c: f.c, flavor: f, from: 'house' });
+  function buildMenu() {
+    const level = onigiri.level || 0;
+    const house = FLAVORS.filter((f) => level >= (FLAVOR_LEVELS[f.id] || 0));
+    const book = SPECIALS.found ? (SPECIALS.book || []).map((sp) => makeDish(sp, 'book')) : [];
+    // with Onigiri the house keeps its two classics; the Book is the real menu
+    const houseDishes = (book.length ? house.slice(0, 2) : house).map(flavorDish);
+    return { house: houseDishes, book, today: SPECIALS.today ? makeDish(SPECIALS.today, 'today') : null };
+  }
+  const MENU_DISHES = buildMenu();
+  const allDishes = () => MENU_DISHES.house.concat(MENU_DISHES.book);
+  function pickFrom(list) {
+    const total = list.reduce((a, d) => a + (RARITY[d.rarity] || RARITY.common).w, 0);
+    let x = Math.random() * total;
+    for (const d of list) { x -= (RARITY[d.rarity] || RARITY.common).w; if (x <= 0) return d; }
+    return list[list.length - 1];
+  }
+  // What a guest orders: leech guests always want a sour plum, golden guests
+  // the Daily Special, and everyone else something from the menu (they'll
+  // often go for something already on the tray).
+  function chooseDish(guest) {
+    if (guest.kind === 'leech') return flavorDish(FLAVORS.find((f) => f.id === 'ume'));
+    if (guest.kind === 'golden' && MENU_DISHES.today) return MENU_DISHES.today;
+    if (trayDishes.length && Math.random() < 0.45) return pick(trayDishes);
+    const { house, book } = MENU_DISHES;
+    if (book.length && Math.random() < 0.75) return pickFrom(book);
+    return house.length ? pick(house) : flavorDish(FLAVORS[0]);
+  }
+  const sameDish = (a, b) => a && b && a.name === b.name;
+
+  // ------------------------------------------------------------ dish art
+  // 9x7 sprites for the order bubble and the plates; 5x5 ones for the tray.
+  // F / f = the dish's colour (and a darker shade), R / r = rice, N / n = nori.
+  const DISH_ART = {
+    nigiri: ['.........', '..FFFFF..', '.FfFFFfF.', '.RRRRRRR.', 'RRRRRRRRr', '.rrrrrrr.', '.........'],
+    maki: ['..NNNNN..', '.NRRRRRN.', 'NRRFFFRRN', 'NRRFfFRRN', 'NRRRRRRRN', '.NRRRRRN.', '..NNNNN..'],
+    uramaki: ['..rRkRr..', '.RRNNNRR.', 'RkNFFFNRR', 'RRNFfFNkR', 'RRNNNNNRR', '.RRRkRRR.', '..rRRRr..'],
+    gunkan: ['..FfFfF..', '.FFFFFFF.', '.NNNNNNN.', '.NnNNNnN.', '.NNNNNNN.', '.rrrrrrr.', '.........'],
+    temaki: ['.FFfFF...', 'RRRRRRN..', '.RRRRNN..', '..NNNN...', '...NNN...', '....N....', '.........'],
+    bowl: ['.........', '.FfRFfRF.', 'UUUUUUUUU', '.UuuuuuU.', '..UUUUU..', '...UUU...', '.........'],
+    inari: ['.........', '..rRRr...', '.bBBBBb..', 'bBBBBBBb.', 'BBBBBBBBb', '.BBBBBBb.', '.........'],
+    cup: ['.........', '.WWWWWW..', '.CFFFFC..', '.CCCCCCcc', '.CCCCCC.c', '..CCCC.c.', '.........'],
+    boba: ['....K....', '..LLKLL..', '..LFFFL..', '..LFFFL..', '..LFFFL..', '..LkkkL..', '...LLL...'],
+    macaron: ['.........', '..FFFFF..', '.FFFFFFF.', '.WWWWWWW.', '.FFFFFFF.', '..fffff..', '.........'],
+    cake: ['.........', '...WWp...', '..WWWWW..', '.FFFFFFF.', '.WWWWWWW.', '.FFFFFFF.', '.........'],
+    bread: ['.........', '..fFFFf..', '.fFfFfFf.', 'fFFFFFFFf', '.fffffff.', '.........', '.........'],
+    sundae: ['...FFF...', '..FFFFF..', '..WWWWW..', '..LLLLL..', '...LLL...', '....L....', '...LLL...'],
+    mochi: ['.........', '...FFF...', '.FFFFFFF.', 'FFFFFFFFF', '.fffffff.', '.........', '.........'],
+    cookie: ['.........', '..FFFFF..', '.FkFFkFF.', '.FFFFkFF.', '.FkFFFFF.', '..FFFFF..', '.........'],
+    produce: ['....g....', '..FFgFF..', '.FFFFFFF.', '.FFFFFFF.', '.FFFFFFf.', '..fffff..', '.........'],
+    milk: ['...LL....', '..LWWL...', '..LWWL...', '..LFFL...', '..LWWL...', '..LLLL...', '.........'],
+    cheese: ['.........', '......FF.', '....FFFF.', '..FFkFFF.', 'FFFFFFkF.', 'FFfffff..', '.........'],
+    bottle: ['....K....', '....F....', '...FFF...', '..FFFFF..', '..FfFFF..', '..FFFFF..', '.........'],
+  };
+  const DISH_MINI = {
+    sushi: ['.FFF.', 'FFFFF', 'RRRRR', 'rrrrr', '.....'],
+    roll: ['.NNN.', 'NRFRN', 'NFFFN', 'NRRRN', '.NNN.'],
+    bowl: ['.FRF.', 'UUUUU', '.UUU.', '..U..', '.....'],
+    cup: ['.FFF.', 'CCCCc', 'CCCC.', '.CC..', '.....'],
+    sweet: ['.FFF.', 'FFFFF', 'WWWWW', 'FFFFF', '.fff.'],
+  };
+  const MINI_OF = { nigiri: 'sushi', gunkan: 'sushi', maki: 'roll', uramaki: 'roll', temaki: 'roll', inari: 'roll', bowl: 'bowl', cup: 'cup', boba: 'cup', milk: 'cup', bottle: 'cup', sundae: 'cup' };
+  function dishPal(d) {
+    return {
+      F: d.c, f: shade(d.c, -0.25), R: C.rice, r: C.riceSh, N: C.nori, n: C.noriHi, W: '#fbf7ee', k: '#3b2d28', K: '#e8546a',
+      U: '#3b4a8a', u: '#56679c', B: '#b87a3a', b: '#d49a52', C: '#f3ecd8', c: '#d8cdb4', L: '#cfe0e6', g: '#4f7a3a', p: '#e0506a',
+    };
+  }
+  function paintRows(rows, x, y, pal, cols) {
+    rows.forEach((row, j) => {
+      for (let i = 0; i < Math.min(row.length, cols == null ? row.length : cols); i++) {
+        const ch = row[i];
+        if (ch !== '.' && pal[ch]) P(x + i, y + j, pal[ch]);
+      }
+    });
+  }
+  // big 9x7 dish with its top-left at (x, y); `cols` crops it (as it's eaten)
+  function drawDish(d, x, y, cols) {
+    if (!d || d.kind === 'onigiri') { bigOnigiri(x, y, d ? d.c : C.shu, cols); return; }
+    paintRows(DISH_ART[d.kind] || DISH_ART.nigiri, x, y, dishPal(d), cols);
+  }
+  function drawDishMini(d, x, y) {
+    if (!d || d.kind === 'onigiri') { miniOnigiri(x, y, d ? d.c : C.shu); return; }
+    paintRows(DISH_MINI[MINI_OF[d.kind] || 'sweet'], x, y, dishPal(d));
+  }
+  function bigOnigiri(x, y, fc, cols) {
+    const rows = ['...rRr...', '..rRFRr..', '.rRRFRRr.', '.RRRRRRR.', '.NNNNNNN.', '.NNnnnNN.', '.NNNNNNN.'];
+    paintRows(rows, x, y, { R: C.rice, r: C.riceSh, F: fc, N: C.nori, n: C.noriHi }, cols);
+  }
+  function dishLabel(d) {
+    if (!d) return '';
+    const rar = RARITY[d.rarity] || RARITY.common;
+    const where = d.from === 'today' ? `Onigiri's Daily Special today · ${rar.name}` : d.from === 'book' ? `${rar.name} · from your Specials Book` : 'House onigiri';
+    const bonus = d.from !== 'house' && rar.bonus ? ` · +${rar.bonus} mon tip` : '';
+    return `<b>${esc(d.name)}</b> <span style="color:${rar.c}">●</span>\n${d.desc ? esc(d.desc) + '\n' : ''}${where}${bonus}`;
   }
 
   // -------------------------------------------------------- static layer
@@ -664,17 +818,63 @@
     { jp: '鰹', en: 'Bonito flakes', c: C.paper },
     { jp: '本日', en: "Today's special", c: C.shu },
   ];
+  const KIND_JP = { nigiri: '握', maki: '巻', uramaki: '裏巻', gunkan: '軍艦', temaki: '手巻', bowl: '散', inari: '稲荷', boba: '茶', cup: '珈琲', macaron: '菓', cake: '菓', bread: '焼', sundae: '氷', mochi: '餅', cookie: '菓', produce: '果', milk: '乳', cheese: '乳', bottle: '油' };
+  // a short Japanese label for a menu tag: the main ingredient if we know it
+  const TAG_JP = [
+    [/negitoro/, 'ネギトロ'], [/otoro|chutoro|\btoro\b/, 'トロ'], [/negihama|hamachi|buri|yellowtail/, '鰤'], [/kanpachi/, '間八'],
+    [/maguro|tekka|tuna/, '鮪'], [/sake|salmon/, '鮭'], [/amaebi|ebi|shrimp/, '海老'], [/unagi|eel/, '鰻'],
+    [/tamago|egg/, '玉子'], [/ikura/, 'いくら'], [/uni\b/, '雲丹'], [/kani|crab/, '蟹'], [/tako/, '蛸'], [/ika\b/, '烏賊'],
+    [/saba/, '鯖'], [/aji\b/, '鯵'], [/\btai\b/, '鯛'], [/hotate|scallop/, '帆立'], [/kappa|cucumber/, '胡瓜'],
+    [/oshinko|daikon/, '新香'], [/kanpyo|gourd/, '干瓢'], [/yamagobo|burdock/, '牛蒡'], [/ume/, '梅'], [/natto/, '納豆'],
+    [/shiitake/, '椎茸'], [/futomaki/, '太巻'], [/dragon/, '龍'], [/rainbow/, '虹'], [/volcano/, '火山'], [/wagyu/, '和牛'],
+    [/avocado/, '鰐梨'], [/sweet potato/, '芋'], [/matcha/, '抹茶'], [/macaron/, '菓子'], [/boba|milk tea/, 'タピ'],
+  ];
+  function tagJp(d) {
+    const n = d.name.toLowerCase();
+    for (const [re, jp] of TAG_JP) if (re.test(n)) return jp;
+    return KIND_JP[d.kind] || '品';
+  }
+  function menuTags() {
+    const tags = [];
+    const used = new Set();
+    for (const d of MENU_DISHES.book) {
+      if (tags.length >= 4) break;
+      const jp = tagJp(d);
+      if (used.has(jp)) continue;
+      used.add(jp);
+      tags.push({ jp, label: dishLabel(d) });
+    }
+    const wall = ['shake', 'ume', 'kombu', 'okaka'].map((id) => FLAVORS.find((f) => f.id === id));
+    for (const f of wall) {
+      if (tags.length >= 4) break;
+      const need = FLAVOR_LEVELS[f.id] || 0;
+      const open = (onigiri.level || 0) >= need;
+      if (used.has(f.jp)) continue;
+      used.add(f.jp);
+      tags.push(open
+        ? { jp: f.jp, label: `<b>${f.jp}</b> ${f.name} onigiri\nOn the menu` }
+        : { jp: f.jp, locked: true, label: `<b>${f.jp}</b> ${f.name} onigiri\nUnlocks at restaurant level ${need}` });
+    }
+    return tags;
+  }
+  const MENU_TAGS = menuTags();
+  function specialTag() {
+    const t = SPECIALS.today;
+    if (!t) return `<b>本日</b> Today's special\n${S.today.reviews || 0} cards reviewed today`;
+    const d = MENU_DISHES.today;
+    return `<b>本日</b> Today's special: ${esc(t.name)}\n${t.done ? '✓ Prepared in Onigiri!' : `${t.progress}/${t.target} cards in Onigiri`} · golden guests order it\n${esc(d.desc || '')}`;
+  }
   function drawMenu() {
     R(102, 20, 66, 2, C.woodDk);
     MENU.forEach((m, i) => {
       const x = 104 + i * 13;
       const sw = shake['menu' + i] > 0 ? Math.round(Math.sin(shake['menu' + i] * 30) * 1) : 0;
+      const tag = i < 4 ? MENU_TAGS[i] : null;
+      const paper = tag && tag.locked ? '#cfc3aa' : m.c;
       R(x + sw, 22, 10, 28, C.woodDk);
-      R(x + 1 + sw, 23, 8, 26, m.c);
-      R(x + 1 + sw, 48, 8, 1, shade(m.c, -0.15));
-      const label = i === 4
-        ? `<b>本日</b> Today's special\n${S.today.reviews || 0} cards reviewed today`
-        : `<b>${m.jp}</b> ${m.en}\nClick to play a note ♪`;
+      R(x + 1 + sw, 23, 8, 26, paper);
+      R(x + 1 + sw, 48, 8, 1, shade(paper, -0.15));
+      const label = i === 4 ? specialTag() : tag ? `${tag.label}\nClick to play a note ♪` : `<b>${m.jp}</b> ${m.en}`;
       regions.push({ x, y: 22, w: 10, h: 28, label, click: () => { shake['menu' + i] = 0.4; OKSound.pluck(3 + i); } });
     });
   }
@@ -868,6 +1068,41 @@
     return `<b>${item.jp}</b> ${item.name}\n${item.desc}`;
   }
 
+  // Specials Book rewards (earned by collecting Onigiri specials)
+  function drawRewards() {
+    const book = MENU_DISHES.book;
+    if (has('kin_gaku')) {
+      // golden frame by the door with your first Epic special
+      const x = 303;
+      const y = 20;
+      R(x, y, 15, 14, C.goldDk); R(x + 1, y + 1, 13, 12, C.gold); R(x + 2, y + 2, 11, 10, '#3e2717');
+      const epic = book.find((d) => d.rarity === 'epic');
+      if (epic) paintRows(DISH_ART[epic.kind] || DISH_ART.nigiri, x + 3, y + 3, dishPal(epic), 9);
+      if (Math.floor(time * 2) % 4 === 0) P(x + 13, y + 1, '#fff6cc');
+      R(x + 7, y - 3, 1, 3, '#2b1c12');
+      regions.push({ x, y: y - 3, w: 15, h: 17, label: `<b>金の額</b> Golden frame\n${epic ? `Your first Epic special: ${esc(epic.name)}` : 'An Epic special from your Specials Book'}`, click: () => { OKSound.chime(); spawnHearts(x + 7, y, 1); } });
+    }
+    if (has('shinagaki')) {
+      // specials board: how many you've collected (the number is drawn in hi-res text)
+      const x = 303;
+      const y = 40;
+      R(x, y, 15, 34, '#5a3a22'); R(x + 1, y + 1, 13, 32, '#7a4d2c'); R(x + 2, y + 2, 11, 30, '#efe6cf');
+      R(x + 7, y - 3, 1, 3, '#2b1c12');
+      regions.push({ x, y: y - 3, w: 15, h: 37, label: `<b>品書き</b> Specials board\n${book.length} specials collected in your Onigiri Specials Book`, click: () => { OKSound.pluck(5); } });
+    }
+    if (has('densetsu_bocho')) {
+      // the legendary knife on a little rack above the chef
+      const x = 107;
+      const y = 62;
+      R(x, y + 4, 28, 2, '#5a3a22');
+      R(x + 4, y + 2, 5, 2, '#2b1c12'); R(x + 9, y + 2, 16, 2, '#dfe7ee'); R(x + 9, y + 2, 16, 1, '#ffffff'); P(x + 25, y + 3, '#dfe7ee');
+      R(x + 8, y + 1, 1, 4, C.gold);
+      if (Math.floor(time * 1.5) % 4 === 0) P(x + 12 + Math.floor(time * 6) % 12, y + 2, '#fff6cc');
+      const leg = book.find((d) => d.rarity === 'legendary');
+      regions.push({ x, y, w: 28, h: 7, label: `<b>伝説の包丁</b> Legendary knife\n${leg ? `For your first Legendary special: ${esc(leg.name)}` : 'For a Legendary special'}`, click: () => { OKSound.chime(); spawnHearts(x + 14, y, 2); } });
+    }
+  }
+
   function drawWallDecor() {
     for (const id of ['kakejiku', 'furin']) {
       if (!has(id)) continue;
@@ -975,8 +1210,9 @@
     // tray of ready onigiri
     R(140, 102, 38, 2, '#3e2717');
     R(141, 101, 36, 1, '#5a3a22');
-    for (let i = 0; i < tray; i++) miniOnigiri(142 + i * 6, 96, FLAVORS[i % FLAVORS.length].c);
-    regions.push({ x: 140, y: 94, w: 38, h: 10, label: `<b>お盆</b> Tray\n${tray} onigiri ready${tray ? ', guests get them straight away' : '. Tap the chef to make some'}`, click: () => chefClick() });
+    trayDishes.forEach((d, i) => drawDishMini(d, 142 + i * 6, 96));
+    const trayNames = [...new Set(trayDishes.map((d) => d.name))].slice(0, 3).map(esc).join(', ');
+    regions.push({ x: 140, y: 94, w: 38, h: 10, label: `<b>お盆</b> Tray\n${trayDishes.length ? `${trayDishes.length} ready: ${trayNames}${trayDishes.length > 3 ? '…' : ''}\nGuests who ordered these get them straight away` : 'Empty. Tap the chef to make something from the menu'}`, click: () => chefClick() });
   }
 
   // ----------------------------------------------------------------- chef
@@ -992,10 +1228,13 @@
     // hachimaki headband with a red rising sun
     const band = y + 8;
     const hw = shape.rows[8] || 8;
-    R(shape.cx - hw - 1, band, hw * 2 + 3, 3, '#ffffff');
-    R(shape.cx - hw - 1, band + 2, hw * 2 + 3, 1, '#e3dccd');
+    const golden = has('kin_hachimaki'); // 25 specials collected
+    const cloth = golden ? C.gold : '#ffffff';
+    R(shape.cx - hw - 1, band, hw * 2 + 3, 3, cloth);
+    R(shape.cx - hw - 1, band + 2, hw * 2 + 3, 1, golden ? C.goldDk : '#e3dccd');
     R(shape.cx - 1, band, 3, 3, C.shu);
-    R(shape.cx + hw + 1, band + 1, 3, 1, '#ffffff'); R(shape.cx + hw + 2, band + 2, 2, 2, '#ffffff');
+    R(shape.cx + hw + 1, band + 1, 3, 1, cloth); R(shape.cx + hw + 2, band + 2, 2, 2, cloth);
+    if (golden && Math.floor(time * 2) % 5 === 0) P(shape.cx - hw + 1, band, '#fff6cc');
     if ((onigiri.level || 0) >= 20) { P(shape.cx - 5, band + 1, C.gold); P(shape.cx + 5, band + 1, C.gold); }
     face(shape.cx, y + 14, 5, {
       blink: chef.blink < 0.12,
@@ -1007,9 +1246,9 @@
       const p = Math.floor(chef.t * 6) % 2;
       ellipse(shape.cx - 6 + p, 102, 2, 1, C.rice);
       ellipse(shape.cx + 6 - p, 102, 2, 1, C.rice);
-      miniOnigiri(shape.cx - 2, 97 + p, chef.target ? chef.target.look.flavor.c : C.shu);
+      drawDishMini(chef.dish, shape.cx - 2, 97 + p);
     }
-    regions.push({ x, y: y - 1, w, h: 28, label: '<b>大将</b> Taishō, the head chef\nTap to make an onigiri for the tray', click: chefClick });
+    regions.push({ x, y: y - 1, w, h: 28, label: `<b>大将</b> Taishō, the head chef\n${chef.dish && chef.state === 'make' ? `Making ${esc(chef.dish.name)}…` : 'Tap to make something from the menu for the tray'}\n${menuSummary()}`, click: chefClick });
   }
 
   const CHEF_LINES = [
@@ -1036,7 +1275,7 @@
 
   function chefClick() {
     if (chef.state === 'idle' && !orders.length) {
-      if (tray >= 6) {
+      if (trayDishes.length >= 6) {
         say(['お盆がいっぱい!', "The tray's full!"]);
         OKSound.blip();
         return;
@@ -1044,11 +1283,22 @@
       chef.state = 'make';
       chef.t = 0;
       chef.target = null;
+      chef.dish = pickFrom(allDishes());
       OKSound.pluck(4);
-      if (Math.random() < 0.35) say(chefLine());
+      say([chef.dish.jp || 'はい、お待ち!', `One ${chef.dish.name}, coming up!`]);
+    } else if (chef.state === 'make' && chef.dish) {
+      say(['もう少し!', `Almost done with the ${chef.dish.name}!`]);
     } else {
       say(chefLine());
     }
+  }
+  // "12 dishes on the menu (10 from your Specials Book)"
+  function menuSummary() {
+    const n = allDishes().length;
+    const b = MENU_DISHES.book.length;
+    if (b) return `${n} dishes on the menu (${b} from your Onigiri Specials Book)`;
+    const locked = FLAVORS.length - MENU_DISHES.house.length;
+    return `${n} onigiri on the menu${locked ? ` · ${locked} more unlock as your restaurant levels up` : ''}`;
   }
 
   // ----------------------------------------------------------------- Tama
@@ -2718,6 +2968,7 @@
       cured: false,
       eaten: 0,
     };
+    c.dish = chooseDish(guest);
     seat.guest = c;
     customers.push(c);
     norenSway = 1;
@@ -2792,6 +3043,8 @@
     if (has('maneki')) amt += 1;
     if (has('shiba')) amt += 1;
     if (petHappy()) amt += 1;
+    // rarer specials are worth more
+    if (c.dish && c.dish.from !== 'house') amt += (RARITY[c.dish.rarity] || RARITY.common).bonus;
     return amt;
   }
 
@@ -2836,18 +3089,9 @@
     R(bx, by, 13, 11, C.ink);
     R(bx + 1, by + 1, 11, 9, '#fffaf0');
     P(bx + 1, by + 11, C.ink); P(bx + 2, by + 11, C.ink); P(bx + 1, by + 12, C.ink);
-    // a clearer 9x7 onigiri with its filling
-    const ix = bx + 2;
-    const iy = by + 2;
-    const fc = c.guest.kind === 'leech' ? '#9a3b7a' : c.look.flavor.c;
-    R(ix + 3, iy, 3, 1, C.riceSh);
-    R(ix + 2, iy + 1, 5, 1, C.riceSh);
-    R(ix + 1, iy + 2, 7, 2, C.riceSh);
-    R(ix + 4, iy, 1, 1, C.outline);
-    R(ix + 3, iy + 1, 3, 1, '#e8e0d0');
-    R(ix + 3, iy + 1, 3, 2, fc);
-    R(ix + 1, iy + 4, 7, 3, C.nori);
-    R(ix + 3, iy + 4, 3, 3, C.noriHi);
+    // what they ordered
+    drawDish(c.dish, bx + 2, by + 2);
+    if (c.dish && c.dish.from === 'today' && Math.floor(time * 3) % 3 === 0) P(bx + 11, by + 1, '#fff6cc');
   }
 
   function deckLeaf(deck) {
@@ -2857,6 +3101,10 @@
   }
 
   function guestLabel(c) {
+    const base = guestLabelBase(c);
+    return c.dish ? `${base}\nOrdered: ${esc(c.dish.name)}${c.dish.from === 'today' ? ' (Daily Special)' : ''}` : base;
+  }
+  function guestLabelBase(c) {
     const gst = c.guest;
     if (gst.kind === 'golden') return '<b>金のおにぎり</b> Golden guest\nCame by because you finished a focus session!';
     if (gst.kind === 'leech') {
@@ -2894,7 +3142,7 @@
       const x = lerp(p.fx, p.tx, k);
       const y = lerp(p.fy, p.ty, k) - Math.sin(k * Math.PI) * 20;
       R(x - 2, y + 5, 9, 1, '#ffffff');
-      miniOnigiri(x, y, p.c.look.flavor.c);
+      drawDishMini(p.c.dish, x, y);
     }
     for (const c of customers) {
       if (!c.plate) continue;
@@ -2902,13 +3150,9 @@
       R(x - 1, 147, 11, 1, '#ffffff');
       R(x, 148, 9, 1, '#d8d2c6');
       if (c.state === 'eat') {
-        const left = 3 - Math.min(3, Math.floor(c.eaten / 2.5));
-        if (left > 0) {
-          const fx = x + 2;
-          if (left >= 3) miniOnigiri(fx, 142, c.look.flavor.c);
-          else if (left === 2) { R(fx, 144, 5, 1, C.rice); R(fx, 145, 5, 2, C.nori); P(fx + 2, 144, c.look.flavor.c); }
-          else R(fx + 1, 145, 3, 2, C.nori);
-        }
+        // eaten a bite at a time, from the right
+        const left = 9 - Math.min(9, c.eaten);
+        if (left > 0) drawDish(c.dish, x, 140, left);
       }
     }
   }
@@ -3169,10 +3413,14 @@
     MENU.forEach((m, i) => {
       const x = 104 + i * 13 + 5;
       const sw = shake['menu' + i] > 0 ? Math.round(Math.sin(shake['menu' + i] * 30) * 1) : 0;
-      v.fillStyle = i === 4 ? '#fff8ee' : '#2b2622';
-      const chars = m.jp.split('');
-      const step = chars.length > 1 ? 9 : 0;
+      const tag = i < 4 ? MENU_TAGS[i] : null;
+      v.fillStyle = i === 4 ? '#fff8ee' : tag && tag.locked ? 'rgba(43,38,34,0.35)' : '#2b2622';
+      const chars = (tag ? tag.jp : m.jp).split('');
+      // up to four characters fit on a tag (ネギトロ), a little smaller when long
+      const step = chars.length > 3 ? 6 : chars.length > 2 ? 7.5 : chars.length > 1 ? 9 : 0;
+      if (chars.length > 2) v.font = `700 ${Math.round(4.4 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
       chars.forEach((ch, k) => v.fillText(ch, (x + sw) * s, (36 + (k - (chars.length - 1) / 2) * step) * s));
+      if (chars.length > 2) v.font = `700 ${Math.round(5.2 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
     });
     if (has('kakejiku')) {
       v.fillStyle = '#2b2622';
@@ -3187,6 +3435,14 @@
     v.fillStyle = preparing ? '#6b5a4a' : '#9a2f22';
     v.font = `700 ${Math.round(4.2 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
     (preparing ? '準備中' : '営業中').split('').forEach((ch, k) => v.fillText(ch, 245.5 * s, (67.5 + k * 6.5) * s));
+    if (has('shinagaki')) {
+      v.fillStyle = '#2b2622';
+      v.font = `700 ${Math.round(3.6 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
+      ['品', '書'].forEach((ch, k) => v.fillText(ch, 310.5 * s, (48 + k * 5.5) * s));
+      v.fillStyle = '#9a2f22';
+      v.font = `800 ${Math.round(4.6 * s)}px -apple-system,system-ui,sans-serif`;
+      v.fillText(String(MENU_DISHES.book.length), 310.5 * s, 64 * s);
+    }
     // suggestion box label
     v.fillStyle = '#5a3a22';
     v.font = `700 ${Math.round(3.3 * s)}px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif`;
@@ -3234,14 +3490,17 @@
       if (chef.t > 1.8) {
         chef.state = 'idle';
         if (chef.target) launchPlate(chef.target);
-        else { tray = Math.min(6, tray + 1); send('bump', 'onigiri_made'); OKSound.pop(); }
+        else if (chef.dish) { trayDishes.push(chef.dish); send('bump', 'onigiri_made'); OKSound.pop(); }
         chef.target = null;
+        chef.dish = null;
       }
     } else if (orders.length) {
       const c = orders.shift();
       if (c && c.state === 'wait') {
-        if (tray > 0) { tray--; launchPlate(c); }
-        else { chef.state = 'make'; chef.t = 0; chef.target = c; }
+        // on the tray already? straight to the table. Otherwise the chef makes it.
+        const i = trayDishes.findIndex((d) => sameDish(d, c.dish));
+        if (i >= 0) { trayDishes.splice(i, 1); launchPlate(c); }
+        else { chef.state = 'make'; chef.t = 0; chef.target = c; chef.dish = c.dish; }
       }
     }
     chef.lineT -= dt;
@@ -3318,6 +3577,7 @@
     updateSparrow(dt);
     updateRadio(dt);
     updateLamps(dt);
+    updateParty(dt);
   }
 
   function render() {
@@ -3332,6 +3592,7 @@
     drawWallDecor();
     drawMeyasubako();
     drawTreasureShelf();
+    drawRewards();
     drawDoor(h);
     drawLanterns(lit);
     drawChef();
@@ -3622,9 +3883,16 @@
       phase.textContent = '待機 · Ready';
       clock.textContent = fmt((conf.focus_minutes || 25) * 60000);
     }
-    if (timer.phase === 'idle') main.innerHTML = '開始<small>Start</small>';
-    else if (timer.paused) main.innerHTML = '再開<small>Resume</small>';
-    else main.innerHTML = '一時停止<small>Pause</small>';
+    // ▶ Start / ❚❚ Pause / ▶ Resume: same width every time, outlined while paused
+    const PLAY = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.8v8.4L10 6z" fill="currentColor"/></svg>';
+    const PAUSE = '<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2.4" y="1.8" width="2.6" height="8.4" rx="0.8" fill="currentColor"/><rect x="7" y="1.8" width="2.6" height="8.4" rx="0.8" fill="currentColor"/></svg>';
+    const state = timer.phase === 'idle' ? 'start' : timer.paused ? 'resume' : 'pause';
+    if (main.dataset.state !== state) {
+      main.dataset.state = state;
+      main.innerHTML = state === 'start' ? `${PLAY}開始<small>Start</small>` : state === 'resume' ? `${PLAY}再開<small>Resume</small>` : `${PAUSE}一時停止<small>Pause</small>`;
+      main.title = state === 'start' ? 'Start a focus session' : state === 'resume' ? 'Resume the timer' : 'Pause the timer';
+    }
+    main.classList.toggle('ok-t-paused', state === 'resume');
     // dango skewer
     const sk = $('ok-skewer');
     const cycle = timer.cycle || conf.rounds_before_long_break || 4;
@@ -3775,7 +4043,8 @@
     const level = onigiri.level || 0;
     const animals = catalog.filter((c) => c.kind === 'animal');
     const pets = catalog.filter((c) => c.kind === 'pet' && c.species !== pet.species);
-    const decor = catalog.filter((c) => !isCompanion(c) && (!c.puffle || hasPuffle() || S.owned.includes(c.id)));
+    const decor = catalog.filter((c) => !isCompanion(c) && c.kind !== 'reward' && (!c.puffle || hasPuffle() || S.owned.includes(c.id)));
+    const rewards = SPECIALS.found ? catalog.filter((c) => c.kind === 'reward') : [];
     const heading = (jp, en, sub) => {
       const h = document.createElement('div');
       h.className = 'ok-grid-head';
@@ -3786,10 +4055,26 @@
     if (pets.length || animals.length) ordered.push({ head: ['ペット', 'Pets', 'Friends who move in · hover one to see its perk'] }, ...pets, ...animals);
     ordered.push({ colors: true });
     ordered.push({ head: ['飾り', 'Decor', 'Little touches for your restaurant'] }, ...decor);
+    if (rewards.length) ordered.push({ head: ['記録', 'Specials rewards', 'Earned by collecting specials in your Onigiri Specials Book'] }, ...rewards);
     for (const item of ordered) {
       if (item.head) { heading(...item.head); continue; }
       if (item.colors) { renderColorShop(grid, heading); continue; }
       const owned = S.owned.includes(item.id);
+      if (item.kind === 'reward' && !owned) {
+        // progress towards it, no price
+        const book = MENU_DISHES.book;
+        const [k, n] = Object.entries(item.need || {})[0] || ['total', 0];
+        const have = k === 'total' ? book.length : book.filter((d) => d.rarity === k).length;
+        const card = document.createElement('div');
+        card.className = 'ok-item locked';
+        const icon = document.createElement('canvas');
+        drawRewardIcon(icon, item.id);
+        card.appendChild(icon);
+        card.insertAdjacentHTML('beforeend', `<div><div class="ok-item-name"><span class="jp">${item.jp}</span><span>${item.name}</span></div><p>${item.desc}</p></div>` +
+          `<div class="ok-item-foot"><span class="ok-lock">🔒 ${Math.min(have, n)}/${n} ${k === 'total' ? 'specials' : `${(RARITY[k] || {}).name || k} special${n === 1 ? '' : 's'}`}</span></div>`);
+        grid.appendChild(card);
+        continue;
+      }
       const locked = !owned && level < item.level;
       const card = document.createElement('div');
       card.className = 'ok-item' + (locked ? ' locked' : '');
@@ -3900,7 +4185,21 @@
   }
   const setPuffleColor = (id) => setPetColor('puffle', id);
 
+  function drawRewardIcon(canvas, id) {
+    canvas.width = 44;
+    canvas.height = 30;
+    const ctx = canvas.getContext('2d');
+    const prev = gRef;
+    gRef = ctx;
+    const d = { name: 'Nigiri Otoro', kind: 'nigiri', c: '#e8909a' };
+    if (id === 'kin_gaku') { R(15, 7, 15, 14, C.goldDk); R(16, 8, 13, 12, C.gold); R(17, 9, 11, 10, '#3e2717'); paintRows(DISH_ART.nigiri, 18, 10, dishPal(d), 9); }
+    else if (id === 'shinagaki') { R(15, 2, 15, 26, '#5a3a22'); R(17, 4, 11, 22, '#efe6cf'); R(19, 8, 7, 1, '#2b2622'); R(19, 11, 7, 1, '#2b2622'); R(20, 17, 5, 4, '#9a2f22'); }
+    else if (id === 'kin_hachimaki') { R(8, 12, 28, 5, C.gold); R(8, 16, 28, 1, C.goldDk); R(20, 12, 4, 5, C.shu); R(36, 13, 4, 2, C.gold); }
+    else if (id === 'densetsu_bocho') { R(6, 16, 32, 2, '#5a3a22'); R(9, 12, 6, 3, '#2b1c12'); R(15, 12, 20, 3, '#dfe7ee'); R(15, 12, 20, 1, '#ffffff'); R(14, 11, 1, 5, C.gold); }
+    gRef = prev;
+  }
   function drawIcon(canvas, id) {
+    if (id === 'shinagaki' || id === 'kin_hachimaki' || id === 'kin_gaku' || id === 'densetsu_bocho') { drawRewardIcon(canvas, id); return; }
     if (ANIMAL_ART[id]) {
       canvas.width = 44;
       canvas.height = 30;
@@ -3982,7 +4281,9 @@
     { jp: 'ようこそ', title: 'Welcome to your restaurant!', text: 'This little onigiri shop runs by itself. Watch it, or click around, since almost everything does something.' },
     { jp: '音', title: 'Sound on: highly recommended!', text: 'The kitchen is best with sound: soft koto notes, wind chimes, your pet\'s little noises and celebration fanfares. It\'s on by default, and this speaker button mutes it any time.', dom: '#ok-b-sound' },
     { jp: 'お客さん', title: 'Guests come from studying', text: 'Every 10 reviews in a deck sends a guest from that deck. They wait outside the door until you visit, so nothing is lost if you study for a long time.', scene: () => ({ x: 254, y: 18, w: 48, h: 112 }) },
-    { jp: '大将', title: 'The chef', text: 'Guests are served automatically. Tap the chef to prep onigiri for the tray so guests are served straight away.', scene: () => ({ x: 104, y: 72, w: 76, h: 34 }) },
+    { jp: '大将', title: 'The chef', text: () => (MENU_DISHES.book.length
+      ? `Guests order from your menu: the ${MENU_DISHES.book.length} specials in your Onigiri Specials Book (it grows as you finish more). The chef cooks each order; tap him to make dishes ahead for the tray.`
+      : 'Guests order onigiri from the menu on the wall, and more flavours unlock as your restaurant levels up. The chef cooks each order; tap him to make some ahead for the tray.'), scene: () => ({ x: 104, y: 72, w: 76, h: 34 }) },
     { jp: '文', title: 'Tips', text: 'Happy guests leave mon (文). Tap coins to collect them, or they collect themselves. Spend mon on decor.', dom: '.ok-purse' },
     { jp: '店', title: 'The shop', text: 'Spend mon on decor and pets: the starters you didn\'t pick and big milestone friends who move in, each with a perk. Some unlock at higher Onigiri levels.', dom: '#ok-b-decor' },
     { jp: () => sp().jp, title: () => `${pet.name}, your ${sp().name.toLowerCase()}`, text: () => `A gentle virtual pet. ${They()} eats while you review, gets a ${sp().food} for every guest, and grows as you study. ${They()} can't get sick or run away. The Pet button opens ${sp().their} care card.`, scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
@@ -4226,6 +4527,53 @@
     if (OKSound.enabled) OKSound.phraseDown();
   }
 
+  // ------------------------------------------------------- 祭り little party
+  // Reaching your daily card goal (⚙ settings) throws a small party: fireworks
+  // across the room and in the window, lanterns on, pets cheering.
+  let partyT = 0;
+  let partyFire = 0;
+  function roomFirework() {
+    const x = rand(100, 300);
+    const y = rand(18, 70);
+    const col = pick(['#ffd27a', '#f07a8a', '#8fd0ff', '#b8f07a', '#ffffff', '#f2a9c0']);
+    for (let i = 0; i < 22; i++) {
+      const a = (i / 22) * Math.PI * 2;
+      const sp = rand(14, 22);
+      particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.9, 1.4), c: col, type: 'spark' });
+    }
+    if (OKSound.enabled) OKSound.koto(pick([146.8, 196, 220]), 0, 0.3);
+  }
+  function goalParty(goal) {
+    partyT = 14;
+    partyFire = 0;
+    lanternsOn = true;
+    OKSound.fanfare();
+    say(['目標達成!', `Daily goal reached: ${goal} cards! Party time!`]);
+    spawnHearts(tama.x, (tama.y == null ? FLOOR_Y : tama.y) - 20, 3);
+    residents.forEach((a) => { if (!a.air) reactResident(a); });
+    toast(`🎆 目標達成 · You reached your daily goal of ${goal} cards!`);
+  }
+  function updateParty(dt) {
+    if (partyT <= 0) return;
+    partyT -= dt;
+    partyFire -= dt;
+    if (partyFire <= 0) {
+      partyFire = rand(0.35, 0.8);
+      roomFirework();
+      if (Math.random() < 0.5) firework();
+    }
+  }
+  // Onigiri's restaurant levelled up since you were last here: the chef cheers.
+  function levelUpCheer(lu) {
+    const seatsThen = clamp(2 + Math.floor(lu.from / 5), 2, 5);
+    const newSeat = seatCount > seatsThen;
+    OKSound.fanfare();
+    chef.lineT = 12;
+    say(['おめでとう!', `Your restaurant reached level ${lu.to}!${newSeat ? ' A new seat opened up.' : ''}`]);
+    for (let i = 0; i < 4; i++) setTimeout(roomFirework, 300 + i * 420);
+    spawnHearts(121, 74, 3);
+  }
+
   // ---------------------------------------------------------- python -> js
   window.OK = {
     onTimer(payload) {
@@ -4259,6 +4607,9 @@
         toast(`🐾 ${pet.name} grew up! Now a ${pet.stageJp} ${pet.stageName}`);
       }
     },
+    onGoal(goal) {
+      goalParty(goal);
+    },
     onReason(reason) {
       if (reason === 'break') breakWelcome();
     },
@@ -4279,7 +4630,7 @@
   // dev preview only: draw sprites onto a test canvas
   if (window.OK_DEBUG_HOOKS) {
     window.OKD = {
-      tama, birdOuting, residents, bedtime, seats,
+      tama, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish,
       step(n) { for (let i = 0; i < n; i++) update(1 / 30); },
       draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, withPet, ANIMAL_ART }); } finally { gRef = prev; } },
     };
@@ -4291,6 +4642,8 @@
     const t = INIT.takeout || {};
     if (t.count) toast(`Yesterday's ${t.count} waiting guest${t.count === 1 ? '' : 's'} took their food to go (+${t.mon} mon)`);
     if (!pet.species) { openChooser('starter'); return; }
+    if (INIT.levelUp) setTimeout(() => levelUpCheer(INIT.levelUp), 200);
+    if (INIT.goalParty) setTimeout(() => goalParty(INIT.goalParty), INIT.levelUp ? 3200 : 300);
     if (INIT.setBonusNow) { setBonusModal(500); return; }
     if (!S.tutorialDone && INIT.reason !== 'break') { startTour(); return; }
     const greeted = greetOnOpen();

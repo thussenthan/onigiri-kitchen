@@ -80,7 +80,17 @@ import anki_stub  # noqa: E402
 _env = anki_stub.setup()
 _state = _env.import_("state")
 _pet = _env.import_("pet")
-data = {"catalog": _state.CATALOG, "petSpecies": _pet.species_payload(),
+# Your real Onigiri Specials Book (read-only), so the preview's guests order from it
+_ol = _env.import_("onigiri_link")
+_env.mw.addonManager.addonsFolder = lambda *a: os.path.expanduser("~/Library/Application Support/Anki2/addons21")
+_env.mw.pm.name = os.environ.get("ONIGIRI_PROFILE", "Thussenthan")
+_ol.find_onigiri_package = lambda: "1011095603" if os.path.isdir(os.path.join(_env.mw.addonManager.addonsFolder(), "1011095603")) else None
+try:
+    _specials = _ol.read_specials()
+except Exception as e:
+    print("note: couldn't read Onigiri specials:", e)
+    _specials = {"found": False, "book": [], "today": None}
+data = {"specials": _specials, "catalog": _state.CATALOG, "petSpecies": _pet.species_payload(),
         "puffleColors": _state.PUFFLE_COLORS, "birdColors": _state.BIRD_COLORS, "puffleColorPrice": _state.PUFFLE_COLOR_PRICE}
 open(os.path.join(ROOT, "dev", "preview_data.js"), "w", encoding="utf-8").write(
     "window.OK_PREVIEW_DATA = " + json.dumps(data, ensure_ascii=False) + ";\n")

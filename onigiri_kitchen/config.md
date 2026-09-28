@@ -6,6 +6,7 @@ Most of these can also be changed from the timer panel inside the kitchen (the d
 - `short_break_minutes` / `long_break_minutes`: break lengths.
 - `rounds_before_long_break`: focus sessions per cycle (one dango each). The long break comes after the last one.
 - `focus_card_goal`: end focus early after this many reviews (`0` = time only).
+- `daily_card_goal`: reach this many reviews in a day and your restaurant throws a little party with fireworks (`0` = off).
 - `auto_open_kitchen_on_break`: open the restaurant automatically when a break starts.
 - `auto_start_next_focus`: start the next focus session as soon as a break ends.
 - `widget_click_opens_kitchen`: clicking the restaurant picture on Onigiri's main screen opens the kitchen. Shift-click still expands the widget the way Onigiri normally does.

@@ -177,6 +177,68 @@ ONIGIRI_FONTS = {
 }
 
 
+def _rgb(color: str) -> Optional[tuple]:
+    """(r, g, b) in 0..1 from #hex or rgb()/rgba(), or None."""
+    c = color.strip()
+    if c.startswith("#"):
+        h = c[1:]
+        if len(h) in (3, 4):
+            h = "".join(ch * 2 for ch in h[:3])
+        try:
+            return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        except ValueError:
+            return None
+    m = re.match(r"rgba?\(\s*([\d.]+)(%?)\s*,\s*([\d.]+)(%?)\s*,\s*([\d.]+)(%?)", c)
+    if not m:
+        return None
+    vals = []
+    for num, pct in ((m.group(1), m.group(2)), (m.group(3), m.group(4)), (m.group(5), m.group(6))):
+        v = float(num)
+        vals.append(v / 100 if pct else v / 255)
+    return tuple(max(0.0, min(1.0, v)) for v in vals)
+
+
+def _rel_lum(color: str) -> Optional[float]:
+    rgb = _rgb(color)
+    if rgb is None:
+        return None
+    lin = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4 for v in rgb]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def _contrast(a: str, b: str) -> Optional[float]:
+    la, lb = _rel_lum(a), _rel_lum(b)
+    if la is None or lb is None:
+        return None
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def readable(pal: Dict[str, str]) -> Dict[str, str]:
+    """Make sure the text colours can be read on the backgrounds they're used
+    on. Some Onigiri themes pair, say, white text with a background *image*;
+    the kitchen draws the theme's background colour instead, so white text
+    could land on a pale colour. If contrast is too low, use a dark or light
+    text that suits the background."""
+    bg = pal.get("--canvas-inset") or pal.get("--bg")
+    if not bg or _rel_lum(bg) is None:
+        return pal
+    dark_bg = _rel_lum(bg) < 0.25
+    fixes = {"--fg": ("#f0ece4", "#212121", 4.5), "--fg-subtle": ("#b8b0a4", "#5d5a55", 3.0)}
+    for var, (on_dark, on_light, need) in fixes.items():
+        worst = min(
+            (r for r in (_contrast(pal.get(var, ""), pal.get(b, "")) for b in ("--bg", "--canvas-inset")) if r is not None),
+            default=None,
+        )
+        if var in pal and worst is not None and worst < need:
+            pal[var] = on_dark if dark_bg else on_light
+    # text on accent-coloured buttons
+    accent = pal.get("--accent-color")
+    if accent and _rel_lum(accent) is not None:
+        pal["--accent-fg"] = "#1b1b24" if (_contrast(accent, "#1b1b24") or 0) > (_contrast(accent, "#ffffff") or 0) else "#ffffff"
+    return pal
+
+
 def _luminance(hex_color: str) -> float:
     h = hex_color.lstrip("#")
     if len(h) == 3:
@@ -212,10 +274,7 @@ def read_theme() -> Optional[Dict[str, Any]]:
             value = str(src.get(var, "")).strip()
             if _SAFE_COLOR.fullmatch(value):
                 pal[var] = value
-        accent = pal.get("--accent-color")
-        if accent and accent.startswith("#"):
-            pal["--accent-fg"] = "#1b1b24" if _luminance(accent) > 0.55 else "#ffffff"
-        palettes[mode] = pal
+        palettes[mode] = readable(pal)
 
     font = None
     try:
@@ -248,8 +307,14 @@ def theme_css() -> str:
     def block(pal: Dict[str, str]) -> str:
         return "".join(f"--oni-{k[2:]}:{v};" for k, v in pal.items())
 
-    css = f":root{{{block(theme['light'])}}}"
-    css += f".nightMode,.night_mode,.night-mode,:root.night-mode{{{block(theme['dark'])}}}"
+    light, dark = theme["light"], dict(theme["dark"])
+    # A colour the dark palette doesn't set would otherwise be inherited from
+    # the light one (a white background with light text, for example); unset
+    # it so the kitchen's own dark default is used instead.
+    for key in light:
+        dark.setdefault(key, "initial")
+    css = f":root{{{block(light)}}}"
+    css += f".nightMode,.night_mode,.night-mode,:root.night-mode{{{block(dark)}}}"
     if theme.get("font"):
         fam = theme["font"]["family"]
         css += f"@font-face{{font-family:'{fam}';src:url('{theme['font']['url']}');}}"
@@ -257,3 +322,114 @@ def theme_css() -> str:
     if theme.get("woodBg"):
         css += f":root{{--oni-wood:url('{theme['woodBg']}');}}"
     return f"<style id=\"ok-onigiri-theme\">{css}</style>"
+
+
+# ---------------------------------------------------------------- specials
+# Onigiri's "Specials Book": every Daily Special you've finished. The kitchen
+# serves those dishes, so the menu grows as the Book does. Read-only, like
+# everything else here.
+_SPECIALS_CACHE: Dict[str, Any] = {"key": None, "dishes": None}
+
+
+def _restaurant_dishes(pkg: str, theme_id: str) -> list:
+    """The dish list Onigiri uses for a restaurant (same lookup as Onigiri:
+    evolutions use the default list, unknown ids fall back to it too)."""
+    path = os.path.join(mw.addonManager.addonsFolder(), pkg, "web", "gamification", "restaurant_level", "special_dishes.js")
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return []
+    if _SPECIALS_CACHE["key"] != (path, mtime):
+        try:
+            with open(path, encoding="utf-8") as f:
+                content = f.read()
+        except OSError:
+            return []
+        lists: Dict[str, list] = {}
+        for m in re.finditer(r'"([\w\-]+)"\s*:\s*\[', content):
+            depth, start = 0, m.end() - 1
+            for i in range(start, len(content)):
+                if content[i] == "[":
+                    depth += 1
+                elif content[i] == "]":
+                    depth -= 1
+                    if depth == 0:
+                        body = content[start + 1:i]
+                        break
+            else:
+                continue
+            dishes = []
+            for obj in re.finditer(r"\{(.*?)\}", body, re.S):
+                fields = dict(re.findall(r'["\']?(\w+)["\']?\s*:\s*["\']?(.*?)["\']?\s*,?\s*$', obj.group(1), re.M))
+                if fields.get("name"):
+                    dishes.append(fields)
+            lists[m.group(1)] = dishes
+        _SPECIALS_CACHE.update(key=(path, mtime), dishes=lists)
+    lists = _SPECIALS_CACHE["dishes"] or {}
+    rid = "default" if (not theme_id or theme_id.startswith("restaurant_evo_")) else theme_id
+    return lists.get(rid) or lists.get("default") or []
+
+
+def read_specials() -> Dict[str, Any]:
+    """Your Specials Book (finished specials, newest first) and today's
+    Daily Special with its progress, from Onigiri."""
+    result: Dict[str, Any] = {"found": False, "book": [], "today": None}
+    pkg = find_onigiri_package()
+    if not pkg:
+        return result
+    try:
+        profile = mw.pm.name
+    except Exception:
+        profile = "default"
+    try:
+        with open(os.path.join(mw.addonManager.addonsFolder(), pkg, "user_files", f"gamification_{profile}.json"), encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return result
+    result["found"] = True
+    seen = set()
+    book = []
+    specials = [s for s in (data.get("daily_specials") or []) if isinstance(s, dict) and s.get("completed")]
+    specials.sort(key=lambda s: str(s.get("completed_date") or ""), reverse=True)
+    for s in specials:
+        name = str(s.get("name") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        book.append({
+            "name": name[:60],
+            "desc": str(s.get("description") or "")[:160],
+            "rarity": str(s.get("difficulty") or "common")[:12],
+        })
+    result["book"] = book
+
+    # Today's special: Onigiri picks it by day of the year from the current
+    # restaurant's list; its progress is in restaurant_level.daily_special.
+    rl = data.get("restaurant_level") or {}
+    # the on/off switch lives in Onigiri's per-profile settings file
+    try:
+        with open(os.path.join(mw.addonManager.addonsFolder(), pkg, "user_files", f"settings_{profile}.json"), encoding="utf-8") as f:
+            settings = json.load(f)
+        ds_conf = settings.get("daily_special") or (settings.get("achievements") or {}).get("daily_special") or {}
+        enabled = bool(ds_conf.get("enabled", True))  # Onigiri's own default is on
+    except Exception:
+        enabled = True
+    dishes = _restaurant_dishes(pkg, str(rl.get("current_theme_id") or "default"))
+    if enabled and dishes:
+        import datetime as _dt
+
+        now = _dt.datetime.now()
+        day_of_year = (now - _dt.datetime(now.year, 1, 1)).days + 1
+        dish = dishes[day_of_year % len(dishes)]
+        ds = rl.get("daily_special") or {}
+        target = int(ds.get("target") or 0)
+        progress = int(ds.get("current_progress") or 0)
+        result["today"] = {
+            "name": str(dish.get("name"))[:60],
+            "desc": str(dish.get("description") or "")[:160],
+            "rarity": str(dish.get("difficulty") or "common")[:12],
+            "target": target,
+            "progress": progress,
+            "done": bool(target) and progress >= target,
+        }
+    return result

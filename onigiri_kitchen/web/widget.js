@@ -182,7 +182,7 @@
       ? stat(num(st.total), short(st.total), 'reviews', 'reviews', `${Number(st.total || 0).toLocaleString()} reviews all time`) +
         stat(num(st.average), short(st.average), 'per day', '/day', 'Average reviews on the days you studied') +
         stat(num(st.days), short(st.days), st.days === 1 ? 'day' : 'days', st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
-        stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'streak', 'Longest run of days in a row with reviews')
+        stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'best streak', 'Your longest-ever streak: the most days in a row you have reviewed')
       : '';
     info.innerHTML =
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +

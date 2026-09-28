@@ -17,12 +17,12 @@ from aqt.webview import AnkiWebView
 from . import onigiri_link
 from . import pet as petmod
 from .pomodoro import Pomodoro
-from .state import BIRD_COLORS, CATALOG, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
+from .state import BIRD_COLORS, CATALOG, earned_rewards, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
 
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.6.2"
+VERSION = "1.7.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -31,6 +31,7 @@ DEFAULT_CONF: Dict[str, Any] = {
     "long_break_minutes": 15,
     "rounds_before_long_break": 4,
     "focus_card_goal": 0,
+    "daily_card_goal": 0,
     "auto_open_kitchen_on_break": True,
     "auto_start_next_focus": False,
     "widget_click_opens_kitchen": True,
@@ -164,6 +165,7 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
             leech_success = False
     new_guest = state.add_review(deck, leech_success, conf().get("reviews_per_guest", 10), todays_reviews_by_deck())
     pomo.on_review()
+    check_daily_goal()
     grew = getattr(state, "pet_grew", None)
     if grew is not None:
         stage = state.pet.stages()[grew]
@@ -211,9 +213,39 @@ def todays_reviews_by_deck() -> Optional[Dict[str, int]]:
     return out
 
 
+def check_daily_goal() -> None:
+    """Reach your daily card goal and the restaurant throws a little party."""
+    goal = int(conf().get("daily_card_goal", 0) or 0)
+    today = state.data["today"]
+    if goal <= 0 or today.get("goal_hit") or int(today.get("reviews", 0)) < goal:
+        return
+    today["goal_hit"] = goal
+    state.save_soon()
+    if _dialog is not None:
+        today["goal_seen"] = True
+        _eval_kitchen(f"window.OK && OK.onGoal({goal})")
+    else:
+        tooltip(f"🎆 Daily goal reached: {goal} cards! Your restaurant is throwing a little party.", period=5000)
+
+
 def init_payload(reason: str = "") -> Dict[str, Any]:
     state.roll_day()
     _sync_with_log()
+    check_daily_goal()
+    today = state.data["today"]
+    goal_party = int(today.get("goal_hit") or 0) if not today.get("goal_seen") else 0
+    if goal_party:
+        today["goal_seen"] = True
+    # Onigiri: the Specials Book (the menu and its rewards) and level-ups
+    _specials_cache["value"] = None
+    specials = cached_specials()
+    for rid in earned_rewards(specials.get("book") or []):
+        if rid not in state.data["owned"]:
+            state.data["owned"].append(rid)
+    progress = restaurant_progress()
+    last_level = state.data.get("last_level")
+    state.data["last_level"] = int(progress.get("level", 0))
+    level_up = {"from": int(last_level), "to": int(progress["level"])} if last_level is not None and progress.get("level", 0) > last_level else None
     away = state.pet.seen()
     # Anyone who already had all 12 keepsakes gets the set bonus once.
     set_bonus_now = False
@@ -237,7 +269,10 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
         "petMilestones": {k: {"kind": v[0], "need": v[1]} for k, v in petmod.MILESTONES.items()},
         "petsPerDay": petmod.PETS_PER_DAY,
         "setBonusNow": set_bonus_now,
-        "onigiri": restaurant_progress(),
+        "onigiri": progress,
+        "specials": specials,
+        "levelUp": level_up,
+        "goalParty": goal_party,
         "state": state.snapshot(),
         "takeout": state.pop_takeout(),
         "catalog": CATALOG,
@@ -784,9 +819,48 @@ def _install_celebration() -> None:
         debug_log("Overview._show_finished_screen not found: no confetti hook")
 
 
+# ------------------------------------------------------------- the menu
+# Extra mon for rarer Onigiri specials, matching kitchen.js (RARITY bonus and
+# how often each is ordered), for guests served in bulk or at day's end.
+RARITY_BONUS = {"common": 0, "uncommon": 1, "rare": 2, "epic": 4, "legendary": 6}
+RARITY_WEIGHT = {"common": 1, "uncommon": 0.8, "rare": 0.6, "epic": 0.45, "legendary": 0.3}
+_specials_cache: Dict[str, Any] = {"at": 0.0, "value": None}
+
+
+def cached_specials() -> Dict[str, Any]:
+    import time as _time
+
+    if _specials_cache["value"] is None or _time.time() - _specials_cache["at"] > 60:
+        try:
+            _specials_cache["value"] = onigiri_link.read_specials()
+        except Exception:
+            _specials_cache["value"] = {"found": False, "book": [], "today": None}
+        _specials_cache["at"] = _time.time()
+    return _specials_cache["value"]
+
+
+def menu_bonus(guest: Dict[str, Any]) -> int:
+    import random as _random
+
+    sp = cached_specials()
+    kind = guest.get("kind")
+    if kind == "leech":
+        return 0  # sour plums order a plum onigiri
+    if kind == "golden":
+        today = sp.get("today")
+        return RARITY_BONUS.get((today or {}).get("rarity", ""), 0) if today else 0
+    book = sp.get("book") or []
+    if not book or _random.random() >= 0.75:
+        return 0  # a house onigiri
+    weights = [RARITY_WEIGHT.get(d.get("rarity"), 1) for d in book]
+    dish = _random.choices(book, weights=weights)[0]
+    return RARITY_BONUS.get(dish.get("rarity"), 0)
+
+
 # --------------------------------------------------------------------- setup
 def on_profile_open() -> None:
     state.load()
+    state.menu_bonus = menu_bonus
 
 
 def on_profile_close() -> None:
