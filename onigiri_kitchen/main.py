@@ -22,7 +22,7 @@ from .state import BIRD_COLORS, CATALOG, earned_rewards, PUFFLE_COLOR_PRICE, PUF
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.7.2"
+VERSION = "1.7.3"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -86,11 +86,26 @@ def _on_timer_change() -> None:
     push_timer()
 
 
+def _focus_credit() -> Dict[str, Any]:
+    """Credit a finished focus session, and tell the kitchen what it earned:
+    the daruma's wish (4th session today) and whether today's special is
+    done in Onigiri (golden guests tip more for it)."""
+    daruma = state.focus_completed()
+    _specials_cache["value"] = None  # re-read Onigiri for the golden guest's order
+    today = cached_specials().get("today")
+    return {
+        "daruma": daruma,
+        "focusDone": int(state.data["today"].get("focus_done", 0)),
+        "mon": state.data["mon"],
+        "specialDone": bool(today and today.get("done")),
+    }
+
+
 def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
     c = conf()
     if kind == "focus_done":
         if info.get("credited"):
-            state.focus_completed()
+            info.update(_focus_credit())
         msg = "休憩 Break time! Your restaurant is open."
         if info.get("long"):
             msg = "祭り Long break! It's festival night at your restaurant."
@@ -102,7 +117,7 @@ def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
     elif kind == "endless_block":
         # Endless focus: a focus-length studied, credited quietly (no break,
         # no pop-up): a dango on the skewer and a golden guest.
-        state.focus_completed()
+        info.update(_focus_credit())
         _eval_kitchen(f"window.OK && OK.onEndlessBlock({json.dumps(info)})")
     elif kind == "idle_paused":
         mins = info.get("minutes", 1)
@@ -846,6 +861,9 @@ def _install_celebration() -> None:
 # Extra mon for rarer Onigiri specials, matching kitchen.js (RARITY bonus and
 # how often each is ordered), for guests served in bulk or at day's end.
 RARITY_BONUS = {"common": 0, "uncommon": 1, "rare": 2, "epic": 4, "legendary": 6}
+# Golden guests tip this much more for today's special once you've finished it
+# in Onigiri (kitchen.js TODAY_DONE_BONUS).
+TODAY_DONE_BONUS = 3
 RARITY_WEIGHT = {"common": 1, "uncommon": 0.8, "rare": 0.6, "epic": 0.45, "legendary": 0.3}
 _specials_cache: Dict[str, Any] = {"at": 0.0, "value": None}
 
@@ -871,7 +889,9 @@ def menu_bonus(guest: Dict[str, Any]) -> int:
         return 0  # sour plums order a plum onigiri
     if kind == "golden":
         today = sp.get("today")
-        return RARITY_BONUS.get((today or {}).get("rarity", ""), 0) if today else 0
+        if not today:
+            return 0
+        return RARITY_BONUS.get(today.get("rarity", ""), 0) + (TODAY_DONE_BONUS if today.get("done") else 0)
     book = sp.get("book") or []
     if not book or _random.random() >= 0.75:
         return 0  # a house onigiri

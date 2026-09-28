@@ -36,7 +36,7 @@ CATALOG: List[Dict[str, Any]] = [
     {"id": "maneki", "name": "Maneki-neko", "jp": "招き猫", "level": 6, "price": 50,
      "desc": "The beckoning cat. Every guest tips +1 mon."},
     {"id": "daruma", "name": "Daruma", "jp": "達磨", "level": 8, "price": 45,
-     "desc": "Paints one eye after your first focus session today, both after four."},
+     "desc": "Paints one eye after your first focus session today, both after four: a wish granted, +30 mon."},
     {"id": "kingyo", "name": "Goldfish bowl", "jp": "金魚鉢", "level": 10, "price": 60,
      "desc": "Two goldfish. Tap to feed them."},
     {"id": "sakura", "name": "Sakura branch", "jp": "桜の枝", "level": 12, "price": 70,
@@ -129,6 +129,11 @@ ANIMALS: List[Dict[str, Any]] = [
      "desc": "An elegant red-crowned crane, a symbol of luck and long life.",
      "perk": "Every deck you finish brings a golden guest."},
 ]
+# The 達磨 daruma (decor) gets its second eye after this many focus sessions
+# in a day, and grants the wish: a one-time bonus (about 2.5 golden guests' worth).
+DARUMA_SESSIONS = 4
+DARUMA_BONUS = 30
+
 # Earned (not bought) by collecting Onigiri Daily Specials in its Specials Book.
 REWARDS: List[Dict[str, Any]] = [
     {"id": "shinagaki", "kind": "reward", "name": "Specials board", "jp": "品書き", "level": 0, "price": 0,
@@ -507,14 +512,21 @@ class KitchenState:
             self.data[key] = int(self.data.get(key, 0)) + 1
             self.save_soon()
 
-    def focus_completed(self) -> None:
+    def focus_completed(self) -> int:
+        """A focus session was finished. Returns the 達磨 daruma bonus paid
+        (once a day, when the second eye is painted), or 0."""
         self.roll_day()
         self.data["today"]["focus_done"] += 1
         self.pet.on_focus_done()
         if self.shown("usagi"):
             self.data["mon"] += 5
         self.add_guest({"deck": None, "kind": "golden", "reviews": 0})
+        bonus = 0
+        if self.shown("daruma") and self.data["today"]["focus_done"] == DARUMA_SESSIONS:
+            bonus = DARUMA_BONUS
+            self.data["mon"] += bonus
         self.save_soon()
+        return bonus
 
     # ---------------------------------------------------------------- pet
     def pet_action(self, kind: str) -> Dict[str, Any]:

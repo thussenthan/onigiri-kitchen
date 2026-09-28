@@ -403,6 +403,10 @@
     epic: { jp: '極', name: 'Epic', c: '#e0701f', w: 0.45, bonus: 4 },
     legendary: { jp: '伝説', name: 'Legendary', c: '#d9a400', w: 0.3, bonus: 6 },
   };
+  // golden guests tip this much more for today's special once it's finished
+  // in Onigiri (same as main.py TODAY_DONE_BONUS)
+  const TODAY_DONE_BONUS = 3;
+  const todayDone = () => !!(SPECIALS.today && SPECIALS.today.done);
   // the main ingredient decides the colour of the filling or topping
   const INGREDIENTS = [
     [/aburi toro|otoro|chutoro|\btoro\b/, '#e8909a'], [/maguro|tekka|spicy tuna|tuna|negitoro/, '#d8404f'],
@@ -538,7 +542,9 @@
     if (!d) return '';
     const rar = RARITY[d.rarity] || RARITY.common;
     const where = d.from === 'today' ? `Onigiri's Daily Special today · ${rar.name}` : d.from === 'book' ? `${rar.name} · from your Specials Book` : 'House onigiri';
-    const bonus = d.from !== 'house' && rar.bonus ? ` · +${rar.bonus} mon tip` : '';
+    const extra = d.from === 'today' && todayDone() ? TODAY_DONE_BONUS : 0;
+    const tip = (d.from !== 'house' ? rar.bonus : 0) + extra;
+    const bonus = tip ? ` · +${tip} mon tip${extra ? ' (prepared in Onigiri!)' : ''}` : '';
     return `<b>${esc(d.name)}</b> <span style="color:${rar.c}">●</span>\n${d.desc ? esc(d.desc) + '\n' : ''}${where}${bonus}`;
   }
 
@@ -1328,10 +1334,31 @@
       default: break;
     }
   }
+  const DARUMA_BONUS = 30; // same as state.py
+  // A finished focus session: keep the daruma, mon and today's special in step
+  // with Python, and celebrate the daruma's second eye.
+  function focusCredited(info) {
+    if (!info) return;
+    if (typeof info.focusDone === 'number') S.today.focus_done = info.focusDone;
+    if (typeof info.mon === 'number' && info.mon !== S.mon) {
+      dispMon += info.mon - S.mon; // the daruma's wish, the rabbit's mochi
+      S.mon = info.mon;
+      bumpPurse();
+    }
+    if (SPECIALS.today && typeof info.specialDone === 'boolean') SPECIALS.today.done = info.specialDone;
+    updateStatus();
+    if (info.daruma) {
+      shake.daruma = 1.2;
+      OKSound.coin();
+      const d = DECOR.daruma;
+      spawnHearts(d.x + 6, d.y + 4, 3);
+      toast(`達磨 Both eyes painted! Wish granted: +${info.daruma} mon`);
+    }
+  }
   function dharmaText() {
     const n = S.today.focus_done || 0;
-    if (n >= 4) return '達磨: both eyes painted. Wish granted for today!';
-    if (n >= 1) return '達磨: one eye painted. Finish 4 focus sessions to paint the other.';
+    if (n >= 4) return `達磨: both eyes painted. Wish granted for today (+${DARUMA_BONUS} mon)!`;
+    if (n >= 1) return `達磨: one eye painted. Finish 4 focus sessions to paint the other (+${DARUMA_BONUS} mon).`;
     return '達磨: finish a focus session today to paint the first eye.';
   }
 
@@ -3203,6 +3230,7 @@
     if (petHappy()) amt += 1;
     // rarer specials are worth more
     if (c.dish && c.dish.from !== 'house') amt += (RARITY[c.dish.rarity] || RARITY.common).bonus;
+    if (c.dish && c.dish.from === 'today' && todayDone()) amt += TODAY_DONE_BONUS;
     return amt;
   }
 
@@ -3249,7 +3277,10 @@
     P(bx + 1, by + 11, C.ink); P(bx + 2, by + 11, C.ink); P(bx + 1, by + 12, C.ink);
     // what they ordered
     drawDish(c.dish, bx + 2, by + 2);
-    if (c.dish && c.dish.from === 'today' && Math.floor(time * 3) % 3 === 0) P(bx + 11, by + 1, '#fff6cc');
+    if (c.dish && c.dish.from === 'today') {
+      if (Math.floor(time * 3) % 3 === 0) P(bx + 11, by + 1, '#fff6cc');
+      if (todayDone() && Math.floor(time * 3 + 1) % 3 === 0) P(bx + 1, by + 9, '#fff6cc');
+    }
   }
 
   function deckLeaf(deck) {
@@ -3260,7 +3291,7 @@
 
   function guestLabel(c) {
     const base = guestLabelBase(c);
-    return c.dish ? `${base}\nOrdered: ${esc(c.dish.name)}${c.dish.from === 'today' ? ' (Daily Special)' : ''}` : base;
+    return c.dish ? `${base}\nOrdered: ${esc(c.dish.name)}${c.dish.from === 'today' ? (todayDone() ? ' (Daily Special, prepared in Onigiri: tips more!)' : ' (Daily Special)') : ''}` : base;
   }
   function guestLabelBase(c) {
     const gst = c.guest;
@@ -4617,7 +4648,8 @@
       gRef = prev;
       row.appendChild(cv);
       // (always a tip cell, so the seals line up in a column)
-      const bonus = `<small class="ok-menu-tip">${d.from !== 'house' && rar.bonus ? `+${rar.bonus}文` : ''}</small>`;
+      const tip = (d.from !== 'house' ? rar.bonus : 0) + (d.from === 'today' && todayDone() ? TODAY_DONE_BONUS : 0);
+      const bonus = `<small class="ok-menu-tip">${tip ? `+${tip}文` : ''}</small>`;
       row.insertAdjacentHTML('beforeend',
         `<div class="ok-menu-name"><b>${esc(d.name)}</b>${d.desc ? `<span>${esc(d.desc)}</span>` : ''}${note ? `<em>${note}</em>` : ''}</div>` +
         (d.from === 'house' ? '<i class="ok-menu-seal house">定番</i>' : `<i class="ok-menu-seal" style="--seal:${rar.c}" title="${rar.name}">${rar.jp}</i>`) + bonus);
@@ -4628,7 +4660,7 @@
     if (today) {
       section('本日のおすすめ', "Today's special");
       const t = SPECIALS.today;
-      entry(today, t.done ? '✓ Prepared in Onigiri today' : `${t.progress}/${t.target} cards in Onigiri · golden guests order it`);
+      entry(today, t.done ? `✓ Prepared in Onigiri today · golden guests tip +${TODAY_DONE_BONUS} more` : `${t.progress}/${t.target} cards in Onigiri · golden guests order it (finish it for +${TODAY_DONE_BONUS})`);
     }
     const book = MENU_DISHES.book.slice().sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
     if (book.length) {
@@ -4774,6 +4806,7 @@
       long ? 'Festival night!' : 'Break time',
       `You studied <b>${cards || 0}</b> card${cards === 1 ? '' : 's'} that session.<br>` +
       (waiting ? `<b>${waiting}</b> guest${waiting === 1 ? ' is' : 's are'} waiting to be seated.` : 'The kitchen is warm and ready.') +
+      (info && info.daruma ? `<br>達磨 Both eyes painted: <b>+${info.daruma}</b> mon!` : '') +
       `<br>Relax for about <b>${mins || 1}</b> minute${mins === 1 ? '' : 's'}.`,
       [['いただきます<small>&nbsp;Let\'s eat!</small>', 'ok-hanko ok-hanko-wide', () => { OKSound.pluck(5); setTimeout(maybeCatchUp, 300); }]]
     );
@@ -4879,12 +4912,14 @@
     },
     onFocusDone(info) {
       S.guestsWaiting = (S.guestsWaiting || 0) + (info && info.credited ? 1 : 0);
+      if (info && info.credited) focusCredited(info);
       if (!$('ok-modal').hidden) return;
       breakWelcome(info);
     },
     // endless focus: a session's worth studied, credited quietly (no pop-up)
-    onEndlessBlock() {
+    onEndlessBlock(info) {
       S.guestsWaiting = (S.guestsWaiting || 0) + 1;
+      focusCredited(info);
       updateStatus();
       renderTimer();
       OKSound.pluck(7);

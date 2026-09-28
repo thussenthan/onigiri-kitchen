@@ -20,11 +20,13 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
 - **Guests come from studying:** every 10 reviews in a deck brings a guest from that deck. There's no limit, so
   study in one big batch and catch up later: serve everyone at 4× or collect all tips at once.
   Each deck has its own look. Getting a leech card right sends a grumpy sour-plum guest who
-  cheers up once fed. Finishing a focus session sends a golden guest.
+  cheers up once fed. Finishing a focus session sends a golden guest, and if you own the
+  daruma, your 4th session of the day paints its second eye for +30 mon.
 - **The menu:** guests order dishes from your Onigiri Specials Book (it grows with every Daily
   Special you finish), and golden guests order today's special. Without Onigiri, onigiri
   flavours unlock as your restaurant levels up. Tap the chef to make dishes ahead for the tray.
-  Rarer specials tip more, and collecting specials earns rewards (see the shop).
+  Rarer specials tip more, golden guests tip +3 more for today's special once you've
+  finished it in Onigiri, and collecting specials earns rewards (see the shop).
 - **Daily goal:** reach `daily_card_goal` reviews (100 by default; change it in ⚙) and the
   kitchen throws a little fireworks party on your next visit.
 - **Guests tip in 文 (mon):** spend mon in the shop on decor and pets. Some pieces
