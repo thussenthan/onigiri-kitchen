@@ -2057,7 +2057,7 @@
     const c = time % 3;
     if (c >= 2.4) return;
     // 5x5 (the smallest that reads as a Z), a pixel apart, rising gently
-    for (let k = 0; k < 3; k++) if (c >= k * 0.6) zGlyph(x - 1 + k * 6, y - 1 - k * 4, 5, '#8b7b69');
+    for (let k = 0; k < 3; k++) if (c >= k * 0.6) zGlyph(x - 1 + k * 6, y - 4 - k * 4, 5, '#8b7b69');
   }
   // Pets without a kotatsu head-poke sleep on top of it instead.
   function bedTop(x) {
@@ -3094,7 +3094,7 @@
       const ay = Math.round(a.y == null ? FLOOR_Y : a.y);
       const asleep = pose === 'sleep' && !a.air;
       art(Math.round(a.x), ay, a.dir, a.air ? 'fly' : asleep && !SLEEP_ART.has(a.id) ? 'rest' : pose, walkFrame, a);
-      if (asleep) sleepZ(Math.round(a.x) + 5, ay - (a.id === 'tsuru' ? 32 : 20));
+      if (asleep) sleepZ(Math.round(a.x) + 5, ay - (a.id === 'tsuru' ? 30 : 18));
       const info = animalInfo(a.id);
       const h = a.id === 'tsuru' ? 27 : a.id === 'usagi' ? 17 : 17;
       regions.push({ x: a.x - 10, y: ay - h, w: 20, h, label: `<b>${info.jp}</b> ${info.name}\n${info.perk}`, click: () => reactResident(a) });
