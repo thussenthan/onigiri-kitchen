@@ -4856,7 +4856,7 @@
     modal(
       '再開',
       "Break's over",
-      'Your guests will keep arriving while you study.<br>Every review sends someone your way. 頑張って! (You\'ve got this!)',
+      'Your guests will keep arriving while you study.<br>Every review sends someone your way.<br>頑張って! (You\'ve got this!)',
       [
         ['勉強<small>Back to studying</small>', 'ok-hanko ok-hanko-wide', () => send('study')],
         ['Stay a little', 'ok-ghost', null],
@@ -5025,8 +5025,9 @@
   // dev preview only: draw sprites onto a test canvas
   if (window.OK_DEBUG_HOOKS) {
     window.OKD = {
-      tama, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish, openOshinagaki, specialTag, dharmaText,
+      tama, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish, openOshinagaki, specialTag, dharmaText, checkGift, setBonusModal, feedbackModal, serveAll,
       hitAt(x, y) { render(); const r = hit({ x, y }); return r && r.label; },
+      pickGift() { if (floorGifts[0]) collectGift(floorGifts[0]); },
       step(n) { for (let i = 0; i < n; i++) update(1 / 30); },
       draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, withPet, ANIMAL_ART }); } finally { gRef = prev; } },
     };
