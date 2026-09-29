@@ -4073,7 +4073,7 @@
       if (k.golden) extras.push(`${k.golden} golden`);
       if (k.leech) extras.push(`${k.leech} sour plum${k.leech === 1 ? '' : 's'}`);
       const deckCount = Object.keys(res.decks || {}).length;
-      modal('完売', 'Sold out!',
+      modal('全員満足', 'Everyone served!',
         `Served <b>${count}</b> guest${count === 1 ? '' : 's'}${extras.length ? ' (' + extras.join(', ') + ')' : ''}` +
         `${deckCount ? ` from <b>${deckCount}</b> deck${deckCount === 1 ? '' : 's'}` : ''}.<br>` +
         `Tips: <b>+${res.mon} mon</b> · ${esc(pet.name)} got <b>${Math.min(count, 20)}</b> ${Math.min(count, 20) === 1 ? sp().food : foods()} saved.`,
