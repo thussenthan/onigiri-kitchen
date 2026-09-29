@@ -19,5 +19,6 @@
     "celebrate_deck_finish": true,
     "pause_focus_when_idle": true,
     "idle_pause_minutes": 1,
-    "clock_style": "analog"
+    "clock_style": "analog",
+    "theme_mode": "anki"
 }

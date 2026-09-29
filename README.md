@@ -78,7 +78,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   your decks on Anki's main screen (you can turn it off in the add-on config).
 - **A guided tour** the first time you open it, which you can replay from ⚙.
 - **目安箱 suggestion box** on the wall (and in ⚙) for feature ideas and bug reports.
-- **Matches your Onigiri theme.** It uses your Onigiri colours, font and dark mode automatically.
+- **Matches your Onigiri theme.** It uses your Onigiri colours, font and dark mode automatically. In ⚙ you can
+  also have light and dark follow your clock (light by day, dark at night) or stay one way.
 - Mostly idle and fully optional: the chef, your pets, the menu tags (they play koto notes), the window, the
   lanterns, the bed and most decor all do something when clicked.
 

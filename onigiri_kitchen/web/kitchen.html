@@ -58,7 +58,6 @@
     <div class="ok-panel-head">
       <h2><span class="jp">店</span> Shop</h2>
       <p>Spend the mon your guests leave on pets and decor. Some unlock as your restaurant levels up (the Lv on the sign).</p>
-      <button class="ok-close" data-close="ok-decor" title="Close">&times;</button>
     </div>
     <div class="ok-decor-grid" id="ok-decor-grid"></div>
   </section>
@@ -75,7 +74,6 @@
         <div class="ok-pet-grow"><i id="ok-pet-grow"></i></div>
         <div class="ok-pet-growtext" id="ok-pet-growtext"></div>
       </div>
-      <button class="ok-close" data-close="ok-pet" title="Close">&times;</button>
     </div>
     <nav class="ok-tabs" id="ok-pet-tabs" role="tablist">
       <button data-tab="care" class="on" role="tab"><b class="jp">世話</b>Care</button>
@@ -110,7 +108,6 @@
     <div class="ok-panel-head">
       <h2><span class="jp">タイマー</span> Timer</h2>
       <p>Guests keep coming while you study. Breaks are when you get to enjoy them.</p>
-      <button class="ok-close" data-close="ok-settings" title="Close">&times;</button>
     </div>
     <form class="ok-form" id="ok-form">
       <label>Focus <span><input type="number" name="focus_minutes" min="1" max="180" step="1"> min</span></label>
@@ -125,6 +122,12 @@
       <label class="ok-check"><input type="checkbox" name="auto_start_next_focus"> Start the next focus session when a break ends</label>
       <label class="ok-check"><input type="checkbox" name="show_timer_chip_in_reviewer"> Show the dango timer while reviewing</label>
       <label class="ok-check"><input type="checkbox" name="widget_click_opens_kitchen"> Clicking Onigiri's restaurant picture opens the kitchen</label>
+      <label>Light / dark <span><select name="theme_mode">
+        <option value="anki">Match Anki</option>
+        <option value="auto">Day &amp; night (your clock)</option>
+        <option value="light">Always light</option>
+        <option value="dark">Always dark</option>
+      </select></span></label>
       <label>Volume <span><input type="range" name="volume" min="0" max="1" step="0.05"></span></label>
       <div class="ok-report">
         <div class="ok-report-head"><b class="jp">統計</b> Stats: your focus, reviews and kitchen in numbers</div>

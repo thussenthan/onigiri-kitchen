@@ -4103,8 +4103,9 @@
       const deckCount = Object.keys(res.decks || {}).length;
       bigToast('全員満足', 'Everyone served!',
         `<b>${count}</b> guest${count === 1 ? '' : 's'}${extras.length ? ' (' + extras.join(', ') + ')' : ''}` +
-        `${deckCount ? ` from <b>${deckCount}</b> deck${deckCount === 1 ? '' : 's'}` : ''} · ` +
-        `<b>+${res.mon} mon</b> · ${esc(pet.name)} got <b>${Math.min(count, 20)}</b> ${Math.min(count, 20) === 1 ? sp().food : foods()} saved`);
+        `${deckCount ? ` from <b>${deckCount}</b> deck${deckCount === 1 ? '' : 's'}` : ''}<br>` +
+        `<b>+${res.mon} mon</b> in tips<br>` +
+        `${esc(pet.name)} got <b>${Math.min(count, 20)}</b> ${Math.min(count, 20) === 1 ? sp().food : foods()} saved`);
     });
   }
 
@@ -4295,6 +4296,20 @@
     }
   }, true);
 
+  // Light or dark: follow Anki, follow the clock (dark from 7:30pm to 5:30am,
+  // like the view out of the window), or stay light or dark.
+  const ANKI_DARK = document.body.classList.contains('nightMode') || document.documentElement.classList.contains('night-mode');
+  function applyTheme() {
+    const mode = conf.theme_mode || 'anki';
+    const h = hourNow();
+    const dark = mode === 'dark' || (mode === 'auto' && (h < 5.5 || h >= 19.5)) || (mode === 'anki' && ANKI_DARK);
+    document.body.classList.toggle('nightMode', dark);
+    document.body.classList.toggle('night_mode', dark);
+    document.documentElement.classList.toggle('night-mode', dark);
+  }
+  applyTheme();
+  setInterval(applyTheme, 60000);
+
   function fillForm() {
     const f = $('ok-form');
     for (const el of f.elements) {
@@ -4308,11 +4323,12 @@
     const updates = {};
     for (const el of e.target.elements) {
       if (!el.name) continue;
-      updates[el.name] = el.type === 'checkbox' ? el.checked : Number(el.value);
+      updates[el.name] = el.type === 'checkbox' ? el.checked : el.tagName === 'SELECT' ? el.value : Number(el.value);
     }
     send('conf', JSON.stringify(updates), (c) => {
       if (c) conf = c;
       OKSound.configure({ volume: conf.volume });
+      applyTheme();
       renderTimer();
       updateStatus();
       $('ok-settings').hidden = true;

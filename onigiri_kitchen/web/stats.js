@@ -245,7 +245,8 @@
       tile('Per active day', dur(dayList.length ? minutes / dayList.length : null), dayList.length ? `${round1(n / dayList.length)} sessions` : '') +
       tile('Best day', best ? dur(best[1].min) : '–', best ? `${fmtDay(best[0], 'year')} · ${best[1].n} sessions` : '') +
       tile('Breaks taken', num(Bk.length), `${dur(Bk.reduce((a, b) => a + b[1], 0) / 60)} of rest`) +
-      tile('祭り Festival nights', num(Bk.filter((b) => b[2]).length), 'long breaks') +
+      tile('Short breaks', num(Bk.filter((b) => !b[2]).length), 'between sessions') +
+      tile('Long breaks', num(Bk.filter((b) => b[2]).length), 'after a full cycle') +
       tile('Breaks skipped', num(Bk.filter((b) => b[3]).length)) +
       tile('Endless share', n ? pct(Math.round((endless / n) * 100)) : '–', '∞ mode sessions') +
       tile('Idle pauses', num(p.idlePauses), `all time · ${num(p.resets)} resets`) +
@@ -453,7 +454,19 @@
   });
   document.addEventListener('mouseleave', () => { tip.hidden = true; });
 
+  // light or dark, as in the kitchen (the theme_mode setting)
+  let ANKI_DARK = null;
+  function applyTheme() {
+    if (ANKI_DARK === null) ANKI_DARK = document.body.classList.contains('nightMode') || document.documentElement.classList.contains('night-mode');
+    const mode = D.themeMode || 'anki';
+    const h = new Date().getHours() + new Date().getMinutes() / 60;
+    const dark = mode === 'dark' || (mode === 'auto' && (h < 5.5 || h >= 19.5)) || (mode === 'anki' && ANKI_DARK);
+    document.body.classList.toggle('nightMode', dark);
+    document.body.classList.toggle('night_mode', dark);
+    document.documentElement.classList.toggle('night-mode', dark);
+  }
   function render() {
+    applyTheme();
     $('oks-sub').textContent = `Everything Onigiri Kitchen keeps count of · ${fmtDay(TODAY, 'year')}`;
     renderRange();
     renderPomo();
@@ -463,4 +476,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
   else render();
+  setInterval(() => { if (document.body) applyTheme(); }, 60000);
 })();

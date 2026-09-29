@@ -37,6 +37,7 @@ DEFAULT_CONF: Dict[str, Any] = {
     "auto_start_next_focus": False,
     "endless_focus": False,
     "clock_style": "analog",
+    "theme_mode": "anki",  # anki, auto (light by day, dark at night), light or dark
     "widget_click_opens_kitchen": True,
     "show_timer_chip": True,
     "show_timer_chip_in_reviewer": True,
@@ -75,6 +76,8 @@ def write_conf(updates: Dict[str, Any]) -> None:
             elif isinstance(default, float):
                 value = float(value)
             elif key == "clock_style" and value not in ("analog", "flip"):
+                continue
+            elif key == "theme_mode" and value not in ("anki", "auto", "light", "dark"):
                 continue
         except (TypeError, ValueError):
             continue
@@ -804,6 +807,7 @@ def stats_payload() -> Dict[str, Any]:
         "pomo": _pomo_stats(today),
         "reviews": _review_stats(today),
         "kitchen": _kitchen_stats(),
+        "themeMode": conf().get("theme_mode", "anki"),
         "version": VERSION,
     }
 
