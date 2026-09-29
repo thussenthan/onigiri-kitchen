@@ -374,6 +374,7 @@
       tile('Again rate', presses ? pct(round1((btn[0] / presses) * 100)) : '–', `${num(btn[0])} presses`) +
       tile('All-time reviews', num(allTotal), first ? `since ${fmtDay(first, 'year')}` : '') +
       tile('All-time days', num(daily.length), `${num(daily.length ? Math.round(allTotal / daily.length) : 0)} per study day`) +
+      tile('All-time study time', dur((((r.ranges || {}).all || {}).ms || 0) / 60000), 'every answer, as timed by Anki') +
       '</div>';
 
     const b = buckets(start);
@@ -393,6 +394,10 @@
       card('Time of day', total ? `busiest around ${hourName(hours.indexOf(Math.max(...hours)))}` : 'reviews', columns(hours.map((v, h) => ({ label: h % 6 === 0 ? hourLabel(h) : '', value: v, tip: `<b>${hourName(h)}–${hourName((h + 1) % 24)}</b>\n${perReview(v)}` })), kfmt, { every: 1 })) +
       card('Day of the week', 'reviews', columns(wd.map((v, i) => ({ label: WD[i], value: v, tip: `<b>${WD_JP[i]} ${WD[i]}</b>\n${perReview(v)}` })), kfmt, { every: 1 })) +
       card('Answer time', `seconds per card, as timed by Anki · ${unitWord(bt.unit)} · lower is faster`, area(answerSeries, (v) => `${round1(v)}s`), 'wide') +
+      card('Study time by card type', `${dur((rg.ms || 0) / 60000)} in ${rangeName()}`, stack(
+        [['Learning', 'New cards in their learning steps'], ['Review', 'Cards coming back for review'], ['Relearning', 'Cards you forgot, back in their steps'], ['Filtered', 'Answers in filtered decks']]
+          .map(([label, note], i) => ({ slot: i + 1, label, value: Math.round((((rg.byType || [])[i] || [0, 0])[1]) / 60000), note: `${note} · minutes` }))
+          .filter((p, i) => i < 3 || p.value)), 'wide') +
       card('Pace by card type', `seconds per answer, as timed by Anki · ${rangeName()}`, rows(
         [['Learning', 'New cards in their learning steps'], ['Review', 'Cards coming back for review'], ['Relearning', 'Cards you forgot, back in their steps'], ['Filtered', 'Answers in filtered decks']]
           .map(([label, note], i) => { const [cnt, ms] = (rg.byType || [])[i] || [0, 0]; return { label, value: cnt ? round1(ms / 1000 / cnt) : 0, shown: cnt ? `${round1(ms / 1000 / cnt)} s · ${num(cnt)}` : '–', tip: `<b>${label}</b>\n${note}${cnt ? `\n${num(cnt)} answers · ${dur(ms / 60000)} in all` : ''}` }; })

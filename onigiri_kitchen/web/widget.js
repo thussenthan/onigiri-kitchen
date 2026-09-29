@@ -211,7 +211,8 @@
       ? stat(num(st.total), short(st.total), 'reviews', 'reviews', `${Number(st.total || 0).toLocaleString()} reviews all time`) +
         stat(num(st.average), short(st.average), 'per day', '/day', 'Average reviews on the days you studied') +
         stat(num(st.days), short(st.days), st.days === 1 ? 'day' : 'days', st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
-        stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'best streak', 'Your longest-ever streak: the most days in a row you have reviewed')
+        stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'best streak', 'Your longest-ever streak: the most days in a row you have reviewed') +
+        (st.hours != null ? stat(`${num(Math.round(st.hours))}h`, `${short(Math.round(st.hours))}h`, 'studied', 'studied', `${st.hours} hours of reviewing, all time (as timed by Anki)`).replace('okw-stat"', 'okw-stat okw-stat-hours"') : '')
       : '';
     // today: cards, time, pace, and how long what's due will take at your pace
     const t = d.studyToday;
@@ -224,9 +225,11 @@
       ? stat(num(t.cards), short(t.cards), 'today', 'today', `${t.cards} cards studied today`) +
         stat(mins(t.seconds), mins(t.seconds), 'studied', 'studied', 'Time spent reviewing today, as timed by Anki') +
         stat(t.pace ? `${t.pace}s` : '–', t.pace ? `${t.pace}s` : '–', 'per card', '/card', 'Your pace today: seconds per card') +
+        stat(t.retention != null ? `${Math.round(t.retention)}%` : '–', t.retention != null ? `${Math.round(t.retention)}%` : '–', 'retention', 'kept', 'Review cards you remembered today') +
         stat(t.due.total ? `~${mins(t.estimateSeconds)}` : 'done', t.due.total ? `~${mins(t.estimateSeconds)}` : 'done', t.due.total ? `left · ${num(t.due.total)} due` : 'nothing due', 'left', esc(todayTip))
       : '';
-    el.title = t ? `Open Onigiri Kitchen\n${todayTip}` : 'Open Onigiri Kitchen';
+    const allTip = st.hours != null ? `\nAll time: ${Number(st.total || 0).toLocaleString()} reviews in ${st.hours} hours.` : '';
+    el.title = `Open Onigiri Kitchen${t ? `\n${todayTip}` : ''}${allTip}`;
     info.innerHTML =
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
       `<div class="okw-big">${big}</div>` +

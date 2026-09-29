@@ -619,6 +619,11 @@ def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
         return None
     total = sum(int(c) for _, c in rows)
     days = len(rows)
+    try:
+        # every answer's time, as Anki recorded it
+        total_ms = int(mw.col.db.scalar("select coalesce(sum(time), 0) from revlog where type in (0, 1, 2, 3)") or 0)
+    except Exception:
+        total_ms = 0
     best = run = 0
     prev = None
     for d, _ in rows:
@@ -630,6 +635,7 @@ def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
         "days": days,
         "average": round(total / days) if days else 0,
         "bestStreak": best,
+        "hours": round(total_ms / 3600000, 1),
     }
     _stats_cache.update(key=key, value=value)
     return value
