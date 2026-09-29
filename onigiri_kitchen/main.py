@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from aqt import gui_hooks, mw
 from aqt.deckbrowser import DeckBrowser
@@ -633,94 +633,46 @@ def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
 
 
 # ------------------------------------------------------------ 統計 stats
-def _streaks(dates: List[datetime.date], today: datetime.date) -> Tuple[int, int]:
-    """(current, best) runs of consecutive days. The current run still counts
-    if the latest day is yesterday (today isn't over yet)."""
-    days = sorted(set(dates))
-    best = run = 0
-    prev = None
-    for d in days:
-        run = run + 1 if prev is not None and (d - prev).days == 1 else 1
-        best = max(best, run)
-        prev = d
-    current = run if days and (today - days[-1]).days <= 1 else 0
-    return current, best
+def _anki_day(ts: float, today: datetime.date, cutoff: Optional[int]) -> datetime.date:
+    """The Anki day a moment belongs to (days roll over at Anki's hour, 4am by default)."""
+    if cutoff:
+        return today + datetime.timedelta(days=int((ts - cutoff) // 86400) + 1)
+    return datetime.datetime.fromtimestamp(ts).date()
 
 
 def _pomo_stats(today: datetime.date) -> Dict[str, Any]:
+    """The raw session and break log (the page works out every range itself)."""
     log = state._log()
-    focus = [f for f in log["focus"] if isinstance(f, list) and len(f) >= 4]
-    breaks = [b for b in log["breaks"] if isinstance(b, list) and len(b) >= 4]
-    by_day: Dict[datetime.date, List[float]] = {}
-    by_hour = [0.0] * 24
-    by_weekday = [0.0] * 7
     try:
         cutoff: Optional[int] = int(mw.col.sched.day_cutoff)
     except Exception:
         cutoff = None
-    for ts, secs, cards, how in focus:
+    sessions = []
+    for f in log["focus"]:
+        if not (isinstance(f, list) and len(f) >= 4):
+            continue
+        ts, secs, cards, how = f[:4]
         mid = ts - secs / 2  # the middle of the session
         moment = datetime.datetime.fromtimestamp(mid)
-        # Anki's day (it rolls over at 4am by default), like the review stats
-        day = today + datetime.timedelta(days=int((mid - cutoff) // 86400) + 1) if cutoff else moment.date()
-        entry = by_day.setdefault(day, [0, 0.0, 0])
-        entry[0] += 1
-        entry[1] += secs / 60
-        entry[2] += cards
-        by_hour[moment.hour] += secs / 60
-        by_weekday[day.weekday()] += secs / 60
-
-    def window(days: int) -> Dict[str, Any]:
-        start = today - datetime.timedelta(days=days - 1)
-        rows = [v for d, v in by_day.items() if d >= start]
-        return {"sessions": sum(r[0] for r in rows), "minutes": round(sum(r[1] for r in rows)), "cards": sum(r[2] for r in rows)}
-
-    n = len(focus)
-    minutes = sum(f[1] for f in focus) / 60
-    cards = sum(f[2] for f in focus)
-    hows = {k: sum(1 for f in focus if f[3] == k) for k in ("f", "g", "x", "e")}
-    timed = hows["f"] + hows["g"] + hows["x"]
-    current, best = _streaks(list(by_day), today)
-    best_day = max(by_day.items(), key=lambda kv: (kv[1][1], kv[1][0]), default=None)
-    daily = []
-    for i in range(29, -1, -1):
-        d = today - datetime.timedelta(days=i)
-        v = by_day.get(d, [0, 0.0, 0])
-        daily.append({"date": d.isoformat(), "sessions": v[0], "minutes": round(v[1])})
+        day = _anki_day(mid, today, cutoff)
+        sessions.append([day.isoformat(), moment.hour, day.weekday(), int(secs), int(cards), how])
+    breaks = []
+    for b in log["breaks"]:
+        if isinstance(b, list) and len(b) >= 4:
+            breaks.append([_anki_day(b[0], today, cutoff).isoformat(), int(b[1]), int(b[2]), int(b[3])])
     return {
         "since": log.get("since"),
-        "first": min(by_day).isoformat() if by_day else None,
-        "sessions": n,
-        "minutes": round(minutes),
-        "today": window(1),
-        "week": window(7),
-        "month": window(30),
-        "avgMinutes": round(minutes / n, 1) if n else 0,
-        "longestMinutes": round(max((f[1] for f in focus), default=0) / 60, 1),
-        "full": hows["f"], "goal": hows["g"], "early": hows["x"], "endless": hows["e"],
-        "completion": round(100 * (hows["f"] + hows["g"]) / timed) if timed else None,
-        "cards": cards,
-        "cardsPerSession": round(cards / n, 1) if n else 0,
-        "cardsPerMinute": round(cards / minutes, 2) if minutes else 0,
-        "activeDays": len(by_day),
-        "avgPerDay": round(n / len(by_day), 1) if by_day else 0,
-        "minutesPerDay": round(minutes / len(by_day)) if by_day else 0,
-        "bestDay": {"date": best_day[0].isoformat(), "sessions": best_day[1][0], "minutes": round(best_day[1][1])} if best_day else None,
-        "streak": current,
-        "bestStreak": best,
-        "breaks": len(breaks),
-        "breakMinutes": round(sum(b[1] for b in breaks) / 60),
-        "longBreaks": sum(1 for b in breaks if b[2]),
-        "breaksSkipped": sum(1 for b in breaks if b[3]),
+        "sessions": sessions,  # [date, hour, weekday (Mon 0), seconds, cards, how]
+        "breaks": breaks,  # [date, seconds, long, skipped]
         "idlePauses": int(log.get("idle", 0)),
         "resets": int(log.get("resets", 0)),
-        "daily": daily,
-        "byHour": [round(m) for m in by_hour],
-        "byWeekday": [round(m) for m in by_weekday],
     }
 
 
 def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
+    """Anki's review history: every day's count, and for each range (7 and 30
+    days, a year, all time) the answer buttons, retention, time and a
+    weekday × hour grid."""
     try:
         cutoff = int(mw.col.sched.day_cutoff)
         db = mw.col.db
@@ -729,18 +681,31 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
             "from revlog where type in (0, 1, 2, 3) group by d order by d",
             cutoff,
         )
-        hours = db.all(
-            "select cast(strftime('%H', id / 1000, 'unixepoch', 'localtime') as integer), count() "
-            "from revlog where type in (0, 1, 2, 3) group by 1"
-        )
-        buttons = db.all("select ease, count() from revlog where type in (0, 1, 2, 3) group by ease")
-        total_ms = db.scalar("select coalesce(sum(time), 0) from revlog where type in (0, 1, 2, 3)") or 0
-        mature = db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1") or (0, 0)
-        since30 = (cutoff - 30 * 86400) * 1000
-        recent = db.first(
-            "select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", since30
-        ) or (0, 0)
-        new_cards = db.scalar("select count(distinct cid) from revlog where type = 0") or 0
+        ranges: Dict[str, Any] = {}
+        for key, days in (("7", 7), ("30", 30), ("365", 365), ("all", None)):
+            since = (cutoff - days * 86400) * 1000 if days else 0
+            where = "type in (0, 1, 2, 3) and id > ?"
+            buttons = {int(e): int(c) for e, c in db.all(f"select ease, count() from revlog where {where} group by ease", since) if e}
+            mature = db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", since) or (0, 0)
+            ms = db.scalar(f"select coalesce(sum(time), 0) from revlog where {where}", since) or 0
+            new = db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", since) or 0
+            grid = [0] * 168
+            for wd, h, c in db.all(
+                "select cast(strftime('%w', id / 1000, 'unixepoch', 'localtime') as integer), "
+                "cast(strftime('%H', id / 1000, 'unixepoch', 'localtime') as integer), count() "
+                f"from revlog where {where} group by 1, 2",
+                since,
+            ):
+                if wd is not None and h is not None:
+                    grid[((int(wd) + 6) % 7) * 24 + int(h)] = int(c)  # rows Monday first
+            ranges[key] = {
+                "buttons": [buttons.get(i, 0) for i in (1, 2, 3, 4)],
+                "reviewAnswers": int(mature[0] or 0),
+                "fails": int(mature[1] or 0),
+                "ms": int(ms),
+                "newCards": int(new),
+                "grid": grid,
+            }
         cards = db.first(
             "select count(), sum(case when type = 0 then 1 else 0 end), "
             "sum(case when type = 2 and ivl >= 21 then 1 else 0 end), "
@@ -758,47 +723,10 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
         print(f"Onigiri Kitchen: couldn't read review history for stats: {e}")
         return None
     # day index 99999 is today (Anki's day, with its own rollover hour)
-    counts = {today - datetime.timedelta(days=99999 - int(d)): int(c) for d, c in rows}
-    total = sum(counts.values())
-    by_weekday = [0] * 7
-    for d, c in counts.items():
-        by_weekday[d.weekday()] += c
-    by_hour = [0] * 24
-    for h, c in hours:
-        if h is not None and 0 <= int(h) < 24:
-            by_hour[int(h)] = int(c)
-    btn = {int(e): int(c) for e, c in buttons if e}
-    current, best = _streaks(list(counts), today)
-    busiest = max(counts.items(), key=lambda kv: kv[1], default=None)
-
-    def last(days: int) -> int:
-        start = today - datetime.timedelta(days=days - 1)
-        return sum(c for d, c in counts.items() if d >= start)
-
-    year = []
-    for i in range(364, -1, -1):
-        d = today - datetime.timedelta(days=i)
-        year.append({"date": d.isoformat(), "count": counts.get(d, 0)})
-    reviews_n, fails = int(mature[0] or 0), int(mature[1] or 0)
-    recent_n, recent_fails = int(recent[0] or 0), int(recent[1] or 0)
+    daily = [[(today - datetime.timedelta(days=99999 - int(d))).isoformat(), int(c)] for d, c in rows]
     return {
-        "total": total,
-        "days": len(counts),
-        "average": round(total / len(counts)) if counts else 0,
-        "today": counts.get(today, 0),
-        "last7": last(7),
-        "last30": last(30),
-        "last365": last(365),
-        "streak": current,
-        "bestStreak": best,
-        "busiest": {"date": busiest[0].isoformat(), "count": busiest[1]} if busiest else None,
-        "first": min(counts).isoformat() if counts else None,
-        "timeHours": round(total_ms / 3600000, 1),
-        "secondsPerCard": round(total_ms / 1000 / total, 1) if total else 0,
-        "retention": round(100 * (1 - fails / reviews_n), 1) if reviews_n else None,
-        "retention30": round(100 * (1 - recent_fails / recent_n), 1) if recent_n else None,
-        "newCards": int(new_cards),
-        "buttons": [btn.get(i, 0) for i in (1, 2, 3, 4)],
+        "daily": daily,  # [date, reviews], every day you reviewed
+        "ranges": ranges,
         "collection": {
             "cards": int(cards[0] or 0),
             "new": int(cards[1] or 0),
@@ -811,9 +739,6 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
             "notes": int(notes),
             "decks": decks,
         },
-        "byHour": by_hour,
-        "byWeekday": by_weekday,
-        "year": year,
     }
 
 
@@ -833,8 +758,10 @@ def _kitchen_stats() -> Dict[str, Any]:
     except ValueError:
         days_open = None
     owned = [i for i in d.get("owned", []) if i in CATALOG_BY_ID]
+    days = sorted((k, v) for k, v in (log.get("days") or {}).items() if isinstance(v, dict))
     return {
         "since": log.get("since"),
+        "days": [[k, int(v.get("guests", 0)), int(v.get("mon", 0)), int(v.get("spent", 0))] for k, v in days],
         "served": int(d.get("served_total", 0)),
         "byKind": log.get("guests_by_kind", {}),
         "mon": int(d.get("mon", 0)),

@@ -129,6 +129,74 @@ body .oks-nav a:hover { border-color: var(--shu); color: var(--shu); }
 }
 #oks-tip b { color: #fff; }
 
+/* ------------------------------------------------ range, heroes, polish */
+.oks-range {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin: 0 -26px; padding: 10px 26px; background: color-mix(in srgb, var(--paper) 86%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+}
+.oks-range span { color: var(--ink-2); font-size: 12px; font-weight: 700; margin-right: 4px; }
+body .oks-range button {
+  margin: 0; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); font: 700 12.5px var(--sans); cursor: pointer; box-shadow: none;
+}
+body .oks-range button:hover { border-color: var(--shu); color: var(--shu); background: var(--card); }
+body .oks-range button.on, body .oks-range button.on:hover { background: var(--shu); border-color: var(--shu); color: var(--accent-fg); }
+.oks-hero-tile {
+  position: relative; overflow: hidden;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--shu) 13%, var(--card)) 0%, var(--card) 70%);
+  border-color: color-mix(in srgb, var(--shu) 28%, var(--line));
+}
+.oks-hero-tile::after {
+  content: ""; position: absolute; right: -18px; top: -18px; width: 70px; height: 70px; border-radius: 50%;
+  background: color-mix(in srgb, var(--shu) 9%, transparent);
+}
+.oks-hero-tile b { color: var(--ink); }
+.oks-sec-head .jp { color: var(--shu); }
+.oks-empty { color: var(--ink-3); font-size: 12.5px; padding: 10px 0; }
+.oks-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.oks-mini .oks-tile { background: var(--paper); }
+
+/* area chart: a 2px line over a light wash; the hover shows a hairline and a dot */
+.oks-area svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.oks-wash { fill: color-mix(in srgb, var(--shu) 14%, transparent); }
+.oks-line { fill: none; stroke: var(--shu); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
+.oks-hits { position: absolute; inset: 0; }
+.oks-hit { position: absolute; top: 0; bottom: 0; transform: translateX(-50%); }
+.oks-hit i { position: absolute; left: 50%; width: 9px; height: 9px; margin: 0 0 -5px -5px; border-radius: 50%; background: var(--shu); box-shadow: 0 0 0 2px var(--card); opacity: 0; }
+.oks-hit::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px solid var(--ink-3); opacity: 0; }
+.oks-hit:hover i, .oks-hit:hover::before { opacity: 1; }
+
+/* categorical slots, in fixed order (validated for colour-blind separation) */
+.s1 { background: #2a78d6; } .s2 { background: #eb6834; } .s3 { background: #1baf7a; } .s4 { background: #eda100; } .s5 { background: #e87ba4; }
+.nightMode .s1, .night_mode .s1, .night-mode .s1 { background: #3987e5; }
+.nightMode .s2, .night_mode .s2, .night-mode .s2 { background: #d95926; }
+.nightMode .s3, .night_mode .s3, .night-mode .s3 { background: #199e70; }
+.nightMode .s4, .night_mode .s4, .night-mode .s4 { background: #c98500; }
+.nightMode .s5, .night_mode .s5, .night-mode .s5 { background: #d55181; }
+
+/* 100% stacked bar: 2px gaps between parts, rounded ends, and a legend with every value */
+.oks-stack { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; }
+.oks-stack i { display: block; min-width: 3px; }
+.oks-stack i:hover { filter: brightness(1.1); }
+.oks-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 12.5px; }
+.oks-key span { display: inline-flex; align-items: center; gap: 6px; }
+.oks-key span i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.oks-key b { font-weight: 800; }
+.oks-key em { font-style: normal; color: var(--ink-3); }
+
+/* weekday × hour grid */
+.oks-punch { display: grid; grid-template-columns: 32px repeat(24, minmax(10px, 1fr)); gap: 3px; align-items: center; }
+.oks-punch .oks-c { width: auto; height: auto; aspect-ratio: 1; max-height: 22px; }
+.oks-punch-h { font-size: 10px; font-weight: 600; color: var(--ink-3); text-align: left; white-space: nowrap; }
+.oks-punch-d { font-size: 10.5px; font-weight: 700; color: var(--ink-2); }
+
+/* the year heatmap's month labels */
+.oks-heat-wrap { overflow-x: auto; padding-bottom: 4px; }
+.oks-heat-wrap .oks-heat { overflow: visible; padding-bottom: 0; }
+.oks-heat-months { display: grid; gap: 3px; height: 14px; margin-bottom: 4px; font-size: 10.5px; color: var(--ink-3); }
+.oks-heat-months span { white-space: nowrap; }
+
 .oks-foot { margin-top: 28px; color: var(--ink-3); font-size: 11.5px; text-align: center; }
 
 @media (max-width: 760px) {

@@ -67,7 +67,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   go out at dawn.
 - **紙吹雪 confetti and sakura petals** when you finish a deck: confetti bursts in from the sides and petals drift
   down from the top of the "Congratulations" screen, with a little fanfare.
-- **統計 Stats.** ⚙ → Open stats opens a window full of numbers and charts. **Pomodoro:** focus time, streaks,
+- **統計 Stats.** ⚙ → Open stats opens a window full of numbers and charts, for the last 7 days, 30 days, year or
+  all time. **Pomodoro:** focus time, streaks,
   completion rate, cards per session, best days, breaks and festival nights, time of day and weekday patterns, the
   last 30 days. **Reviews** (from Anki's history): a year heatmap, retention, answer buttons, time per card, your
   collection's new, young and mature cards. **Kitchen:** guests by type and deck, mon earned and spent, your pet

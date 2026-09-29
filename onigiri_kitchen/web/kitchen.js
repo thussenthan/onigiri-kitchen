@@ -3285,7 +3285,7 @@
   function drawCustomer(c) {
     const moving = c.state === 'walk' || c.state === 'leave';
     const hop = moving ? (Math.floor(c.t * 7) % 2) : c.state === 'eat' ? (Math.floor(c.t * 3.6) % 2) : c.state === 'happy' ? Math.round(Math.abs(Math.sin(c.t * 8)) * 2) : 0;
-    const bottom = moving ? c.y : 152;
+    const bottom = moving ? c.y : 149; // seated a little high, so faces show over the table
     g.globalAlpha = c.alpha;
     drawGuest(Math.round(c.x), Math.round(bottom), c, {
       hop,

@@ -1,238 +1,411 @@
 /* Onigiri Kitchen - 統計 Stats window. Draws window.OKS (built by main.py
-   stats_payload): pomodoro, reviews and kitchen numbers, with charts. */
+   stats_payload). Python sends the raw log (sessions, breaks, reviews per day,
+   per-range review summaries); every number and chart here is worked out for
+   the chosen time range. */
 (function () {
   'use strict';
 
   const D = window.OKS || {};
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const num = (n) => (n == null ? '–' : Number(n).toLocaleString());
-  const pct = (n) => (n == null ? '–' : `${n}%`);
-  const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const WEEKDAYS_JP = ['月', '火', '水', '木', '金', '土', '日'];
+  const num = (n) => (n == null || Number.isNaN(n) ? '–' : Number(n).toLocaleString());
+  const pct = (n) => (n == null || Number.isNaN(n) ? '–' : `${n}%`);
+  const round1 = (n) => Math.round(n * 10) / 10;
+  const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const WD_JP = ['月', '火', '水', '木', '金', '土', '日'];
+  const RANGES = [['7', '7 days'], ['30', '30 days'], ['365', '1 year'], ['all', 'All time']];
 
+  // ------------------------------------------------------------- dates
+  const TODAY = D.today || new Date().toISOString().slice(0, 10);
+  const toDate = (s) => new Date(s + 'T12:00:00');
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const addDays = (s, n) => { const d = toDate(s); d.setDate(d.getDate() + n); return iso(d); };
+  const between = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+  function fmtDay(s, style) {
+    if (!s) return '–';
+    const o = style === 'year' ? { year: 'numeric', month: 'short', day: 'numeric' }
+      : style === 'month' ? { year: 'numeric', month: 'short' }
+        : style === 'short' ? { month: 'short', day: 'numeric' }
+          : { weekday: 'short', month: 'short', day: 'numeric' };
+    return toDate(s).toLocaleDateString(undefined, o);
+  }
   // 95 → "1 h 35 m", 25 → "25 m"
   function dur(minutes) {
-    if (minutes == null) return '–';
+    if (minutes == null || Number.isNaN(minutes)) return '–';
     const m = Math.round(minutes);
     if (m < 60) return `${m} m`;
     const h = Math.floor(m / 60);
     return m % 60 ? `${num(h)} h ${m % 60} m` : `${num(h)} h`;
   }
-  function day(iso, withYear) {
-    if (!iso) return '–';
-    const d = new Date(iso + 'T12:00:00');
-    return d.toLocaleDateString(undefined, withYear ? { year: 'numeric', month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', weekday: 'short' });
-  }
+  const hm = (v) => (v >= 60 ? `${round1(v / 60)}h` : `${Math.round(v)}m`);
+  const kfmt = (v) => (v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${round1(v / 1000)}k` : `${Math.round(v)}`);
   const hourLabel = (h) => (h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`);
-  const hourRange = (h) => `${hourLabel(h)}–${hourLabel((h + 1) % 24)}`.replace(/a|p/g, (x) => (x === 'a' ? ' am' : ' pm'));
+  const hourName = (h) => hourLabel(h).replace('a', ' am').replace('p', ' pm');
+
+  // the chosen range (remembered between visits)
+  let range = '30';
+  try {
+    const saved = new URLSearchParams(location.search).get('range') || localStorage.getItem('oksRange');
+    if (saved && RANGES.some((r) => r[0] === saved)) range = saved;
+  } catch (e) {}
+  function rangeStart(firstEver) {
+    if (range === 'all') return firstEver && firstEver < TODAY ? firstEver : TODAY;
+    return addDays(TODAY, -(parseInt(range, 10) - 1));
+  }
+  const rangeName = () => ({ 7: 'the last 7 days', 30: 'the last 30 days', 365: 'the last year', all: 'all time' }[range]);
+
+  // a time series: by day up to a month, by week up to a year, else by month
+  function buckets(start) {
+    const span = between(start, TODAY) + 1;
+    const unit = span <= 31 ? 'day' : span <= 380 ? 'week' : 'month';
+    const list = [];
+    let cur = start;
+    if (unit === 'week') cur = addDays(start, -((toDate(start).getDay() + 6) % 7)); // back to Monday
+    if (unit === 'month') cur = `${start.slice(0, 7)}-01`;
+    while (cur <= TODAY) {
+      let next;
+      if (unit === 'day') next = addDays(cur, 1);
+      else if (unit === 'week') next = addDays(cur, 7);
+      else { const d = toDate(cur); d.setMonth(d.getMonth() + 1, 1); next = iso(d); }
+      list.push({ from: cur, to: addDays(next, -1), label: unit === 'month' ? fmtDay(cur, 'month') : fmtDay(cur, 'short'), value: 0, extra: 0 });
+      cur = next;
+    }
+    return { unit, list };
+  }
+  function fill(b, date, v, extra) {
+    for (const x of b.list) if (date >= x.from && date <= x.to) { x.value += v; x.extra += extra || 0; return; }
+  }
+  const unitWord = (u) => ({ day: 'per day', week: 'per week', month: 'per month' }[u]);
+  const bucketTitle = (x) => (x.from === x.to ? fmtDay(x.from) : `${fmtDay(x.from, 'short')} – ${fmtDay(x.to > TODAY ? TODAY : x.to, 'year')}`);
+
+  // current and best runs of consecutive days (the current one survives until today ends)
+  function streaks(dates) {
+    const days = Array.from(new Set(dates)).sort();
+    let best = 0;
+    let run = 0;
+    let prev = null;
+    for (const d of days) { run = prev && between(prev, d) === 1 ? run + 1 : 1; best = Math.max(best, run); prev = d; }
+    const current = days.length && between(days[days.length - 1], TODAY) <= 1 ? run : 0;
+    return { current, best };
+  }
 
   // -------------------------------------------------------------- pieces
-  function tile(label, value, note, tip) {
-    return `<div class="oks-tile"${tip ? ` data-tip="${esc(tip)}"` : ''}><small>${label}</small><b>${value}</b>${note ? `<em>${note}</em>` : ''}</div>`;
+  function tile(label, value, note, tip, cls) {
+    return `<div class="oks-tile ${cls || ''}"${tip ? ` data-tip="${esc(tip)}"` : ''}><small>${label}</small><b>${value}</b>${note ? `<em>${note}</em>` : ''}</div>`;
   }
-  function section(el, jp, en, sub, html) {
-    el.innerHTML = `<div class="oks-sec-head"><span class="jp">${jp}</span><b>${en}</b>${sub ? `<span class="oks-sec-sub">${sub}</span>` : ''}</div>${html}`;
+  const hero = (label, value, note, tip) => tile(label, value, note, tip, 'oks-hero-tile');
+  function card(title, sub, body, cls) {
+    return `<div class="oks-chart ${cls || ''}"><h4>${title}${sub ? `<span>${sub}</span>` : ''}</h4>${body}</div>`;
   }
   function niceMax(v) {
     if (v <= 0) return 1;
     const p = Math.pow(10, Math.floor(Math.log10(v)));
     const f = v / p;
-    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; // halves stay round: 0.5, 1, 2.5, 5
   }
+  function scaleMax(values, minutes) {
+    const top = Math.max(0, ...values);
+    return minutes && top > 60 ? niceMax(top / 60) * 60 : niceMax(top);
+  }
+  function gridlines(max, fmt) {
+    return [0, 0.5, 1].map((f) => `<div class="oks-gridline" style="bottom:${f * 100}%"><i>${fmt(max * f)}</i></div>`).join('');
+  }
+  // labels under a chart, at most about six of them, always including the last
+  function axis(items, every) {
+    const last = items.length - 1;
+    return `<div class="oks-axis">${items.map((it, i) => `<i>${(last - i) % every === 0 ? esc(it.label) : ''}</i>`).join('')}</div>`;
+  }
+  const labelEvery = (n) => (n <= 8 ? 1 : n <= 16 ? 2 : n <= 31 ? 7 : Math.ceil(n / 6));
+
   // thin columns from one baseline, a hairline grid, a tooltip per column
-  function columns(title, sub, items, fmt, opts) {
+  function columns(items, fmt, opts) {
     opts = opts || {};
-    const top = Math.max(0, ...items.map((it) => it.value));
-    const max = opts.minutes && top > 60 ? niceMax(top / 60) * 60 : niceMax(top);
-    const grid = [0, 0.5, 1].map((f) => `<div class="oks-gridline" style="bottom:${f * 100}%"><i>${fmt(max * f, true)}</i></div>`).join('');
-    const bars = items.map((it) => {
-      const h = max ? (it.value / max) * 100 : 0;
-      return `<div class="oks-bar${it.value ? '' : ' zero'}" data-tip="${esc(it.tip)}"><span style="height:${h}%"></span></div>`;
-    }).join('');
-    const axis = items.map((it, i) => `<i>${opts.every && i % opts.every ? '' : esc(it.label)}</i>`).join('');
-    return `<div class="oks-chart${opts.wide ? ' wide' : ''}"><h4>${title}${sub ? `<span>${sub}</span>` : ''}</h4>` +
-      `<div class="oks-cols">${grid}<div class="oks-bars">${bars}</div></div><div class="oks-axis">${axis}</div></div>`;
-  }
-  // horizontal bars with the label on the left and the value on the right
-  function rows(title, sub, items, opts) {
-    opts = opts || {};
-    const max = Math.max(1, ...items.map((it) => it.value));
-    const body = items.length
-      ? items.map((it) => `<div class="oks-row" data-tip="${esc(it.tip || '')}"><span>${it.label}</span>` +
-        `<div class="oks-track"><i style="width:${Math.max(it.value ? 1.5 : 0, (it.value / max) * 100)}%"></i></div><b>${it.shown != null ? it.shown : num(it.value)}</b></div>`).join('')
-      : '<div class="oks-row"><span>Nothing yet</span></div>';
-    return `<div class="oks-chart${opts.wide ? ' wide' : ''}"><h4>${title}${sub ? `<span>${sub}</span>` : ''}</h4><div class="oks-rows">${body}</div></div>`;
-  }
-  function byHour(list, unit) {
-    return list.map((v, h) => ({ label: h % 3 === 0 ? hourLabel(h) : '', value: v, tip: `<b>${hourRange(h)}</b>\n${unit(v)}` }));
-  }
-  function byWeekday(list, unit) {
-    return list.map((v, i) => ({ label: WEEKDAYS[i], value: v, tip: `<b>${WEEKDAYS_JP[i]} ${WEEKDAYS[i]}</b>\n${unit(v)}` }));
+    const max = scaleMax(items.map((i) => i.value), opts.minutes);
+    const bars = items.map((it) => `<div class="oks-bar${it.value ? '' : ' zero'}" data-tip="${esc(it.tip)}"><span style="height:${(it.value / max) * 100}%"></span></div>`).join('');
+    return `<div class="oks-cols">${gridlines(max, fmt)}<div class="oks-bars">${bars}</div></div>${axis(items, opts.every || labelEvery(items.length))}`;
   }
 
-  // axis ticks for minutes: 90 → "1.5h", 45 → "45m"
-  const hm = (v) => (v >= 60 ? `${Math.round(v / 6) / 10}h` : `${Math.round(v)}m`);
+  // an area chart: a 2px line over a light wash, with a hover crosshair and dot per point
+  function area(items, fmt, opts) {
+    opts = opts || {};
+    const n = items.length;
+    const max = scaleMax(items.map((i) => i.value), opts.minutes);
+    const W = 1000;
+    const H = 100;
+    const x = (i) => (n === 1 ? W / 2 : (i / (n - 1)) * W);
+    const y = (v) => H - (v / max) * H;
+    const pts = items.map((it, i) => `${x(i).toFixed(1)},${y(it.value).toFixed(1)}`);
+    const line = `M${pts.join(' L')}`;
+    const wash = `M${x(0)},${H} L${pts.join(' L')} L${x(n - 1)},${H} Z`;
+    const hits = items.map((it, i) => `<div class="oks-hit" style="left:${n === 1 ? 50 : (i / (n - 1)) * 100}%;width:${100 / Math.max(1, n - 1)}%" data-tip="${esc(it.tip)}"><i style="bottom:${(it.value / max) * 100}%"></i></div>`).join('');
+    return `<div class="oks-cols oks-area">${gridlines(max, fmt)}` +
+      `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="oks-wash" d="${wash}"/><path class="oks-line" d="${line}" vector-effect="non-scaling-stroke"/></svg>` +
+      `<div class="oks-hits">${hits}</div></div>${axis(items, opts.every || labelEvery(n))}`;
+  }
+
+  // a 100% stacked bar in fixed categorical order, with a legend naming every part
+  function stack(parts) {
+    const total = parts.reduce((a, p) => a + p.value, 0);
+    if (!total) return '<div class="oks-empty">Nothing yet in this range.</div>';
+    const share = (v) => `${round1((v / total) * 100)}%`;
+    const segs = parts.filter((p) => p.value).map((p) => `<i class="s${p.slot}" style="flex-grow:${p.value}" data-tip="${esc(`<b>${p.label}</b>\n${num(p.value)} · ${share(p.value)}${p.note ? '\n' + p.note : ''}`)}"></i>`).join('');
+    const legend = parts.map((p) => `<span${p.note ? ` data-tip="${esc(p.note)}"` : ''}><i class="s${p.slot}"></i>${p.label} <b>${num(p.value)}</b> <em>${share(p.value)}</em></span>`).join('');
+    return `<div class="oks-stack">${segs}</div><div class="oks-key">${legend}</div>`;
+  }
+
+  // weekday × hour grid, one hue light to dark
+  const heatKey = () => `<div class="oks-legend">Less ${[0, 1, 2, 3, 4].map((l) => `<i class="oks-c" data-l="${l}"></i>`).join('')} More</div>`;
+  function punchcard(grid, unit) {
+    const max = Math.max(1, ...grid);
+    const lvl = (v) => (!v ? 0 : v <= max * 0.2 ? 1 : v <= max * 0.45 ? 2 : v <= max * 0.7 ? 3 : 4);
+    let cells = '<div class="oks-punch"><i></i>';
+    for (let h = 0; h < 24; h++) cells += `<b class="oks-punch-h">${h % 3 === 0 ? hourLabel(h) : ''}</b>`;
+    for (let d = 0; d < 7; d++) {
+      cells += `<b class="oks-punch-d">${WD[d]}</b>`;
+      for (let h = 0; h < 24; h++) {
+        const v = grid[d * 24 + h] || 0;
+        cells += `<i class="oks-c" data-l="${lvl(v)}" data-tip="${esc(`<b>${WD_JP[d]} ${WD[d]}, ${hourName(h)}</b>\n${unit(v)}`)}"></i>`;
+      }
+    }
+    return `${cells}</div>${heatKey()}`;
+  }
+
+  // horizontal bars: label, bar, value
+  function rows(items) {
+    if (!items.length) return '<div class="oks-empty">Nothing yet.</div>';
+    const max = Math.max(1, ...items.map((it) => it.value));
+    return `<div class="oks-rows">${items.map((it) => `<div class="oks-row"${it.tip ? ` data-tip="${esc(it.tip)}"` : ''}><span>${it.label}</span>` +
+      `<div class="oks-track"><i style="width:${Math.max(it.value ? 1.5 : 0, (it.value / max) * 100)}%"></i></div><b>${it.shown != null ? it.shown : num(it.value)}</b></div>`).join('')}</div>`;
+  }
+
+  // a running total over the range
+  function cumulative(b, fmt, unit, opts) {
+    let sum = 0;
+    const items = b.list.map((x) => { sum += x.value; return { label: x.label, value: sum, tip: `<b>${bucketTitle(x)}</b>\n${unit(sum)} so far` }; });
+    return area(items, fmt, opts);
+  }
+
+  function section(el, jp, en, sub, html) {
+    el.innerHTML = `<div class="oks-sec-head"><span class="jp">${jp}</span><b>${en}</b>${sub ? `<span class="oks-sec-sub">${sub}</span>` : ''}</div>${html}`;
+  }
 
   // --------------------------------------------------------- 集中 pomodoro
   function renderPomo() {
     const p = D.pomo || {};
-    const since = p.since ? `Recorded since ${day(p.since, true)}` : '';
+    const all = (p.sessions || []).map(([date, hour, wd, secs, cards, how]) => ({ date, hour, wd, min: secs / 60, cards, how }));
+    const first = all.reduce((a, s) => (!a || s.date < a ? s.date : a), null);
+    const start = rangeStart(first);
+    const S = all.filter((s) => s.date >= start);
+    const Bk = (p.breaks || []).filter((b) => b[0] >= start);
+    const minutes = S.reduce((a, s) => a + s.min, 0);
+    const cards = S.reduce((a, s) => a + s.cards, 0);
+    const n = S.length;
+    const count = (h) => S.filter((s) => s.how === h).length;
+    const full = count('f');
+    const goal = count('g');
+    const early = count('x');
+    const endless = count('e');
+    const timed = full + goal + early;
+    const byDay = {};
+    S.forEach((s) => { const d = (byDay[s.date] = byDay[s.date] || { n: 0, min: 0 }); d.n++; d.min += s.min; });
+    const dayList = Object.entries(byDay);
+    const best = dayList.reduce((a, e) => (!a || e[1].min > a[1].min ? e : a), null);
+    const st = streaks(all.map((s) => s.date));
+    const spanDays = between(start, TODAY) + 1;
+
     let html = '';
-    if (!p.sessions) {
-      html += '<div class="oks-note">Pomodoro stats start counting from this version. Finish a focus session and they\'ll show up here.</div>';
-    }
+    if (!all.length) html += '<div class="oks-note">Pomodoro stats start counting from version 1.8.0. Finish a focus session and they\'ll show up here.</div>';
     html += '<div class="oks-hero">' +
-      tile('Focus time', dur(p.minutes), `${num(p.sessions)} session${p.sessions === 1 ? '' : 's'}`) +
-      tile('Current streak', `${num(p.streak)} day${p.streak === 1 ? '' : 's'}`, `best ${num(p.bestStreak)}`, 'Days in a row with at least one focus session') +
-      tile('Completion rate', pct(p.completion), 'timed sessions finished', 'Timed sessions that ran their full length or reached your card goal, out of all timed sessions (endless ones not included)') +
-      tile('Cards in focus', num(p.cards), `${p.cardsPerSession || 0} per session`) +
+      hero('Focus time', dur(minutes), `${num(n)} session${n === 1 ? '' : 's'} in ${rangeName()}`) +
+      hero('Current streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one focus session') +
+      hero('Completion rate', timed ? pct(Math.round(((full + goal) / timed) * 100)) : '–', 'timed sessions finished', 'Timed sessions that ran their full length or reached your card goal, out of all timed sessions (endless ones aren\'t timed)') +
+      hero('Cards in focus', num(cards), n ? `${round1(cards / n)} per session` : '') +
       '</div><div class="oks-grid">' +
-      tile('Today', dur(p.today && p.today.minutes), `${num(p.today && p.today.sessions)} sessions · ${num(p.today && p.today.cards)} cards`) +
-      tile('Last 7 days', dur(p.week && p.week.minutes), `${num(p.week && p.week.sessions)} sessions · ${num(p.week && p.week.cards)} cards`) +
-      tile('Last 30 days', dur(p.month && p.month.minutes), `${num(p.month && p.month.sessions)} sessions · ${num(p.month && p.month.cards)} cards`) +
-      tile('Average session', dur(p.avgMinutes)) +
-      tile('Longest session', dur(p.longestMinutes)) +
-      tile('Cards per minute', p.cardsPerMinute || 0, 'while focusing') +
-      tile('Active days', num(p.activeDays), 'with a focus session') +
-      tile('Sessions per active day', p.avgPerDay || 0) +
-      tile('Focus per active day', dur(p.minutesPerDay)) +
-      tile('Best day', p.bestDay ? dur(p.bestDay.minutes) : '–', p.bestDay ? `${day(p.bestDay.date, true)} · ${p.bestDay.sessions} sessions` : '') +
-      tile('Best streak', `${num(p.bestStreak)} days`) +
-      tile('Full-length sessions', num(p.full), 'ran the whole timer') +
-      tile('Card-goal finishes', num(p.goal), 'ended at your card goal') +
-      tile('Cut short', num(p.early), 'skipped before the end') +
-      tile('Endless sessions', num(p.endless), '∞ mode, a focus-length each') +
-      tile('Breaks taken', num(p.breaks), dur(p.breakMinutes) + ' of rest') +
-      tile('祭り Festival nights', num(p.longBreaks), 'long breaks') +
-      tile('Breaks skipped', num(p.breaksSkipped)) +
-      tile('Idle pauses', num(p.idlePauses), 'timer paused while away') +
-      tile('Resets', num(p.resets), 'cycles reset mid-way') +
-      tile('First session', day(p.first, true)) +
-      '</div><div class="oks-charts">' +
-      columns('Focus time, last 30 days', 'minutes per day', (p.daily || []).map((d, i, a) => ({
-        label: (a.length - 1 - i) % 7 === 0 ? day(d.date).replace(/^\w+,?\s*/, '') : '', // weekly, counting back from today
-        value: d.minutes,
-        tip: `<b>${day(d.date)}</b>\n${dur(d.minutes)} · ${d.sessions} session${d.sessions === 1 ? '' : 's'}`,
-      })), hm, { wide: true, minutes: true }) +
-      columns('Time of day', 'when you focus', byHour(p.byHour || [], (v) => `${dur(v)} of focus`), hm, { minutes: true }) +
-      columns('Day of the week', 'focus time', byWeekday(p.byWeekday || [], (v) => `${dur(v)} of focus`), hm, { minutes: true }) +
-      rows('How sessions ended', 'all sessions', [
-        { label: 'Full length', value: p.full || 0, tip: 'Ran the whole focus timer' },
-        { label: 'Card goal', value: p.goal || 0, tip: 'Ended when you reached your card goal' },
-        { label: 'Endless (∞)', value: p.endless || 0, tip: 'A focus-length in endless mode' },
-        { label: 'Cut short', value: p.early || 0, tip: 'Skipped before the timer ran out' },
-      ], { wide: true }) +
+      tile('Average session', dur(n ? minutes / n : null)) +
+      tile('Longest session', dur(n ? Math.max(...S.map((s) => s.min)) : null)) +
+      tile('Cards per minute', minutes ? round1(cards / minutes) : '–', 'while focusing') +
+      tile('Focus per day', dur(minutes / spanDays), `over ${num(spanDays)} day${spanDays === 1 ? '' : 's'}`) +
+      tile('Active days', num(dayList.length), `${Math.round((dayList.length / spanDays) * 100)}% of days`) +
+      tile('Per active day', dur(dayList.length ? minutes / dayList.length : null), dayList.length ? `${round1(n / dayList.length)} sessions` : '') +
+      tile('Best day', best ? dur(best[1].min) : '–', best ? `${fmtDay(best[0], 'year')} · ${best[1].n} sessions` : '') +
+      tile('Breaks taken', num(Bk.length), `${dur(Bk.reduce((a, b) => a + b[1], 0) / 60)} of rest`) +
+      tile('祭り Festival nights', num(Bk.filter((b) => b[2]).length), 'long breaks') +
+      tile('Breaks skipped', num(Bk.filter((b) => b[3]).length)) +
+      tile('Endless share', n ? pct(Math.round((endless / n) * 100)) : '–', '∞ mode sessions') +
+      tile('Idle pauses', num(p.idlePauses), `all time · ${num(p.resets)} resets`) +
       '</div>';
-    section($('oks-pomo'), '集中', 'Pomodoro', since, html);
+
+    const b = buckets(start);
+    S.forEach((s) => fill(b, s.date, s.min, 1));
+    const series = b.list.map((x) => ({ label: x.label, value: Math.round(x.value), tip: `<b>${bucketTitle(x)}</b>\n${dur(x.value)} · ${x.extra} session${x.extra === 1 ? '' : 's'}` }));
+    const grid = new Array(168).fill(0);
+    const wd = new Array(7).fill(0);
+    const hours = new Array(24).fill(0);
+    S.forEach((s) => { grid[s.wd * 24 + s.hour] += s.min; wd[s.wd] += s.min; hours[s.hour] += s.min; });
+    const peak = hours.indexOf(Math.max(...hours));
+    const focusOf = (v) => `${dur(v)} of focus`;
+    html += '<div class="oks-charts">' +
+      card('Focus time', `${unitWord(b.unit)} · ${rangeName()}`, columns(series, hm, { minutes: true }), 'wide') +
+      card('When you focus', `weekday × hour · ${rangeName()}`, punchcard(grid, focusOf), 'wide') +
+      card('Time of day', n ? `busiest around ${hourName(peak)}` : 'focus time', columns(hours.map((v, h) => ({ label: h % 6 === 0 ? hourLabel(h) : '', value: Math.round(v), tip: `<b>${hourName(h)}–${hourName((h + 1) % 24)}</b>\n${focusOf(v)}` })), hm, { minutes: true, every: 1 })) +
+      card('Day of the week', 'focus time', columns(wd.map((v, i) => ({ label: WD[i], value: Math.round(v), tip: `<b>${WD_JP[i]} ${WD[i]}</b>\n${focusOf(v)}` })), hm, { minutes: true, every: 1 })) +
+      card('How sessions ended', rangeName(), stack([
+        { slot: 1, label: 'Full length', value: full, note: 'Ran the whole focus timer' },
+        { slot: 2, label: 'Card goal', value: goal, note: 'Ended when you reached your card goal' },
+        { slot: 3, label: 'Endless (∞)', value: endless, note: 'A focus-length in endless mode' },
+        { slot: 4, label: 'Cut short', value: early, note: 'Skipped before the timer ran out' },
+      ]), 'wide') +
+      card('Focus time, adding up', `running total · ${rangeName()}`, cumulative(b, hm, dur, { minutes: true }), 'wide') +
+      '</div>';
+    section($('oks-pomo'), '集中', 'Pomodoro', p.since ? `Recorded since ${fmtDay(p.since, 'year')}` : '', html);
   }
 
   // ----------------------------------------------------------- 復習 reviews
-  function heatmap(year) {
-    if (!year || !year.length) return '';
-    const max = Math.max(1, ...year.map((d) => d.count));
-    const level = (c) => (!c ? 0 : c <= max * 0.25 ? 1 : c <= max * 0.5 ? 2 : c <= max * 0.75 ? 3 : 4);
-    // weeks run Monday to Sunday, top to bottom
-    const first = new Date(year[0].date + 'T12:00:00');
-    const pad = (first.getDay() + 6) % 7;
+  function yearHeatmap(daily) {
+    const counts = {};
+    daily.forEach(([d, c]) => { counts[d] = c; });
+    const start = addDays(TODAY, -364);
+    const vals = [];
+    for (let d = start; d <= TODAY; d = addDays(d, 1)) vals.push([d, counts[d] || 0]);
+    const max = Math.max(1, ...vals.map((v) => v[1]));
+    const lvl = (c) => (!c ? 0 : c <= max * 0.25 ? 1 : c <= max * 0.5 ? 2 : c <= max * 0.75 ? 3 : 4);
+    const pad = (toDate(start).getDay() + 6) % 7;
     let cells = '<i class="oks-c pad"></i>'.repeat(pad);
-    cells += year.map((d) => `<i class="oks-c" data-l="${level(d.count)}" data-tip="${esc(`<b>${day(d.date)}</b>\n${num(d.count)} review${d.count === 1 ? '' : 's'}`)}"></i>`).join('');
-    const legend = [0, 1, 2, 3, 4].map((l) => `<i class="oks-c" data-l="${l}"></i>`).join('');
-    return `<div class="oks-chart wide"><h4>The last year<span>reviews per day · darker is more</span></h4><div class="oks-heat">${cells}</div>` +
-      `<div class="oks-legend">Less ${legend} More</div></div>`;
-  }
-  // what's in the collection right now
-  function collection(c) {
-    if (!c) return '';
-    const of = (n) => (c.cards ? `${Math.round((n / c.cards) * 1000) / 10}% of cards` : '');
-    return '<h4 class="oks-sub-head">Your collection</h4><div class="oks-grid">' +
-      tile('Cards', num(c.cards), `${num(c.notes)} notes`) +
-      tile('Decks', num(c.decks)) +
-      tile('New', num(c.new), of(c.new), 'Cards you haven\'t studied yet') +
-      tile('Learning', num(c.learning), of(c.learning), 'Cards in (re)learning steps') +
-      tile('Young', num(c.young), of(c.young), 'Review cards with an interval under 21 days') +
-      tile('Mature', num(c.mature), of(c.mature), 'Review cards with an interval of 21 days or more') +
-      tile('Suspended', num(c.suspended), of(c.suspended)) +
-      tile('Average interval', c.avgInterval == null ? '–' : `${num(c.avgInterval)} days`, 'review cards') +
-      tile('Average ease', c.avgEase == null ? '–' : `${c.avgEase}%`, 'review cards') +
-      '</div>';
+    const months = [];
+    vals.forEach(([d, c], i) => {
+      if (d.slice(8) === '01' || i === 0) months.push([Math.floor((i + pad) / 7), d.slice(0, 7)]);
+      cells += `<i class="oks-c" data-l="${lvl(c)}" data-tip="${esc(`<b>${fmtDay(d)}</b>\n${num(c)} review${c === 1 ? '' : 's'}`)}"></i>`;
+    });
+    const cols = Math.ceil((vals.length + pad) / 7);
+    const monthRow = `<div class="oks-heat-months" style="grid-template-columns:repeat(${cols}, 11px)">` +
+      months.filter((m, i) => i > 0 || months.length < 2 || months[1][0] - m[0] > 2)
+        .map(([c, m]) => `<span style="grid-column:${c + 1}">${toDate(m + '-01').toLocaleDateString(undefined, { month: 'short' })}</span>`).join('') + '</div>';
+    const studied = vals.filter((v) => v[1]).length;
+    return card('The last year', `${num(studied)} of 365 days studied · darker is more`,
+      `<div class="oks-heat-wrap">${monthRow}<div class="oks-heat">${cells}</div></div>${heatKey()}`, 'wide');
   }
   function renderReviews() {
     const r = D.reviews;
-    if (!r) {
-      section($('oks-rev'), '復習', 'Reviews', '', '<div class="oks-note">Couldn\'t read your review history.</div>');
-      return;
-    }
-    const b = r.buttons || [0, 0, 0, 0];
-    const bTotal = b.reduce((a, c) => a + c, 0) || 1;
-    const share = (n) => `${Math.round((n / bTotal) * 1000) / 10}%`;
-    const perCard = (v) => `${num(v)} review${v === 1 ? '' : 's'}`;
-    const html = '<div class="oks-hero">' +
-      tile('Total reviews', num(r.total), r.first ? `since ${day(r.first, true)}` : '') +
-      tile('Days studied', num(r.days), `${num(r.average)} reviews per study day`) +
-      tile('Current streak', `${num(r.streak)} day${r.streak === 1 ? '' : 's'}`, `best ${num(r.bestStreak)}`) +
-      tile('Retention', pct(r.retention), `last 30 days: ${pct(r.retention30)}`, 'Share of review-card answers that weren\'t Again') +
+    if (!r) { section($('oks-rev'), '復習', 'Reviews', '', '<div class="oks-note">Couldn\'t read your review history.</div>'); return; }
+    const daily = r.daily || [];
+    const first = daily.length ? daily[0][0] : null;
+    const start = rangeStart(first);
+    const inRange = daily.filter(([d]) => d >= start);
+    const total = inRange.reduce((a, [, c]) => a + c, 0);
+    const allTotal = daily.reduce((a, [, c]) => a + c, 0);
+    const spanDays = between(start, TODAY) + 1;
+    const rg = (r.ranges || {})[range] || {};
+    const btn = rg.buttons || [0, 0, 0, 0];
+    const presses = btn.reduce((a, x) => a + x, 0);
+    const retention = rg.reviewAnswers ? round1((1 - rg.fails / rg.reviewAnswers) * 100) : null;
+    const st = streaks(daily.filter(([, c]) => c).map(([d]) => d));
+    const busiest = inRange.reduce((a, e) => (!a || e[1] > a[1] ? e : a), null);
+    const c = r.collection || {};
+
+    let html = '<div class="oks-hero">' +
+      hero('Reviews', num(total), `in ${rangeName()}`) +
+      hero('Per day', num(Math.round(total / spanDays)), `${num(inRange.length ? Math.round(total / inRange.length) : 0)} per study day`) +
+      hero('Retention', pct(retention), 'review cards remembered', 'Share of answers on review cards that weren\'t Again') +
+      hero('Current streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`) +
       '</div><div class="oks-grid">' +
-      tile('Today', num(r.today)) +
-      tile('Last 7 days', num(r.last7), `${num(Math.round(r.last7 / 7))} a day`) +
-      tile('Last 30 days', num(r.last30), `${num(Math.round(r.last30 / 30))} a day`) +
-      tile('Last 365 days', num(r.last365), `${num(Math.round(r.last365 / 365))} a day`) +
-      tile('Busiest day', r.busiest ? num(r.busiest.count) : '–', r.busiest ? day(r.busiest.date, true) : '') +
-      tile('Best streak', `${num(r.bestStreak)} days`) +
-      tile('Time reviewing', `${num(r.timeHours)} h`, 'as timed by Anki') +
-      tile('Per card', `${r.secondsPerCard || 0} s`, 'average answer time') +
-      tile('Cards learned', num(r.newCards), 'first seen as new') +
-      tile('Again', share(b[0]), num(b[0])) +
-      tile('Hard', share(b[1]), num(b[1])) +
-      tile('Good', share(b[2]), num(b[2])) +
-      tile('Easy', share(b[3]), num(b[3])) +
-      '</div>' + collection(r.collection) + '<div class="oks-charts">' +
-      heatmap(r.year) +
-      columns('Time of day', 'when you review', byHour(r.byHour || [], perCard), (v) => (v >= 1000 ? `${Math.round(v / 100) / 10}k` : `${Math.round(v)}`)) +
-      columns('Day of the week', 'reviews', byWeekday(r.byWeekday || [], perCard), (v) => (v >= 1000 ? `${Math.round(v / 100) / 10}k` : `${Math.round(v)}`)) +
-      rows('Answer buttons', 'every answer', [
-        { label: 'Again', value: b[0], shown: `${num(b[0])} · ${share(b[0])}` },
-        { label: 'Hard', value: b[1], shown: `${num(b[1])} · ${share(b[1])}` },
-        { label: 'Good', value: b[2], shown: `${num(b[2])} · ${share(b[2])}` },
-        { label: 'Easy', value: b[3], shown: `${num(b[3])} · ${share(b[3])}` },
-      ], { wide: true }) +
+      tile('Days studied', num(inRange.length), `${Math.round((inRange.length / spanDays) * 100)}% of days`) +
+      tile('Busiest day', busiest ? num(busiest[1]) : '–', busiest ? fmtDay(busiest[0], 'year') : '') +
+      tile('Time reviewing', dur((rg.ms || 0) / 60000), 'as timed by Anki') +
+      tile('Per card', total ? `${round1((rg.ms || 0) / 1000 / total)} s` : '–', 'average answer time') +
+      tile('Cards learned', num(rg.newCards), 'first seen as new') +
+      tile('Again rate', presses ? pct(round1((btn[0] / presses) * 100)) : '–', `${num(btn[0])} presses`) +
+      tile('All-time reviews', num(allTotal), first ? `since ${fmtDay(first, 'year')}` : '') +
+      tile('All-time days', num(daily.length), `${num(daily.length ? Math.round(allTotal / daily.length) : 0)} per study day`) +
       '</div>';
-    section($('oks-rev'), '復習', 'Reviews', 'From your Anki review history', html);
+
+    const b = buckets(start);
+    inRange.forEach(([d, cnt]) => fill(b, d, cnt));
+    const series = b.list.map((x) => ({ label: x.label, value: x.value, tip: `<b>${bucketTitle(x)}</b>\n${num(x.value)} review${x.value === 1 ? '' : 's'}` }));
+    const wd = new Array(7).fill(0);
+    const hours = new Array(24).fill(0);
+    (rg.grid || []).forEach((v, i) => { wd[Math.floor(i / 24)] += v; hours[i % 24] += v; });
+    const perReview = (v) => `${num(v)} review${v === 1 ? '' : 's'}`;
+    html += '<div class="oks-charts">' +
+      card('Reviews', `${unitWord(b.unit)} · ${rangeName()}`, area(series, kfmt), 'wide') +
+      yearHeatmap(daily) +
+      card('When you review', `weekday × hour · ${rangeName()}`, punchcard(rg.grid || new Array(168).fill(0), perReview), 'wide') +
+      card('Time of day', total ? `busiest around ${hourName(hours.indexOf(Math.max(...hours)))}` : 'reviews', columns(hours.map((v, h) => ({ label: h % 6 === 0 ? hourLabel(h) : '', value: v, tip: `<b>${hourName(h)}–${hourName((h + 1) % 24)}</b>\n${perReview(v)}` })), kfmt, { every: 1 })) +
+      card('Day of the week', 'reviews', columns(wd.map((v, i) => ({ label: WD[i], value: v, tip: `<b>${WD_JP[i]} ${WD[i]}</b>\n${perReview(v)}` })), kfmt, { every: 1 })) +
+      card('Answer buttons', rangeName(), stack([
+        { slot: 1, label: 'Again', value: btn[0] }, { slot: 2, label: 'Hard', value: btn[1] },
+        { slot: 3, label: 'Good', value: btn[2] }, { slot: 4, label: 'Easy', value: btn[3] },
+      ]), 'wide') +
+      card('Reviews, adding up', `running total · ${rangeName()}`, cumulative(b, kfmt, perReview), 'wide') +
+      card('Your collection', `${num(c.cards)} cards · ${num(c.notes)} notes · ${num(c.decks)} decks`, stack([
+        { slot: 1, label: 'New', value: c.new || 0, note: 'Not studied yet' },
+        { slot: 2, label: 'Learning', value: c.learning || 0, note: 'In (re)learning steps' },
+        { slot: 3, label: 'Young', value: c.young || 0, note: 'Interval under 21 days' },
+        { slot: 4, label: 'Mature', value: c.mature || 0, note: 'Interval of 21 days or more' },
+        { slot: 5, label: 'Suspended', value: c.suspended || 0, note: 'Suspended cards' },
+      ]) + `<div class="oks-mini">${tile('Average interval', c.avgInterval == null ? '–' : `${num(c.avgInterval)} days`, 'review cards')}${tile('Average ease', c.avgEase == null ? '–' : `${c.avgEase}%`, 'review cards')}${tile('Mature share', c.cards ? pct(round1((c.mature / c.cards) * 100)) : '–', 'of all cards')}</div>`, 'wide') +
+      '</div>';
+    section($('oks-rev'), '復習', 'Reviews', 'From your whole Anki review history', html);
   }
 
   // ----------------------------------------------------------- 食堂 kitchen
   function renderKitchen() {
     const k = D.kitchen || {};
+    const days = k.days || [];
+    const first = days.length ? days[0][0] : null;
+    const start = rangeStart(first);
+    const inRange = days.filter(([d]) => d >= start);
+    const guests = inRange.reduce((a, d) => a + d[1], 0);
+    const earned = inRange.reduce((a, d) => a + d[2], 0);
+    const spent = inRange.reduce((a, d) => a + d[3], 0);
     const kinds = k.byKind || {};
     const src = k.bySource || {};
     const pet = k.pet || {};
     const SOURCES = [['tips', 'Tips'], ['takeout', 'Takeout'], ['daruma', '達磨 Daruma wishes'], ['rabbit', '兎 Rabbit\'s mochi'], ['gifts', 'Coins from your pet'], ['keepsakes', '宝物 Keepsake set']];
-    const html = '<div class="oks-hero">' +
-      tile('Guests served', num(k.served), 'all time') +
-      tile('Mon earned', `${num(k.earned)} 文`, k.since ? `since ${day(k.since, true)}` : '', 'Mon (文) your guests and pets brought in since stats began') +
-      tile('Restaurant level', `Lv ${num(k.level)}`, k.levelFrom === 'study' ? 'from your study days' : 'from Onigiri') +
-      tile('Your pet', esc(pet.name || '–'), `${esc(pet.stage || '')} · ${num(pet.studyDays)} study days`) +
+    let html = '<div class="oks-hero">' +
+      hero('Guests served', num(guests), `in ${rangeName()} · ${num(k.served)} all time`) +
+      hero('Mon earned', `${num(earned)} 文`, `in ${rangeName()}`, 'Mon (文) your guests and pets brought in') +
+      hero('Mon spent', `${num(spent)} 文`, `in ${rangeName()} · ${num(k.mon)} 文 now`) +
+      hero('Restaurant', `Lv ${num(k.level)}`, k.levelFrom === 'study' ? 'from your study days' : 'from Onigiri') +
       '</div><div class="oks-grid">' +
-      tile('Mon now', `${num(k.mon)} 文`) +
-      tile('Mon spent', `${num(k.spent)} 文`, 'in the shop') +
-      tile('金 Golden guests', num(kinds.golden), 'from focus sessions') +
-      tile('梅 Sour plums', num(kinds.leech), 'leech guests cheered up') +
-      tile('Regular guests', num(kinds.regular)) +
-      tile('Onigiri made ahead', num(k.onigiriMade), 'for the tray') +
-      tile('Fish fed', num(k.fishFed)) +
+      tile('Your pet', esc(pet.name || '–'), `${esc(pet.stage || '')} · ${num(pet.studyDays)} study days`) +
       tile('Times petted', num(pet.petted)) +
       tile('Keepsakes found', `${num(pet.gifts)} / ${num(pet.giftsTotal)}`) +
+      tile('Fish fed', num(k.fishFed)) +
+      tile('Onigiri made ahead', num(k.onigiriMade), 'for the tray') +
       tile('Decor owned', `${num(k.items)} / ${num(k.catalog)}`) +
       tile('Companions', num(k.pets), 'milestone pets') +
       tile('Rewards earned', num(k.rewards), 'from Onigiri specials') +
       tile('Specials on the menu', num(k.specials), 'in your Specials Book') +
-      tile('Days open', num(k.daysOpen), k.firstSeen ? `since ${day(k.firstSeen, true)}` : '') +
-      '</div><div class="oks-charts">' +
-      rows('Guests by deck', 'top decks, all time', (k.topDecks || []).map(([name, n]) => ({ label: esc(name), value: n, tip: `<b>${esc(name)}</b>\n${num(n)} guests` }))) +
-      rows('Where mon came from', 'since stats began', SOURCES.map(([id, label]) => ({ label, value: src[id] || 0, shown: `${num(src[id] || 0)} 文` }))) +
+      tile('Days open', num(k.daysOpen), k.firstSeen ? `since ${fmtDay(k.firstSeen, 'year')}` : '') +
       '</div>';
-    section($('oks-kitchen'), '食堂', 'Kitchen', '', html);
+    const bg = buckets(start);
+    const bm = buckets(start);
+    inRange.forEach(([d, g, m]) => { fill(bg, d, g); fill(bm, d, m); });
+    html += '<div class="oks-charts">' +
+      card('Guests served', `${unitWord(bg.unit)} · ${rangeName()}`, columns(bg.list.map((x) => ({ label: x.label, value: x.value, tip: `<b>${bucketTitle(x)}</b>\n${num(x.value)} guest${x.value === 1 ? '' : 's'}` })), kfmt)) +
+      card('Mon earned', `${unitWord(bm.unit)} · ${rangeName()}`, area(bm.list.map((x) => ({ label: x.label, value: x.value, tip: `<b>${bucketTitle(x)}</b>\n${num(x.value)} 文` })), kfmt)) +
+      card('Guests by type', 'since stats began', stack([
+        { slot: 1, label: 'Regular', value: kinds.regular || 0, note: 'Every 10 reviews in a deck' },
+        { slot: 2, label: '金 Golden', value: kinds.golden || 0, note: 'From finished focus sessions' },
+        { slot: 3, label: '梅 Sour plum', value: kinds.leech || 0, note: 'Leech cards you got right' },
+      ]), 'wide') +
+      card('Guests by deck', 'top decks, all time', rows((k.topDecks || []).map(([name, cnt]) => ({ label: esc(name), value: cnt, tip: `<b>${esc(name)}</b>\n${num(cnt)} guests` })))) +
+      card('Where mon came from', 'since stats began', rows(SOURCES.map(([id, label]) => ({ label, value: src[id] || 0, shown: `${num(src[id] || 0)} 文` })))) +
+      '</div>';
+    section($('oks-kitchen'), '食堂', 'Kitchen', k.since ? `Recorded since ${fmtDay(k.since, 'year')}` : '', html);
   }
+
+  // ------------------------------------------------------------ range bar
+  function renderRange() {
+    $('oks-range').innerHTML = '<span>Show</span>' + RANGES.map(([id, label]) => `<button type="button" data-range="${id}" class="${id === range ? 'on' : ''}">${label}</button>`).join('');
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-range]');
+    if (!b) return;
+    range = b.dataset.range;
+    try { localStorage.setItem('oksRange', range); } catch (err) {}
+    render();
+  });
 
   // --------------------------------------------------------------- tooltip
   const tip = $('oks-tip');
@@ -253,11 +426,12 @@
   document.addEventListener('mouseleave', () => { tip.hidden = true; });
 
   function render() {
-    $('oks-sub').textContent = `Everything Onigiri Kitchen keeps count of · ${day(D.today, true)}`;
+    $('oks-sub').textContent = `Everything Onigiri Kitchen keeps count of · ${fmtDay(TODAY, 'year')}`;
+    renderRange();
     renderPomo();
     renderReviews();
     renderKitchen();
-    $('oks-foot').textContent = `Onigiri Kitchen${D.version ? ' v' + D.version : ''} · Pomodoro and kitchen numbers are kept from the version that added stats; reviews come from Anki.`;
+    $('oks-foot').textContent = `Onigiri Kitchen${D.version ? ' v' + D.version : ''} · Pomodoro and kitchen numbers are recorded from 1.8.0 on; reviews come from your whole Anki history.`;
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
   else render();
