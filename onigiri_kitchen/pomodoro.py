@@ -297,16 +297,28 @@ class Pomodoro:
             cards = self.focus_cards
             self.focus_cards = 0
             self._emit()
-            self._on_event("endless_block", {"credited": True, "cards": cards})
+            self._on_event("endless_block", {"credited": True, "cards": cards, "seconds": self._block()})
+
+    def _left(self) -> float:
+        """Seconds left in the current timed phase (0 when it ran out)."""
+        if self.ends_at is not None:
+            return max(0.0, self.ends_at - time.time())
+        return max(0.0, float(self.paused_remaining or 0))
 
     def _finish_focus(self, credited: bool) -> None:
         self.rounds += 1
         cards = self.focus_cards
+        left = self._left()
+        studied = max(0.0, float(self.total or 0) - left)
+        # for the stats: ran the full time, ended at the card goal, or cut short
+        how = "x" if not credited else ("g" if left > 1 else "f")
         self.start_break()
-        self._on_event("focus_done", {"credited": credited, "cards": cards, "long": self.long_break})
+        self._on_event("focus_done", {"credited": credited, "cards": cards, "long": self.long_break, "seconds": studied, "how": how})
 
     def _finish_break(self) -> None:
         was_long = self.long_break
+        left = self._left()
+        took = max(0.0, float(self.total or 0) - left)
         if was_long:
             self.rounds = 0
         if self._conf().get("auto_start_next_focus", False):
@@ -317,7 +329,7 @@ class Pomodoro:
             self.ends_at = None
             self.paused_remaining = None
             self._emit()
-        self._on_event("break_done", {"long": was_long})
+        self._on_event("break_done", {"long": was_long, "seconds": took, "skipped": left > 1})
 
     def _emit(self) -> None:
         try:

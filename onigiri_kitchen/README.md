@@ -52,6 +52,10 @@ Once you have a puffle, puffle colours (250 mon each), an igloo lamp and penguin
 window appear too. Finishing a deck right after reviewing sets off 紙吹雪 confetti and falling sakura petals (turn it off with
 `celebrate_deck_finish` in the config).
 
+**統計 Stats:** ⚙ → Open stats shows your pomodoro numbers (focus time, streaks, completion rate, cards per
+session, time-of-day and weekday patterns), your Anki reviews (year heatmap, retention, answer buttons, your
+collection) and the kitchen's (guests, mon, pet). Pomodoro and kitchen numbers are recorded from 1.8.0 on.
+
 ## Home-screen widget
 
 With Onigiri, add **Onigiri Kitchen · おにぎり食堂** to your main menu from Onigiri's layout editor.

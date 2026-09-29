@@ -1,0 +1,138 @@
+/* Onigiri Kitchen - 統計 Stats window. Same palette as the kitchen (the
+   active Onigiri theme, else the washi palette), light and dark. */
+:root {
+  --paper: var(--oni-bg, #f4ecdd);
+  --paper-2: var(--oni-highlight-bg, #efe4d0);
+  --card: var(--oni-canvas-inset, #fbf6ec);
+  --ink: var(--oni-fg, #2b2622);
+  --ink-2: var(--oni-fg-subtle, #5d5046);
+  --ink-3: color-mix(in srgb, var(--oni-fg-subtle, #8b7b69) 80%, var(--paper));
+  --line: var(--oni-border, #dccbad);
+  --shu: var(--oni-accent-color, #c8412f);
+  --shu-dk: color-mix(in srgb, var(--shu) 78%, #000);
+  --accent-fg: var(--oni-accent-fg, #fff8ee);
+  --matcha: #6f9a5c;
+  --gold: #e8c25a;
+  --wood-dk: #3e2717;
+  --sign-text: #fff6e6;
+  --stage-bg: var(--oni-canvas-inset, #2a1d14);
+  --shadow: 0 6px 22px var(--oni-shadow-md, rgba(60, 38, 18, 0.16));
+  --shadow-lg: 0 18px 50px var(--oni-shadow-lg, rgba(40, 24, 10, 0.3));
+  --theme: #d49083;
+  --mincho: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "Songti SC", serif;
+  --sans: var(--oni-font, -apple-system), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Yu Gothic", Helvetica, Arial, sans-serif;
+}
+.nightMode, .night_mode, .night-mode {
+  --paper: var(--oni-bg, #1f1b18);
+  --paper-2: var(--oni-highlight-bg, #26211d);
+  --card: var(--oni-canvas-inset, #2c2622);
+  --ink: var(--oni-fg, #efe6d6);
+  --ink-2: var(--oni-fg-subtle, #cdbfab);
+  --ink-3: color-mix(in srgb, var(--oni-fg-subtle, #9d8e7b) 78%, var(--paper));
+  --line: var(--oni-border, #463b31);
+  --shu: var(--oni-accent-color, #e0604b);
+  --stage-bg: var(--oni-canvas-inset, #140e0a);
+  --shadow: 0 6px 22px var(--oni-shadow-md, rgba(0, 0, 0, 0.45));
+  --shadow-lg: 0 18px 50px var(--oni-shadow-lg, rgba(0, 0, 0, 0.6));
+}
+
+
+html, body { margin: 0 !important; padding: 0 !important; }
+body {
+  background: var(--paper) !important;
+  color: var(--ink);
+  font: 14px/1.45 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+.jp { font-family: var(--mincho); font-weight: 700; }
+#oks { max-width: 1040px; margin: 0 auto; padding: 22px 26px 40px; }
+
+/* header */
+.oks-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.oks-title { display: flex; align-items: baseline; gap: 12px; }
+.oks-title .jp { font-size: 30px; letter-spacing: 0.08em; }
+.oks-title b { font-size: 22px; font-weight: 800; }
+.oks-sub { color: var(--ink-2); font-size: 13px; }
+.oks-nav { display: flex; gap: 6px; flex-wrap: wrap; }
+body .oks-nav a {
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); text-decoration: none; font-weight: 700; font-size: 12.5px;
+}
+body .oks-nav a:hover { border-color: var(--shu); color: var(--shu); }
+.oks-nav a .jp { margin-right: 4px; color: var(--shu); }
+
+/* sections */
+.oks-sec { margin-top: 26px; }
+.oks-sec-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); margin-bottom: 14px; }
+.oks-sec-head .jp { font-size: 22px; letter-spacing: 0.08em; }
+.oks-sec-head b { font-size: 17px; font-weight: 800; }
+.oks-sec-head .oks-sec-sub { color: var(--ink-2); font-size: 12.5px; margin-left: auto; }
+.oks-note {
+  padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--line); background: var(--card);
+  color: var(--ink-2); font-size: 13px; margin-bottom: 14px;
+}
+
+/* stat tiles */
+.oks-hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }
+.oks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.oks-tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.oks-tile small { display: block; color: var(--ink-2); font-size: 11.5px; font-weight: 600; }
+.oks-tile b { display: block; font-size: 18px; font-weight: 800; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oks-tile em { display: block; font-style: normal; color: var(--ink-3); font-size: 11px; margin-top: 1px; }
+.oks-hero .oks-tile { padding: 14px 16px; }
+.oks-hero .oks-tile b { font-size: 28px; }
+
+.oks-sub-head { margin: 4px 0 8px; font-size: 13px; font-weight: 800; }
+
+/* charts */
+.oks-charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.oks-chart { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 10px; min-width: 0; }
+.oks-chart.wide { grid-column: 1 / -1; }
+.oks-chart h4 { margin: 0 0 8px; font-size: 13px; font-weight: 800; display: flex; align-items: baseline; gap: 8px; }
+.oks-chart h4 span { color: var(--ink-2); font-weight: 600; font-size: 11.5px; }
+
+/* column chart: a hairline grid, thin columns grown from one baseline */
+.oks-cols { position: relative; height: 150px; margin-left: 34px; }
+.oks-gridline { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); }
+.oks-gridline i { position: absolute; right: calc(100% + 6px); top: -7px; font-style: normal; font-size: 10.5px; color: var(--ink-3); }
+.oks-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; }
+.oks-bar { flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; min-width: 0; cursor: default; }
+.oks-bar span { display: block; width: 100%; max-width: 24px; background: var(--shu); border-radius: 4px 4px 0 0; min-height: 0; }
+.oks-bar:hover span { filter: brightness(1.12); }
+.oks-bar.zero span { background: transparent; }
+.oks-axis { display: flex; gap: 2px; margin: 4px 0 0 34px; }
+.oks-axis i { flex: 1 1 0; display: flex; justify-content: center; font-style: normal; font-size: 10.5px; color: var(--ink-3); white-space: nowrap; min-width: 0; overflow: visible; }
+
+/* horizontal bars (ledger) */
+.oks-rows { display: grid; gap: 7px; }
+.oks-row { display: grid; grid-template-columns: minmax(80px, 34%) 1fr auto; align-items: center; gap: 10px; font-size: 12.5px; }
+.oks-row > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oks-track { height: 12px; }
+.oks-track i { display: block; height: 100%; background: var(--shu); border-radius: 0 4px 4px 0; }
+.oks-row b { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* year heatmap: one hue, light to dark */
+.oks-heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 11px); gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.oks-c { width: 11px; height: 11px; border-radius: 3px; background: var(--paper-2); display: inline-block; }
+.oks-c[data-l="1"] { background: color-mix(in srgb, var(--shu) 28%, var(--card)); }
+.oks-c[data-l="2"] { background: color-mix(in srgb, var(--shu) 50%, var(--card)); }
+.oks-c[data-l="3"] { background: color-mix(in srgb, var(--shu) 74%, var(--card)); }
+.oks-c[data-l="4"] { background: var(--shu); }
+.oks-c.pad { background: transparent; }
+.oks-legend { display: flex; align-items: center; gap: 3px; justify-content: flex-end; font-size: 10.5px; color: var(--ink-3); margin-top: 6px; }
+
+/* tooltip */
+#oks-tip {
+  position: fixed; z-index: 10; pointer-events: none; max-width: 260px;
+  padding: 6px 10px; border-radius: 8px; background: rgba(34, 26, 20, 0.92); color: #f6ead2;
+  font-size: 12px; line-height: 1.45; white-space: pre-line;
+}
+#oks-tip b { color: #fff; }
+
+.oks-foot { margin-top: 28px; color: var(--ink-3); font-size: 11.5px; text-align: center; }
+
+@media (max-width: 760px) {
+  .oks-hero { grid-template-columns: repeat(2, 1fr); }
+  .oks-charts { grid-template-columns: 1fr; }
+  .oks-head { flex-direction: column; align-items: flex-start; }
+}

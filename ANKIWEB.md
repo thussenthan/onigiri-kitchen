@@ -37,6 +37,7 @@ You study, guests arrive. You take a break, you get to enjoy them.
 - **A real-time clock:** a wooden wall clock, or tap it for a flip clock.
 - **Candles on the tables:** click one to light or snuff it. Lanterns and candles light themselves at dusk and go out at dawn.
 - **Confetti and sakura petals** when you finish a deck: 紙吹雪 bursts in from the sides and petals drift down over the "Congratulations" screen, with a little fanfare.
+- **統計 Stats, lots of them:** ⚙ → Open stats. Pomodoro focus time, streaks, completion rate, best days and time-of-day patterns; your Anki reviews with a year heatmap, retention, answer buttons and your collection's new, young and mature cards; and the kitchen's guests, mon and pet.
 - **Home-screen widget** with your all-time reviews, daily average, days studied and longest streak: add it to your Onigiri main menu from Onigiri's layout editor (or see it under your decks without Onigiri).
 - **A guided tour** the first time you open it, and a **目安箱 suggestion box** for ideas and bug reports.
 - **Matches your Onigiri theme:** your colours, font and dark mode.

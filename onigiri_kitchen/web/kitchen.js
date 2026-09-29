@@ -3274,7 +3274,7 @@
       OKSound.coin();
       for (let i = 0; i < 8; i++) particles.push({ x: c.x + 5 + rand(-4, 4), y: 140 + rand(-3, 3), vx: rand(-10, 10), vy: -rand(8, 18), life: 0.9, c: '#fff1a8', type: 'spark' });
     }
-    send('pay', JSON.stringify({ amount, deck: c.guest.deck || null }), (snap) => {
+    send('pay', JSON.stringify({ amount, deck: c.guest.deck || null, kind: c.guest.kind }), (snap) => {
       if (snap && typeof snap.mon === 'number') {
         S = Object.assign(S, snap);
         updateStatus();
@@ -4208,6 +4208,7 @@
   $('ok-t-set').addEventListener('click', () => togglePanel('ok-settings'));
   $('ok-report').addEventListener('click', () => send('report'));
   $('ok-idea').addEventListener('click', () => send('idea'));
+  $('ok-stats').addEventListener('click', () => { OKSound.pluck(4); send('stats'); });
   $('ok-tour-replay').addEventListener('click', () => { $('ok-settings').hidden = true; startTour(); });
   $('ok-b-rush').addEventListener('click', () => {
     // first click: serve at 4×; second click: collect everyone's tips at once

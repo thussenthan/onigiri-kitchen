@@ -19,5 +19,6 @@ shot pet 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=puffle&p
 shot shop 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=cat&stage=2&mon=5200&owned=$DECOR,puffle,usagi&puffle=green&puffles=green&noanim=1&guests=0&panel=ok-b-decor"
 shot menu 1000 655 "$BASE/anki_order.html?hour=15&rain=0&clean=1&species=cat&stage=2&owned=$DECOR,shinagaki&noanim=1&guests=0&js=OKD.openOshinagaki()"
 shot confetti 1400 815 "$BASE/celebrate.html?t=0&el=1.4&banner=1" 1 # caught up 1.4 s in, petals and all
+shot stats 1000 1100 "$BASE/stats_order.html"
 shot widget 1000 560 "$BASE/widget.html?at=2&hour=11"
 sips --cropOffset 60 20 -c 820 1960 docs/widget.png >/dev/null # just the grid

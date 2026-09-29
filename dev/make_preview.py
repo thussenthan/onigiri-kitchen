@@ -132,3 +132,18 @@ window.addEventListener('load',()=>setTimeout(()=>{{ if(q.get('panel')) document
 </body></html>"""
 open(os.path.join(ROOT, "dev", "anki_order.html"), "w", encoding="utf-8").write(page)
 print("wrote dev/anki_order.html")
+
+# The 統計 Stats window, with made-up numbers (dev/stats_mock.js)
+stats_body = open(os.path.join(ROOT, "onigiri_kitchen", "web", "stats.html"), encoding="utf-8").read()
+stats_page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Stats preview</title>
+{anki_css}
+<link rel="stylesheet" href="../onigiri_kitchen/web/stats.css">
+{theme}
+<script src="stats_mock.js"></script>
+<script src="../onigiri_kitchen/web/stats.js"></script>
+<script>if (new URLSearchParams(location.search).get('night')) document.documentElement.className='nightMode night-mode';</script>
+</head><body>{stats_body}
+<script>if (new URLSearchParams(location.search).get('night')) document.body.className='nightMode';</script>
+</body></html>"""
+open(os.path.join(ROOT, "dev", "stats_order.html"), "w", encoding="utf-8").write(stats_page)
+print("wrote dev/stats_order.html")

@@ -67,6 +67,11 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   go out at dawn.
 - **紙吹雪 confetti and sakura petals** when you finish a deck: confetti bursts in from the sides and petals drift
   down from the top of the "Congratulations" screen, with a little fanfare.
+- **統計 Stats.** ⚙ → Open stats opens a window full of numbers and charts. **Pomodoro:** focus time, streaks,
+  completion rate, cards per session, best days, breaks and festival nights, time of day and weekday patterns, the
+  last 30 days. **Reviews** (from Anki's history): a year heatmap, retention, answer buttons, time per card, your
+  collection's new, young and mature cards. **Kitchen:** guests by type and deck, mon earned and spent, your pet
+  and collection. Pomodoro and kitchen numbers are recorded from 1.8.0 on.
 - **Home-screen widget.** A small live pixel scene with guests waiting, mon, your pet's mood and all-time stats
   (total reviews, daily average, days studied and longest streak), plus a Visit button. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
   your decks on Anki's main screen (you can turn it off in the add-on config).
@@ -81,6 +86,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 | ![Night](docs/night.png) | ![The pet card](docs/pet.png) | ![The shop](docs/shop.png) |
 
 ![The お品書き menu: tap the specials board to see your Specials Book](docs/menu.png)
+
+![統計 Stats: pomodoro, review and kitchen numbers with charts](docs/stats.png)
 
 ![Confetti and sakura petals when you finish a deck](docs/confetti.png)
 

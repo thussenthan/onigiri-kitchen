@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from aqt import gui_hooks, mw
 from aqt.deckbrowser import DeckBrowser
@@ -17,12 +18,12 @@ from aqt.webview import AnkiWebView
 from . import onigiri_link
 from . import pet as petmod
 from .pomodoro import Pomodoro
-from .state import BIRD_COLORS, CATALOG, earned_rewards, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
+from .state import BIRD_COLORS, CATALOG, CATALOG_BY_ID, anki_today, earned_rewards, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
 
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.7.3"
+VERSION = "1.8.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 
 DEFAULT_CONF: Dict[str, Any] = {
@@ -118,6 +119,7 @@ def _focus_credit() -> Dict[str, Any]:
 def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
     c = conf()
     if kind == "focus_done":
+        state.log_focus(info.get("seconds", 0), info.get("cards", 0), info.get("how", "f"))
         if info.get("credited"):
             info.update(_focus_credit())
         msg = "休憩 Break time! Your restaurant is open."
@@ -131,15 +133,18 @@ def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
     elif kind == "endless_block":
         # Endless focus: a focus-length studied, credited quietly (no break,
         # no pop-up): a dango on the skewer and a golden guest.
+        state.log_focus(info.get("seconds", 0), info.get("cards", 0), "e")
         info.update(_focus_credit())
         _eval_kitchen(f"window.OK && OK.onEndlessBlock({json.dumps(info)})")
     elif kind == "idle_paused":
+        state.log_count("idle")
         mins = info.get("minutes", 1)
         tooltip(
             f"集中 Focus paused: no reviews for {mins:g} min.<br>It resumes when you answer your next card.",
             period=5000,
         )
     elif kind == "break_done":
+        state.log_break(info.get("seconds", 0), bool(info.get("long")), bool(info.get("skipped")))
         if _dialog is not None:
             _eval_kitchen("OK.onBreakDone()")
         else:
@@ -296,7 +301,7 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     # Anyone who already had all 12 keepsakes gets the set bonus once.
     set_bonus_now = False
     if state.pet.check_set_bonus():
-        state.data["mon"] += petmod.SET_BONUS_MON
+        state.earn(petmod.SET_BONUS_MON, "keepsakes")
         if "takaramono" not in state.data["owned"]:
             state.data["owned"].append("takaramono")
         set_bonus_now = True
@@ -477,7 +482,7 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
             info = json.loads(arg or "{}")
         except ValueError:
             info = {}
-        state.pay(int(info.get("amount", 0)), info.get("deck"))
+        state.pay(int(info.get("amount", 0)), info.get("deck"), info.get("kind"))
         return state.snapshot()
     if cmd == "buy":
         level = restaurant_progress()["level"]
@@ -533,6 +538,8 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
             "break": pomo.start_break,
         }.get(arg)
         if action:
+            if arg == "reset" and pomo.phase != "idle":
+                state.log_count("resets")
             action()
         elif arg == "endless":
             # the ∞ switch: remember the mode, and switch a running session over
@@ -541,6 +548,9 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
             pomo.set_endless(on)
             push_timer()
         return timer_payload()
+    if cmd == "stats":
+        open_stats()
+        return None
     if cmd == "conf":
         try:
             write_conf(json.loads(arg or "{}"))
@@ -620,6 +630,294 @@ def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
     }
     _stats_cache.update(key=key, value=value)
     return value
+
+
+# ------------------------------------------------------------ 統計 stats
+def _streaks(dates: List[datetime.date], today: datetime.date) -> Tuple[int, int]:
+    """(current, best) runs of consecutive days. The current run still counts
+    if the latest day is yesterday (today isn't over yet)."""
+    days = sorted(set(dates))
+    best = run = 0
+    prev = None
+    for d in days:
+        run = run + 1 if prev is not None and (d - prev).days == 1 else 1
+        best = max(best, run)
+        prev = d
+    current = run if days and (today - days[-1]).days <= 1 else 0
+    return current, best
+
+
+def _pomo_stats(today: datetime.date) -> Dict[str, Any]:
+    log = state._log()
+    focus = [f for f in log["focus"] if isinstance(f, list) and len(f) >= 4]
+    breaks = [b for b in log["breaks"] if isinstance(b, list) and len(b) >= 4]
+    by_day: Dict[datetime.date, List[float]] = {}
+    by_hour = [0.0] * 24
+    by_weekday = [0.0] * 7
+    try:
+        cutoff: Optional[int] = int(mw.col.sched.day_cutoff)
+    except Exception:
+        cutoff = None
+    for ts, secs, cards, how in focus:
+        mid = ts - secs / 2  # the middle of the session
+        moment = datetime.datetime.fromtimestamp(mid)
+        # Anki's day (it rolls over at 4am by default), like the review stats
+        day = today + datetime.timedelta(days=int((mid - cutoff) // 86400) + 1) if cutoff else moment.date()
+        entry = by_day.setdefault(day, [0, 0.0, 0])
+        entry[0] += 1
+        entry[1] += secs / 60
+        entry[2] += cards
+        by_hour[moment.hour] += secs / 60
+        by_weekday[day.weekday()] += secs / 60
+
+    def window(days: int) -> Dict[str, Any]:
+        start = today - datetime.timedelta(days=days - 1)
+        rows = [v for d, v in by_day.items() if d >= start]
+        return {"sessions": sum(r[0] for r in rows), "minutes": round(sum(r[1] for r in rows)), "cards": sum(r[2] for r in rows)}
+
+    n = len(focus)
+    minutes = sum(f[1] for f in focus) / 60
+    cards = sum(f[2] for f in focus)
+    hows = {k: sum(1 for f in focus if f[3] == k) for k in ("f", "g", "x", "e")}
+    timed = hows["f"] + hows["g"] + hows["x"]
+    current, best = _streaks(list(by_day), today)
+    best_day = max(by_day.items(), key=lambda kv: (kv[1][1], kv[1][0]), default=None)
+    daily = []
+    for i in range(29, -1, -1):
+        d = today - datetime.timedelta(days=i)
+        v = by_day.get(d, [0, 0.0, 0])
+        daily.append({"date": d.isoformat(), "sessions": v[0], "minutes": round(v[1])})
+    return {
+        "since": log.get("since"),
+        "first": min(by_day).isoformat() if by_day else None,
+        "sessions": n,
+        "minutes": round(minutes),
+        "today": window(1),
+        "week": window(7),
+        "month": window(30),
+        "avgMinutes": round(minutes / n, 1) if n else 0,
+        "longestMinutes": round(max((f[1] for f in focus), default=0) / 60, 1),
+        "full": hows["f"], "goal": hows["g"], "early": hows["x"], "endless": hows["e"],
+        "completion": round(100 * (hows["f"] + hows["g"]) / timed) if timed else None,
+        "cards": cards,
+        "cardsPerSession": round(cards / n, 1) if n else 0,
+        "cardsPerMinute": round(cards / minutes, 2) if minutes else 0,
+        "activeDays": len(by_day),
+        "avgPerDay": round(n / len(by_day), 1) if by_day else 0,
+        "minutesPerDay": round(minutes / len(by_day)) if by_day else 0,
+        "bestDay": {"date": best_day[0].isoformat(), "sessions": best_day[1][0], "minutes": round(best_day[1][1])} if best_day else None,
+        "streak": current,
+        "bestStreak": best,
+        "breaks": len(breaks),
+        "breakMinutes": round(sum(b[1] for b in breaks) / 60),
+        "longBreaks": sum(1 for b in breaks if b[2]),
+        "breaksSkipped": sum(1 for b in breaks if b[3]),
+        "idlePauses": int(log.get("idle", 0)),
+        "resets": int(log.get("resets", 0)),
+        "daily": daily,
+        "byHour": [round(m) for m in by_hour],
+        "byWeekday": [round(m) for m in by_weekday],
+    }
+
+
+def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
+    try:
+        cutoff = int(mw.col.sched.day_cutoff)
+        db = mw.col.db
+        rows = db.all(
+            "select cast((id / 1000 - ?) / 86400.0 + 100000 as integer) as d, count() "
+            "from revlog where type in (0, 1, 2, 3) group by d order by d",
+            cutoff,
+        )
+        hours = db.all(
+            "select cast(strftime('%H', id / 1000, 'unixepoch', 'localtime') as integer), count() "
+            "from revlog where type in (0, 1, 2, 3) group by 1"
+        )
+        buttons = db.all("select ease, count() from revlog where type in (0, 1, 2, 3) group by ease")
+        total_ms = db.scalar("select coalesce(sum(time), 0) from revlog where type in (0, 1, 2, 3)") or 0
+        mature = db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1") or (0, 0)
+        since30 = (cutoff - 30 * 86400) * 1000
+        recent = db.first(
+            "select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", since30
+        ) or (0, 0)
+        new_cards = db.scalar("select count(distinct cid) from revlog where type = 0") or 0
+        cards = db.first(
+            "select count(), sum(case when type = 0 then 1 else 0 end), "
+            "sum(case when type = 2 and ivl >= 21 then 1 else 0 end), "
+            "sum(case when type = 2 and ivl < 21 then 1 else 0 end), "
+            "sum(case when type in (1, 3) then 1 else 0 end), "
+            "sum(case when queue = -1 then 1 else 0 end), "
+            "avg(case when type = 2 then ivl end), avg(case when type = 2 and factor > 0 then factor end) from cards"
+        ) or (0,) * 8
+        notes = db.scalar("select count() from notes") or 0
+        try:
+            decks = len(mw.col.decks.all_names_and_ids())
+        except Exception:
+            decks = None
+    except Exception as e:
+        print(f"Onigiri Kitchen: couldn't read review history for stats: {e}")
+        return None
+    # day index 99999 is today (Anki's day, with its own rollover hour)
+    counts = {today - datetime.timedelta(days=99999 - int(d)): int(c) for d, c in rows}
+    total = sum(counts.values())
+    by_weekday = [0] * 7
+    for d, c in counts.items():
+        by_weekday[d.weekday()] += c
+    by_hour = [0] * 24
+    for h, c in hours:
+        if h is not None and 0 <= int(h) < 24:
+            by_hour[int(h)] = int(c)
+    btn = {int(e): int(c) for e, c in buttons if e}
+    current, best = _streaks(list(counts), today)
+    busiest = max(counts.items(), key=lambda kv: kv[1], default=None)
+
+    def last(days: int) -> int:
+        start = today - datetime.timedelta(days=days - 1)
+        return sum(c for d, c in counts.items() if d >= start)
+
+    year = []
+    for i in range(364, -1, -1):
+        d = today - datetime.timedelta(days=i)
+        year.append({"date": d.isoformat(), "count": counts.get(d, 0)})
+    reviews_n, fails = int(mature[0] or 0), int(mature[1] or 0)
+    recent_n, recent_fails = int(recent[0] or 0), int(recent[1] or 0)
+    return {
+        "total": total,
+        "days": len(counts),
+        "average": round(total / len(counts)) if counts else 0,
+        "today": counts.get(today, 0),
+        "last7": last(7),
+        "last30": last(30),
+        "last365": last(365),
+        "streak": current,
+        "bestStreak": best,
+        "busiest": {"date": busiest[0].isoformat(), "count": busiest[1]} if busiest else None,
+        "first": min(counts).isoformat() if counts else None,
+        "timeHours": round(total_ms / 3600000, 1),
+        "secondsPerCard": round(total_ms / 1000 / total, 1) if total else 0,
+        "retention": round(100 * (1 - fails / reviews_n), 1) if reviews_n else None,
+        "retention30": round(100 * (1 - recent_fails / recent_n), 1) if recent_n else None,
+        "newCards": int(new_cards),
+        "buttons": [btn.get(i, 0) for i in (1, 2, 3, 4)],
+        "collection": {
+            "cards": int(cards[0] or 0),
+            "new": int(cards[1] or 0),
+            "mature": int(cards[2] or 0),
+            "young": int(cards[3] or 0),
+            "learning": int(cards[4] or 0),
+            "suspended": int(cards[5] or 0),
+            "avgInterval": round(float(cards[6]), 1) if cards[6] else None,
+            "avgEase": round(float(cards[7]) / 10) if cards[7] else None,
+            "notes": int(notes),
+            "decks": decks,
+        },
+        "byHour": by_hour,
+        "byWeekday": by_weekday,
+        "year": year,
+    }
+
+
+def _kitchen_stats() -> Dict[str, Any]:
+    d = state.data
+    log = state._log()
+    pet = state.pet.snapshot()
+    progress = restaurant_progress()
+    try:
+        book = len(cached_specials().get("book") or [])
+    except Exception:
+        book = 0
+    decks = sorted((d.get("served_by_deck") or {}).items(), key=lambda kv: -kv[1])[:8]
+    try:
+        first = datetime.date.fromisoformat(d.get("first_seen") or "")
+        days_open = (datetime.date.fromisoformat(anki_today()) - first).days + 1
+    except ValueError:
+        days_open = None
+    owned = [i for i in d.get("owned", []) if i in CATALOG_BY_ID]
+    return {
+        "since": log.get("since"),
+        "served": int(d.get("served_total", 0)),
+        "byKind": log.get("guests_by_kind", {}),
+        "mon": int(d.get("mon", 0)),
+        "earned": int(log.get("mon_earned", 0)),
+        "spent": int(log.get("mon_spent", 0)),
+        "bySource": log.get("mon_by", {}),
+        "topDecks": decks,
+        "onigiriMade": int(d.get("onigiri_made", 0)),
+        "fishFed": int(d.get("fish_fed", 0)),
+        "daysOpen": days_open,
+        "firstSeen": d.get("first_seen"),
+        "items": len([i for i in owned if CATALOG_BY_ID[i].get("kind") not in ("pet", "reward")]),
+        "pets": len([i for i in owned if CATALOG_BY_ID[i].get("kind") == "pet"]),
+        "rewards": len([i for i in owned if CATALOG_BY_ID[i].get("kind") == "reward"]),
+        "catalog": len([c for c in CATALOG if c.get("kind") not in ("pet", "reward")]),
+        "level": int(progress.get("level", 0)),
+        "levelFrom": progress.get("levelFrom", "onigiri"),
+        "specials": book,
+        "pet": {
+            "name": pet.get("name"),
+            "species": pet.get("species"),
+            "stage": f"{pet.get('stageJp', '')} {pet.get('stageName', '')}".strip(),
+            "studyDays": pet.get("studyDays", 0),
+            "petted": pet.get("timesPetted", 0),
+            "gifts": len([g for g, n in (pet.get("gifts") or {}).items() if n]),
+            "giftsTotal": len(petmod.GIFTS) + len(petmod.RARE_GIFTS),
+        },
+    }
+
+
+def stats_payload() -> Dict[str, Any]:
+    state.roll_day()
+    today = datetime.date.fromisoformat(anki_today())
+    return {
+        "today": today.isoformat(),
+        "pomo": _pomo_stats(today),
+        "reviews": _review_stats(today),
+        "kitchen": _kitchen_stats(),
+        "version": VERSION,
+    }
+
+
+class StatsDialog(QDialog):
+    """統計: every number the kitchen keeps, in its own window."""
+
+    def __init__(self) -> None:
+        super().__init__(mw)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.setWindowTitle("Onigiri Kitchen · 統計 Stats")
+        self.setMinimumSize(640, 480)
+        self.resize(980, 760)
+        restoreGeom(self, "onigiriKitchenStats")
+        self.web = AnkiWebView(self)
+        shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Close), self)
+        shortcut.activated.connect(self.close)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.web)
+        self.setLayout(layout)
+        base = f"/_addons/{PACKAGE}/web"
+        head = onigiri_link.theme_css() + (
+            "<script>window.OKS = "
+            + json.dumps(stats_payload(), ensure_ascii=False).replace("</", "<\\/")
+            + ";</script>"
+        )
+        self.web.stdHtml(_read_web("stats.html"), css=[f"{base}/stats.css"], js=[f"{base}/stats.js"], head=head, context=self)
+
+    def closeEvent(self, event: Any) -> None:
+        global _stats_dialog
+        saveGeom(self, "onigiriKitchenStats")
+        _stats_dialog = None
+        super().closeEvent(event)
+
+
+_stats_dialog: Optional[StatsDialog] = None
+
+
+def open_stats() -> None:
+    global _stats_dialog
+    if _stats_dialog is not None:
+        _stats_dialog.close()
+    _stats_dialog = StatsDialog()
+    _stats_dialog.show()
 
 
 # Without Onigiri there's no restaurant level to read, so shop items that need

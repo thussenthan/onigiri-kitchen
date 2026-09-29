@@ -194,6 +194,19 @@ def _defaults() -> Dict[str, Any]:
         "bird_color": "",
         "today": {"date": "", "reviews": 0, "focus_done": 0, "leech_guests": 0},
         "pet": petmod.defaults(),
+        # for the 統計 Stats window, recorded from this version on
+        "log": {
+            "since": anki_today(),
+            "focus": [],  # [end time, seconds studied, cards, how]: f full, g card goal, x ended early, e endless
+            "breaks": [],  # [end time, seconds, long 0/1, skipped 0/1]
+            "idle": 0,
+            "resets": 0,
+            "mon_earned": 0,
+            "mon_spent": 0,
+            "mon_by": {},  # where mon came from: tips, takeout, daruma, rabbit, gifts, keepsakes
+            "guests_by_kind": {},
+            "days": {},  # date -> {guests, mon, spent}
+        },
     }
 
 
@@ -271,7 +284,7 @@ class KitchenState:
             tips = sum(self.tip_for(g) for g in leftover)
             if self.shown("tanuki_friend"):
                 tips *= 2
-            self.data["mon"] += tips
+            self.earn(tips, "takeout")
             self.data["takeout"]["count"] += len(leftover)
             self.data["takeout"]["mon"] += tips
         self.data["guests"] = []
@@ -340,9 +353,63 @@ class KitchenState:
         return takeout
 
     # ---------------------------------------------------------------- mon
-    def pay(self, amount: int, deck: Optional[str]) -> None:
-        amount = max(0, min(int(amount), 100))
+    # ---------------------------------------------------------- stats log
+    MAX_LOG = 20000
+
+    def _log(self) -> Dict[str, Any]:
+        log = self.data.setdefault("log", {})
+        for key, empty in (("focus", []), ("breaks", []), ("mon_by", {}), ("guests_by_kind", {}), ("days", {})):
+            if not isinstance(log.get(key), type(empty)):
+                log[key] = empty
+        log.setdefault("since", anki_today())
+        return log
+
+    def _log_day(self) -> Dict[str, Any]:
+        return self._log()["days"].setdefault(anki_today(), {})
+
+    def earn(self, amount: int, source: str) -> None:
+        amount = int(amount)
+        if amount <= 0:
+            return
         self.data["mon"] += amount
+        log = self._log()
+        log["mon_earned"] = int(log.get("mon_earned", 0)) + amount
+        log["mon_by"][source] = int(log["mon_by"].get(source, 0)) + amount
+        day = self._log_day()
+        day["mon"] = int(day.get("mon", 0)) + amount
+
+    def spend(self, amount: int) -> None:
+        self.data["mon"] -= amount
+        log = self._log()
+        log["mon_spent"] = int(log.get("mon_spent", 0)) + amount
+        day = self._log_day()
+        day["spent"] = int(day.get("spent", 0)) + amount
+
+    def log_focus(self, seconds: float, cards: int, how: str) -> None:
+        focus = self._log()["focus"]
+        focus.append([int(time.time()), int(round(seconds)), int(cards), how])
+        del focus[: max(0, len(focus) - self.MAX_LOG)]
+        self.save_soon()
+
+    def log_break(self, seconds: float, long: bool, skipped: bool) -> None:
+        breaks = self._log()["breaks"]
+        breaks.append([int(time.time()), int(round(seconds)), int(bool(long)), int(bool(skipped))])
+        del breaks[: max(0, len(breaks) - self.MAX_LOG)]
+        self.save_soon()
+
+    def log_count(self, key: str) -> None:
+        log = self._log()
+        log[key] = int(log.get(key, 0)) + 1
+        self.save_soon()
+
+    def pay(self, amount: int, deck: Optional[str], kind: Optional[str] = None) -> None:
+        amount = max(0, min(int(amount), 100))
+        self.earn(amount, "tips")
+        kind = kind if kind in ("regular", "golden", "leech") else "regular"
+        by_kind = self._log()["guests_by_kind"]
+        by_kind[kind] = int(by_kind.get(kind, 0)) + 1
+        day = self._log_day()
+        day["guests"] = int(day.get("guests", 0)) + 1
         self.data["served_total"] += 1
         self.pet.on_guest_served()
         if self.shown("mike"):
@@ -368,7 +435,7 @@ class KitchenState:
             return {"ok": False, "msg": f"Reach restaurant level {item['level']} to unlock."}
         if self.data["mon"] < item["price"]:
             return {"ok": False, "msg": "Not enough mon yet. Keep serving guests!"}
-        self.data["mon"] -= item["price"]
+        self.spend(item["price"])
         self.data["owned"].append(item_id)
         self.apply_companion_perks()
         self.save()
@@ -499,7 +566,7 @@ class KitchenState:
             kinds[g.get("kind", "regular")] = kinds.get(g.get("kind", "regular"), 0) + 1
             if g.get("deck"):
                 decks[g["deck"]] = decks.get(g["deck"], 0) + 1
-            self.pay(tip, g.get("deck"))
+            self.pay(tip, g.get("deck"), g.get("kind"))
         self.save()
         return {"count": len(guests), "mon": total, "kinds": kinds, "decks": decks}
 
@@ -519,12 +586,12 @@ class KitchenState:
         self.data["today"]["focus_done"] += 1
         self.pet.on_focus_done()
         if self.shown("usagi"):
-            self.data["mon"] += 5
+            self.earn(5, "rabbit")
         self.add_guest({"deck": None, "kind": "golden", "reviews": 0})
         bonus = 0
         if self.shown("daruma") and self.data["today"]["focus_done"] == DARUMA_SESSIONS:
             bonus = DARUMA_BONUS
-            self.data["mon"] += bonus
+            self.earn(bonus, "daruma")
         self.save_soon()
         return bonus
 
@@ -539,12 +606,12 @@ class KitchenState:
         gift = self.pet.maybe_gift()
         if gift:
             if gift["id"] == "kosen":
-                self.data["mon"] += 5
+                self.earn(5, "gifts")
             if gift["id"] == "koban":
-                self.data["mon"] += 25
+                self.earn(25, "gifts")
             if gift.get("setBonus"):
                 # all 12 keepsakes: one-time mon + the treasure shelf
-                self.data["mon"] += int(gift["setBonus"])
+                self.earn(int(gift["setBonus"]), "keepsakes")
                 if "takaramono" not in self.data["owned"]:
                     self.data["owned"].append("takaramono")
             self.save_soon()
@@ -598,7 +665,7 @@ class KitchenState:
             return {"ok": True, "msg": f"{c['jp']} {c['name']} {noun}!"}
         if self.data["mon"] < PUFFLE_COLOR_PRICE:
             return {"ok": False, "msg": "Not enough mon yet. Keep serving guests!"}
-        self.data["mon"] -= PUFFLE_COLOR_PRICE
+        self.spend(PUFFLE_COLOR_PRICE)
         owned.append(color)
         self.data[current_key] = color
         self.save()
