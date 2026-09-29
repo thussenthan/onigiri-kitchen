@@ -29,18 +29,18 @@
           : { weekday: 'short', month: 'short', day: 'numeric' };
     return toDate(s).toLocaleDateString(undefined, o);
   }
-  // the two largest units that make sense: 25 m, 3 h 25 m, 2 d 5 h, 1 w 3 d, 2 mo 1 w, 1 y 2 mo
+  // the two largest units that make sense: 25m, 3h 25m, 2d 5h, 1w 3d, 2mo 1w, 1y 2mo
   const UNITS = [['y', 525960], ['mo', 43830], ['w', 10080], ['d', 1440], ['h', 60], ['m', 1]];
   function dur(minutes) {
     if (minutes == null || Number.isNaN(minutes)) return '–';
     let m = Math.round(minutes);
-    if (m < 60) return `${m} m`;
+    if (m < 60) return `${m}m`;
     const i = UNITS.findIndex(([, size]) => m >= size);
     const [u1, s1] = UNITS[i];
     const big = Math.floor(m / s1);
     const [u2, s2] = UNITS[i + 1];
     const small = Math.floor((m - big * s1) / s2);
-    return small ? `${num(big)} ${u1} ${small} ${u2}` : `${num(big)} ${u1}`;
+    return small ? `${num(big)}${u1} ${small}${u2}` : `${num(big)}${u1}`;
   }
   const hm = (v) => (v >= 60 ? `${round1(v / 60)}h` : `${Math.round(v)}m`);
   const kfmt = (v) => (v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${round1(v / 1000)}k` : `${Math.round(v)}`);
@@ -211,11 +211,11 @@
       if (i === 3 && !cnt) return '';
       const pass = cnt ? `${round1((1 - (fails || 0) / cnt) * 100)}%` : '–';
       return `<tr data-tip="${esc(`<b>${label}</b>\n${note}`)}"><th>${label}</th><td>${num(cnt)}</td><td>${dur((ms || 0) / 60000)}</td>` +
-        `<td>${cnt ? `${round1(ms / 1000 / cnt)} s` : '–'}</td><td>${pass}</td></tr>`;
+        `<td>${cnt ? `${round1(ms / 1000 / cnt)}s` : '–'}</td><td>${pass}</td></tr>`;
     }).join('');
     const tot = (byType || []).reduce((a, r) => [a[0] + (r[0] || 0), a[1] + (r[1] || 0), a[2] + (r[2] || 0)], [0, 0, 0]);
     return `<table class="oks-table"><thead><tr><th></th><th>Answers</th><th>Time</th><th>Pace</th><th data-tip="Answers that weren't Again">Got it</th></tr></thead><tbody>${rowsHtml}</tbody>` +
-      `<tfoot><tr><th>All</th><td>${num(tot[0])}</td><td>${dur(tot[1] / 60000)}</td><td>${tot[0] ? `${round1(tot[1] / 1000 / tot[0])} s` : '–'}</td><td>${tot[0] ? `${round1((1 - tot[2] / tot[0]) * 100)}%` : '–'}</td></tr></tfoot></table>`;
+      `<tfoot><tr><th>All</th><td>${num(tot[0])}</td><td>${dur(tot[1] / 60000)}</td><td>${tot[0] ? `${round1(tot[1] / 1000 / tot[0])}s` : '–'}</td><td>${tot[0] ? `${round1((1 - tot[2] / tot[0]) * 100)}%` : '–'}</td></tr></tfoot></table>`;
   }
 
   function section(el, jp, en, sub, html) {
@@ -235,7 +235,7 @@
     let html = '<div class="oks-hero">' +
       hero('Cards today', num(t.cards), `${num(t.newCards)} new`) +
       hero('Time today', dur(t.seconds / 60), 'as timed by Anki') +
-      hero('Pace', t.pace ? `${t.pace} s` : '–', 'per card today') +
+      hero('Pace', t.pace ? `${t.pace}s` : '–', 'per card today') +
       hero('Time left', due.total ? `~${dur(t.estimateSeconds / 60)}` : 'All done', due.total ? `${num(due.total)} cards due, at your pace` : 'nothing due right now',
         'Your cards still due today, times your own average seconds per answer (last 30 days), counting the answers a new card usually takes') +
       '</div><div class="oks-grid">' +
@@ -245,14 +245,14 @@
       tile('Finish around', due.total ? new Date(Date.now() + t.estimateSeconds * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '–', due.total ? 'if you start now' : '') +
       '</div><div class="oks-charts">' +
       card('Due today', `${num(due.total)} cards · about ${dur(t.estimateSeconds / 60)}`, stack([
-        { slot: 1, label: 'New', value: due.new || 0, note: `About ${pc.answersPerNew || '–'} answers each, ${pc.learning || '–'} s an answer` },
-        { slot: 2, label: 'Learning', value: due.learn || 0, note: `${pc.relearning || '–'} s an answer` },
-        { slot: 3, label: 'Review', value: due.review || 0, note: `${pc.review || '–'} s an answer` },
+        { slot: 1, label: 'New', value: due.new || 0, note: `About ${pc.answersPerNew || '–'} answers each, ${pc.learning || '–'}s an answer` },
+        { slot: 2, label: 'Learning', value: due.learn || 0, note: `${pc.relearning || '–'}s an answer` },
+        { slot: 3, label: 'Review', value: due.review || 0, note: `${pc.review || '–'}s an answer` },
       ])) +
       card('Your pace', 'last 30 days, as timed by Anki', rows([
-        { label: 'Learning', value: pc.learning || 0, shown: `${pc.learning || '–'} s`, tip: 'Seconds per answer for new cards in their learning steps' },
-        { label: 'Review', value: pc.review || 0, shown: `${pc.review || '–'} s`, tip: 'Seconds per answer for review cards' },
-        { label: 'Relearning', value: pc.relearning || 0, shown: `${pc.relearning || '–'} s`, tip: 'Seconds per answer for cards you forgot' },
+        { label: 'Learning', value: pc.learning || 0, shown: `${pc.learning || '–'}s`, tip: 'Seconds per answer for new cards in their learning steps' },
+        { label: 'Review', value: pc.review || 0, shown: `${pc.review || '–'}s`, tip: 'Seconds per answer for review cards' },
+        { label: 'Relearning', value: pc.relearning || 0, shown: `${pc.relearning || '–'}s`, tip: 'Seconds per answer for cards you forgot' },
         { label: 'Answers per new card', value: 0, shown: `${pc.answersPerNew || '–'}`, tip: 'How many answers a new card takes before it leaves its learning steps' },
       ])) +
       card('Today by card type', 'answers, time, pace and how often you got it', typeTable(t.byType), 'wide') +
@@ -292,12 +292,12 @@
       hero('Focus time', dur(minutes), `${num(n)} session${n === 1 ? '' : 's'} in ${rangeName()}`) +
       hero('Current streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one focus session') +
       hero('Completion rate', timed ? pct(Math.round(((full + goal) / timed) * 100)) : '–', 'timed sessions finished', 'Timed sessions that ran their full length or reached your card goal, out of all timed sessions (endless ones aren\'t timed)') +
-      hero('Pace', cards ? `${round1((minutes * 60) / cards)} s` : '–', cards ? `a card · ${num(cards)} cards in focus` : 'seconds per card while focusing', 'Focus time divided by the cards you reviewed in it') +
+      hero('Pace', cards ? `${round1((minutes * 60) / cards)}s` : '–', cards ? `a card · ${num(cards)} cards in focus` : 'seconds per card while focusing', 'Focus time divided by the cards you reviewed in it') +
       '</div><div class="oks-grid">' +
       tile('Average session', dur(n ? minutes / n : null)) +
       tile('Longest session', dur(n ? Math.max(...S.map((s) => s.min)) : null)) +
       tile('Cards per session', n ? round1(cards / n) : '–', `${num(cards)} cards in focus`) +
-      tile('Fastest session', fastest ? `${round1(fastest.min * 60 / fastest.cards)} s` : '–', fastest ? `a card · ${fmtDay(fastest.date, 'year')}` : 'needs 10+ cards') +
+      tile('Fastest session', fastest ? `${round1(fastest.min * 60 / fastest.cards)}s` : '–', fastest ? `a card · ${fmtDay(fastest.date, 'year')}` : 'needs 10+ cards') +
       tile('Focus per day', dur(minutes / spanDays), `over ${num(spanDays)} day${spanDays === 1 ? '' : 's'}`) +
       tile('Active days', num(dayList.length), `${Math.round((dayList.length / spanDays) * 100)}% of days`) +
       tile('Per active day', dur(dayList.length ? minutes / dayList.length : null), dayList.length ? `${round1(n / dayList.length)} sessions` : '') +
@@ -308,7 +308,7 @@
       tile('Breaks skipped', num(Bk.filter((b) => b[3]).length)) +
       tile('Endless share', n ? pct(Math.round((endless / n) * 100)) : '–', '∞ mode sessions') +
       tile('Retention in focus', (() => { const rv = S.reduce((a, s) => a + s.rev, 0); const f = S.reduce((a, s) => a + s.fails, 0); return rv ? pct(round1((1 - f / rv) * 100)) : '–'; })(), 'review cards remembered while focusing') +
-      tile('Answer time in focus', cards ? `${round1(S.reduce((a, s) => a + s.ms, 0) / 1000 / cards)} s` : '–', 'per card, as timed by Anki') +
+      tile('Answer time in focus', cards ? `${round1(S.reduce((a, s) => a + s.ms, 0) / 1000 / cards)}s` : '–', 'per card, as timed by Anki') +
       tile('Idle pauses', num(p.idlePauses), `all time · ${num(p.resets)} resets`) +
       '</div>';
 
@@ -316,7 +316,7 @@
     S.forEach((s) => fill(b, s.date, s.min, 1));
     const bp = buckets(start);
     S.forEach((s) => fill(bp, s.date, s.min * 60, s.cards)); // seconds, cards
-    const paceSeries = bp.list.map((x) => ({ label: x.label, value: x.extra ? round1(x.value / x.extra) : null, tip: `<b>${bucketTitle(x)}</b>\n${x.extra ? `${round1(x.value / x.extra)} s a card · ${num(x.extra)} cards` : 'No cards'}` }));
+    const paceSeries = bp.list.map((x) => ({ label: x.label, value: x.extra ? round1(x.value / x.extra) : null, tip: `<b>${bucketTitle(x)}</b>\n${x.extra ? `${round1(x.value / x.extra)}s a card · ${num(x.extra)} cards` : 'No cards'}` }));
     const series = b.list.map((x) => ({ label: x.label, value: Math.round(x.value), tip: `<b>${bucketTitle(x)}</b>\n${dur(x.value)} · ${x.extra} session${x.extra === 1 ? '' : 's'}` }));
     const grid = new Array(168).fill(0);
     const wd = new Array(7).fill(0);
@@ -392,13 +392,13 @@
       tile('Days studied', num(inRange.length), `${Math.round((inRange.length / spanDays) * 100)}% of days`) +
       tile('Busiest day', busiest ? num(busiest[1]) : '–', busiest ? fmtDay(busiest[0], 'year') : '') +
       tile('Time reviewing', dur((rg.ms || 0) / 60000), 'as timed by Anki') +
-      tile('Per card', total ? `${round1((rg.ms || 0) / 1000 / total)} s` : '–', 'average answer time') +
+      tile('Per card', total ? `${round1((rg.ms || 0) / 1000 / total)}s` : '–', 'average answer time') +
       tile('Cards learned', num(rg.newCards), 'first seen as new') +
       tile('Again rate', presses ? pct(round1((btn[0] / presses) * 100)) : '–', `${num(btn[0])} presses`) +
       tile('All-time reviews', num(allTotal), first ? `since ${fmtDay(first, 'year')}` : '') +
       tile('All-time days', num(daily.length), `${num(daily.length ? Math.round(allTotal / daily.length) : 0)} per study day`) +
       tile('All-time study time', dur((((r.ranges || {}).all || {}).ms || 0) / 60000), 'every answer, as timed by Anki') +
-      tile('All-time pace', allTotal ? `${round1((((r.ranges || {}).all || {}).ms || 0) / 1000 / allTotal)} s` : '–', 'per card') +
+      tile('All-time pace', allTotal ? `${round1((((r.ranges || {}).all || {}).ms || 0) / 1000 / allTotal)}s` : '–', 'per card') +
       tile('All-time retention', (() => { const a = (r.ranges || {}).all || {}; return a.reviewAnswers ? pct(round1((1 - a.fails / a.reviewAnswers) * 100)) : '–'; })(), 'review cards remembered') +
       '</div>';
 
@@ -406,7 +406,7 @@
     inRange.forEach(([d, cnt]) => fill(b, d, cnt));
     const bt = buckets(start);
     inRange.forEach(([d, cnt, ms]) => fill(bt, d, (ms || 0) / 1000, cnt)); // seconds, cards
-    const answerSeries = bt.list.map((x) => ({ label: x.label, value: x.extra ? round1(x.value / x.extra) : null, tip: `<b>${bucketTitle(x)}</b>\n${x.extra ? `${round1(x.value / x.extra)} s a card · ${num(x.extra)} reviews` : 'No reviews'}` }));
+    const answerSeries = bt.list.map((x) => ({ label: x.label, value: x.extra ? round1(x.value / x.extra) : null, tip: `<b>${bucketTitle(x)}</b>\n${x.extra ? `${round1(x.value / x.extra)}s a card · ${num(x.extra)} reviews` : 'No reviews'}` }));
     const series = b.list.map((x) => ({ label: x.label, value: x.value, tip: `<b>${bucketTitle(x)}</b>\n${num(x.value)} review${x.value === 1 ? '' : 's'}` }));
     const wd = new Array(7).fill(0);
     const hours = new Array(24).fill(0);

@@ -170,6 +170,7 @@
     if (p.species && sleepy && time % 3 < 2.4) {
       const c = time % 3;
       const zc = '#d8c8ab';
+      ctx.globalAlpha = 0.5; // faint, so they don't draw the eye
       // start just past the pet's head (its right edge and top differ by
       // species) and rise up and to the right; up-left when there's no room
       const edge = p.species === 'cat' ? 8 : p.species === 'bird' ? 4 : 5;
@@ -184,6 +185,7 @@
         for (let j = 1; j <= 3; j++) R(zx + 4 - j, zy + j, 1, 1, zc);
         R(zx, zy + 4, 5, 1, zc);
       }
+      ctx.globalAlpha = 1;
     }
     if (night) {
       ctx.fillStyle = 'rgba(22,14,40,0.22)';

@@ -2058,7 +2058,9 @@
     const c = time % 3;
     if (c >= 2.4) return;
     // 5x5 (the smallest that reads as a Z), a pixel apart, rising gently
+    gRef.globalAlpha = 0.5; // faint, so they don't draw the eye
     for (let k = 0; k < 3; k++) if (c >= k * 0.6) zGlyph(x - 1 + k * 6, y - 4 - k * 4, 5, '#8b7b69');
+    gRef.globalAlpha = 1;
   }
   // Pets without a kotatsu head-poke sleep on top of it instead.
   function bedTop(x) {
@@ -4867,9 +4869,9 @@
 
   // "25 min", "90 s", for the break card
   function spanText(secs) {
-    if (secs < 60) return `${Math.round(secs)} s`;
+    if (secs < 60) return `${Math.round(secs)}s`;
     const m = Math.round(secs / 60);
-    return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ''}`.trim() : `${m} min`;
+    return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`;
   }
   function breakWelcome(info) {
     const long = timer.longBreak || (info && info.long);
@@ -4880,7 +4882,7 @@
     const mins = Math.round(remaining() / 60000);
     // the session in one line: cards, how long, the pace, and how it ended if not by the timer
     const ended = last.how === 'g' ? '<br>You reached your card goal.' : last.how === 'x' ? '<br>You ended it early.' : '';
-    const pace = cards && secs ? ` · <b>${Math.round((secs / cards) * 10) / 10} s</b> a card` : '';
+    const pace = cards && secs ? ` · <b>${Math.round((secs / cards) * 10) / 10}s</b> a card` : '';
     modal(
       '休憩',
       long ? 'Long break' : 'Short break',
