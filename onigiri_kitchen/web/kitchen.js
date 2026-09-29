@@ -2443,16 +2443,17 @@
     }
   }
 
+  // Rule: a click on the pet (or a companion) always gets a visible reaction,
+  // whatever it's doing. Walking pauses for it and carries on after; flying
+  // still shows hearts. Never return silently here.
   function tamaReact(kind) {
     const hy = (tama.y == null ? FLOOR_Y : tama.y) - 16;
     // a trick in mid-flight: land first, then do it
     if (tama.air && kind === 'trick' && !feather) { birdLand(tama.x, () => tamaReact('trick')); return; }
     // flying or chasing the toy: hearts, but no stopping
     if (tama.air || feather) { if (kind === 'pet') { spawnHearts(tama.x, hy, 2); voice(); } return; }
-    // walking somewhere: stop for a pat, a brush or a trick, then carry on
-    // (to the bowl, to bed…)
+    // walking somewhere: stop for it, then carry on (to the bowl, to bed…)
     if (tama.state === 'walk') {
-      if (kind !== 'pet' && kind !== 'brush' && kind !== 'trick') return;
       tama.resume = tama.target == null ? null : { x: tama.target, then: tama.then };
       tama.target = null;
       tama.then = null;
@@ -3081,12 +3082,18 @@
   }
 
   function reactResident(a) {
-    if (a.air) return;
+    // (same rule as tamaReact: always a visible reaction)
+    spawnHearts(a.x, (a.y == null ? FLOOR_Y : a.y) - 22, 1);
+    residentSound(a);
+    if (a.air) return; // flying: hearts, no stopping
+    // walking somewhere (to bed…): pause for it, then carry on
+    a.resume = a.pose === 'walk' ? { target: a.target, then: a.then } : null;
     a.then = null;
     a.pose = 'react';
     a.t = 0;
     a.dur = 1.3;
-    spawnHearts(a.x, (a.y == null ? FLOOR_Y : a.y) - 22, 1);
+  }
+  function residentSound(a) {
     if (a.id === 'usagi') OKSound.pluck(9);
     else if (a.id === 'kuro' || a.id === 'mike') OKSound.meow();
     else if (a.id === 'puffle') OKSound.squeak();
@@ -3103,7 +3110,11 @@
       const art = ANIMAL_ART[a.id];
       if (!art) continue;
       const pose = a.pose === 'react' && a.t > a.dur ? 'rest' : a.pose;
-      if (a.pose === 'react' && a.t > a.dur) { a.pose = 'rest'; a.t = 0; a.dur = rand(3, 8); }
+      if (a.pose === 'react' && a.t > a.dur) {
+        if (a.resume) { a.target = a.resume.target; a.then = a.resume.then; a.pose = 'walk'; a.t = 0; }
+        else { a.pose = 'rest'; a.t = 0; a.dur = rand(3, 8); }
+        a.resume = null;
+      }
       const ay = Math.round(a.y == null ? FLOOR_Y : a.y);
       const asleep = pose === 'sleep' && !a.air;
       art(Math.round(a.x), ay, a.dir, a.air ? 'fly' : asleep && !SLEEP_ART.has(a.id) ? 'rest' : pose, walkFrame, a);
