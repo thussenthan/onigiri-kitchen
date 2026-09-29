@@ -4081,14 +4081,51 @@
     OKSound.pluck(6);
   }
 
+  // Collect all also settles the guests already inside: each pays their tip
+  // straight into the purse and heads out, and coins left on tables are swept up.
+  function settleInside() {
+    let count = 0;
+    let mon = 0;
+    const kinds = {};
+    const decks = {};
+    for (const c of customers) {
+      if (c.state === 'happy' || c.state === 'leave') continue;
+      const amount = tipFor(c);
+      send('pay', JSON.stringify({ amount, deck: c.guest.deck || null, kind: c.guest.kind }), (snap) => {
+        if (snap && typeof snap.mon === 'number') { S = Object.assign(S, snap); updateStatus(); }
+      });
+      count++;
+      mon += amount;
+      const kind = c.guest.kind || 'regular';
+      kinds[kind] = (kinds[kind] || 0) + 1;
+      if (c.guest.deck) decks[c.guest.deck] = (decks[c.guest.deck] || 0) + 1;
+      c.state = 'happy';
+      c.t = 0;
+      c.plate = false;
+      c.cured = true;
+    }
+    orders = orders.filter((c) => c.state !== 'happy' && c.state !== 'leave');
+    if (chef.target && (chef.target.state === 'happy' || chef.target.state === 'leave')) chef.target = null;
+    for (const cn of coins) if (!cn.done) { cn.done = true; dispMon += cn.amount; }
+    coins = [];
+    return { count, mon, kinds, decks };
+  }
+
   function serveAll() {
+    const inside = settleInside();
     send('serveall', null, (res) => {
       if (!res) return;
       if (res.state) S = Object.assign(S, res.state);
       if (res.pet) { pet = res.pet; renderPetPanel(); }
-      const count = res.count || 0;
+      res.count = (res.count || 0) + inside.count;
+      res.mon = (res.mon || 0) + inside.mon;
+      res.kinds = res.kinds || {};
+      for (const k in inside.kinds) res.kinds[k] = (res.kinds[k] || 0) + inside.kinds[k];
+      res.decks = res.decks || {};
+      for (const k in inside.decks) res.decks[k] = (res.decks[k] || 0) + inside.decks[k];
+      const count = res.count;
       if (!count) { toast('Nobody is waiting right now.'); return; }
-      dispMon += res.mon || 0;
+      dispMon += res.mon; // the line outside and everyone who was inside
       bumpPurse();
       for (let i = 0; i < Math.min(60, count * 3); i++) {
         particles.push({ x: rand(20, 300), y: rand(-40, 0), vx: rand(-6, 6), vy: rand(10, 40), life: 4, c: C.gold, type: 'coin' });
@@ -4606,7 +4643,7 @@
     { jp: '店', title: 'The shop', text: 'Spend mon on decor and pets: the starters you didn\'t pick and big milestone friends who move in, each with a perk. Some unlock at higher restaurant levels.', dom: '#ok-b-decor' },
     { jp: () => sp().jp, title: () => `${pet.name}, your ${sp().name.toLowerCase()}`, text: () => `A gentle virtual pet. ${They()} eats while you review, gets a ${sp().food} for every guest, and grows as you study. ${They()} can't get sick or run away. The Pet button opens ${sp().their} care card.`, scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
     { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session. Rather skip the breaks? Tap ∞ for endless focus: it counts up, and every session still counts.', dom: '#ok-timer' },
-    { jp: '大入り', title: 'Big study sessions', text: () => `Prefer to study in one go? Go ahead. When you come back, tap 急 Serve faster to serve everyone at 4×, and tap it again to collect every tip at once.${conf.daily_card_goal === 0 ? '' : ` Reach ${conf.daily_card_goal || 100} cards in a day and your restaurant throws a little party (change the goal in ⚙).`}`, dom: '#ok-status' },
+    { jp: '大入り', title: 'Big study sessions', text: () => `Prefer to study in one go? Go ahead. When you come back, tap 急 Serve faster to serve everyone at 4×, and tap it again to collect every tip at once.${conf.daily_card_goal === 0 ? '' : ` Reach ${conf.daily_card_goal || 100} cards in a day and your restaurant throws a little party (change the goal in ⚙).`} Finish a deck and 紙吹雪 confetti and sakura petals celebrate it.`, dom: '#ok-status' },
     { jp: '目安箱', title: 'Ideas & bugs', text: 'Use the suggestion box on the wall (or ⚙ settings) to suggest features or report bugs. You can replay this tour from ⚙.', scene: () => ({ x: MEYASU.x - 3, y: MEYASU.y - 5, w: MEYASU.w + 6, h: MEYASU.h + 7 }) },
   ];
   let tourIdx = -1;
