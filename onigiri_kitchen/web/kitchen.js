@@ -1334,7 +1334,7 @@
         particles.push({ x: d.x + rand(6, 18), y: d.y + 6, vx: rand(-4, 4), vy: 6, life: 1.4, c: '#6a9a4a', type: 'leaf' });
         OKSound.pop();
         break;
-      case 'kakejiku': OKSound.pluck(2); toast('継続は力なり · Consistency is power'); break;
+      case 'kakejiku': OKSound.pluck(2); break; // the saying is in its tooltip
       case 'kamakura': toggleLamp('kama', d.x + 7, d.y + 8); break;
       default: break;
     }
@@ -4945,6 +4945,16 @@
     spawnHearts(121, 74, 3);
   }
 
+  // "Focus started" only for the day's first session; after that the timer says it
+  function focusStartToast() {
+    const day = S.today.date || new Date().toDateString();
+    try {
+      if (localStorage.getItem('okFocusToast') === day) return;
+      localStorage.setItem('okFocusToast', day);
+    } catch (e) {}
+    toast('集中 · Focus started. The kitchen will prep while you study.');
+  }
+
   // ---------------------------------------------------------- python -> js
   window.OK = {
     onTimer(payload) {
@@ -4955,7 +4965,7 @@
       if (typeof payload.sound === 'boolean') { conf.sound = payload.sound; OKSound.configure(payload); renderSoundBtn(); }
       renderTimer();
       updateStatus();
-      if (prev !== timer.phase && timer.phase === 'focus') toast('集中 · Focus started. The kitchen will prep while you study.');
+      if (prev !== timer.phase && timer.phase === 'focus') focusStartToast();
     },
     onGuests(n) {
       S.guestsWaiting = n;
