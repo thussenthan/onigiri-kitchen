@@ -2445,11 +2445,14 @@
 
   function tamaReact(kind) {
     const hy = (tama.y == null ? FLOOR_Y : tama.y) - 16;
+    // a trick in mid-flight: land first, then do it
+    if (tama.air && kind === 'trick' && !feather) { birdLand(tama.x, () => tamaReact('trick')); return; }
     // flying or chasing the toy: hearts, but no stopping
     if (tama.air || feather) { if (kind === 'pet') { spawnHearts(tama.x, hy, 2); voice(); } return; }
-    // walking somewhere: stop for the pat, then carry on (to the bowl, to bed…)
+    // walking somewhere: stop for a pat, a brush or a trick, then carry on
+    // (to the bowl, to bed…)
     if (tama.state === 'walk') {
-      if (kind !== 'pet') return;
+      if (kind !== 'pet' && kind !== 'brush' && kind !== 'trick') return;
       tama.resume = tama.target == null ? null : { x: tama.target, then: tama.then };
       tama.target = null;
       tama.then = null;
