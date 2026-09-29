@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from aqt import gui_hooks, mw
 from aqt.deckbrowser import DeckBrowser
@@ -649,6 +649,19 @@ def _anki_day(ts: float, today: datetime.date, cutoff: Optional[int]) -> datetim
     return datetime.datetime.fromtimestamp(ts).date()
 
 
+def _answers_between(start: float, end: float) -> List[int]:
+    """Anki's answers in a time window: [review answers, of them Again, all answers' ms]."""
+    try:
+        row = mw.col.db.first(
+            "select sum(case when type = 1 then 1 else 0 end), sum(case when type = 1 and ease = 1 then 1 else 0 end), "
+            "coalesce(sum(time), 0) from revlog where type in (0, 1, 2, 3) and id between ? and ?",
+            int(start * 1000), int(end * 1000),
+        ) or (0, 0, 0)
+        return [int(row[0] or 0), int(row[1] or 0), int(row[2] or 0)]
+    except Exception:
+        return [0, 0, 0]
+
+
 def _pomo_stats(today: datetime.date) -> Dict[str, Any]:
     """The raw session and break log (the page works out every range itself)."""
     log = state._log()
@@ -664,14 +677,14 @@ def _pomo_stats(today: datetime.date) -> Dict[str, Any]:
         mid = ts - secs / 2  # the middle of the session
         moment = datetime.datetime.fromtimestamp(mid)
         day = _anki_day(mid, today, cutoff)
-        sessions.append([day.isoformat(), moment.hour, day.weekday(), int(secs), int(cards), how])
+        sessions.append([day.isoformat(), moment.hour, day.weekday(), int(secs), int(cards), how, *_answers_between(ts - secs, ts)])
     breaks = []
     for b in log["breaks"]:
         if isinstance(b, list) and len(b) >= 4:
             breaks.append([_anki_day(b[0], today, cutoff).isoformat(), int(b[1]), int(b[2]), int(b[3])])
     return {
         "since": log.get("since"),
-        "sessions": sessions,  # [date, hour, weekday (Mon 0), seconds, cards, how]
+        "sessions": sessions,  # [date, hour, weekday (Mon 0), seconds, cards, how, review answers, Again, answer ms]
         "breaks": breaks,  # [date, seconds, long, skipped]
         "idlePauses": int(log.get("idle", 0)),
         "resets": int(log.get("resets", 0)),
@@ -699,8 +712,8 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
             ms = db.scalar(f"select coalesce(sum(time), 0) from revlog where {where}", since) or 0
             new = db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", since) or 0
             # answers and time by kind: 0 learning (new cards), 1 review, 2 relearning, 3 filtered deck
-            by_type = {int(t): [int(c), int(m or 0)] for t, c, m in db.all(
-                f"select type, count(), sum(time) from revlog where {where} group by type", since)}
+            by_type = {int(t): [int(c), int(m or 0), int(f or 0)] for t, c, m, f in db.all(
+                f"select type, count(), sum(time), sum(case when ease = 1 then 1 else 0 end) from revlog where {where} group by type", since)}
             grid = [0] * 168
             for wd, h, c in db.all(
                 "select cast(strftime('%w', id / 1000, 'unixepoch', 'localtime') as integer), "
@@ -716,7 +729,7 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
                 "fails": int(mature[1] or 0),
                 "ms": int(ms),
                 "newCards": int(new),
-                "byType": [by_type.get(t, [0, 0]) for t in (0, 1, 2, 3)],
+                "byType": [by_type.get(t, [0, 0, 0]) for t in (0, 1, 2, 3)],  # [answers, ms, Again presses]
                 "grid": grid,
             }
         cards = db.first(
@@ -909,6 +922,9 @@ def study_today() -> Optional[Dict[str, Any]]:
         ms = int(db.scalar("select coalesce(sum(time), 0) from revlog where type in (0, 1, 2, 3) and id > ?", start_ms) or 0)
         rev = db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", start_ms) or (0, 0)
         new_today = int(db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", start_ms) or 0)
+        today_types = {int(t): [int(c), int(m or 0), int(f or 0)] for t, c, m, f in db.all(
+            "select type, count(), sum(time), sum(case when ease = 1 then 1 else 0 end) from revlog "
+            "where type in (0, 1, 2, 3) and id > ? group by type", start_ms)}
 
         def paces(since: int) -> Dict[int, Tuple[int, int]]:
             return {int(t): (int(c), int(m or 0)) for t, c, m in db.all(
@@ -939,6 +955,7 @@ def study_today() -> Optional[Dict[str, Any]]:
         "pace": round(ms / 1000 / today_n, 1) if today_n else None,
         "retention": round(100 * (1 - (rev[1] or 0) / rev[0]), 1) if rev[0] else None,
         "newCards": new_today,
+        "byType": [today_types.get(t, [0, 0, 0]) for t in (0, 1, 2, 3)],
         "due": {"new": due_new, "learn": due_learn, "review": due_review, "total": due_new + due_learn + due_review},
         "estimateSeconds": round(estimate),
         "paces": {"learning": round(learn_s, 1), "review": round(review_s, 1), "relearning": round(relearn_s, 1), "answersPerNew": round(answers_per_new, 1)},

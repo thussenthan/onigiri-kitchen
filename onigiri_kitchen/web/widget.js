@@ -205,6 +205,15 @@
     const num = (n) => (n >= 100000 ? Math.round(n / 1000) + 'k' : Number(n || 0).toLocaleString());
     // short forms for narrow widgets, so all four stats always fit
     const short = (n) => (n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n || 0));
+    // hours in one short unit: 18h, 3d, 1.3w, 2.1mo, 1.2y
+    const span = (h) => {
+      const one = (v) => (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
+      if (h < 24) return `${one(h)}h`;
+      if (h < 24 * 7) return `${one(h / 24)}d`;
+      if (h < 24 * 30.44) return `${one(h / 168)}w`;
+      if (h < 24 * 365.25) return `${one(h / 730.5)}mo`;
+      return `${one(h / 8766)}y`;
+    };
     const two = (l, sh) => `<span class="okw-l">${l}</span><span class="okw-s">${sh}</span>`;
     const stat = (v, vs, label, ls, tip) => `<span class="okw-stat" title="${tip}"><b>${two(v, vs)}</b><small>${two(label, ls)}</small></span>`;
     // how long what's still due will take at your pace (the one thing about
@@ -221,7 +230,7 @@
         stat(num(st.average), short(st.average), 'per day', '/day', 'Average reviews on the days you studied') +
         stat(num(st.days), short(st.days), st.days === 1 ? 'day' : 'days', st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
         stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'best streak', 'Your longest-ever streak: the most days in a row you have reviewed') +
-        (st.hours != null ? stat(`${num(Math.round(st.hours))}h`, `${short(Math.round(st.hours))}h`, 'studied', 'studied', `${st.hours} hours of reviewing, all time (as timed by Anki)`).replace('okw-stat"', 'okw-stat okw-stat-big"') : '') +
+        (st.hours != null ? stat(span(st.hours), span(st.hours), 'studied', 'studied', `${st.hours} hours of reviewing, all time (as timed by Anki)`) : '') +
         left
       : '';
     info.innerHTML =

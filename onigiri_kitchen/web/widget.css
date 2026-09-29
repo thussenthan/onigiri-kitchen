@@ -114,7 +114,7 @@
 }
 /* Not much width: short numbers and labels, so all four stats still fit */
 .okw-stat .okw-s { display: none; }
-@container (max-width: 420px) {
+@container (max-width: 520px) {
   .okw-stat .okw-l { display: none; }
   .okw-stat .okw-s { display: inline; }
   .okw-stats { gap: 8px; }
@@ -129,7 +129,7 @@
 }
 /* Narrow but tall (1 column, 2+ rows): the stats fit on the scene too */
 @container (max-width: 300px) and (min-height: 170px) {
-  .okw-stats { display: flex; gap: 7px; flex: 1 0 100%; }
+  .okw-stats { display: flex; gap: 4px 7px; flex: 1 0 100%; flex-wrap: wrap; padding-right: 34px; box-sizing: border-box; } /* room for the pet */
   .okw-row { flex-wrap: wrap; row-gap: 6px; }
   .okw-stat b { font-size: 12px; }
   .okw-stat small { font-size: 9.5px; }

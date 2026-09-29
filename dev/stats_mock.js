@@ -34,7 +34,7 @@
         const r = rnd();
         const how = r < 0.72 ? 'f' : r < 0.83 ? 'g' : r < 0.92 ? 'e' : 'x';
         const secs = how === 'x' ? Math.round(300 + rnd() * 900) : how === 'g' ? Math.round(900 + rnd() * 500) : 1500;
-        sessions.push([d, hour, wd, secs, Math.round(secs / 60 * (1.4 + rnd() * 0.8)), how]);
+        { const c = Math.round(secs / 60 * (1.4 + rnd() * 0.8)); const rv = Math.round(c * 0.6); sessions.push([d, hour, wd, secs, c, how, rv, Math.round(rv * (0.08 + rnd() * 0.06)), Math.round(c * (6500 + rnd() * 2500))]); }
         if (how !== 'e') breaks.push([d, rnd() < 0.2 ? 900 : 300, rnd() < 0.2 ? 1 : 0, rnd() < 0.06 ? 1 : 0]);
       }
       guests = Math.round(reviews / 10) + n;
@@ -52,11 +52,11 @@
       [8, 12, 15, 19, 20, 21, 22, 23, 0].forEach((h, j) => { g[wd * 24 + h] += Math.round(c * [0.04, 0.06, 0.08, 0.12, 0.16, 0.18, 0.17, 0.12, 0.07][j]); });
     });
     const again = Math.round(total * 0.13);
-    return { byType: [[Math.round(total * 0.2), Math.round(total * 0.2 * 11400)], [Math.round(total * 0.62), Math.round(total * 0.62 * 17200)], [Math.round(total * 0.18), Math.round(total * 0.18 * 14100)], [0, 0]], buttons: [again, Math.round(total * 0.04), Math.round(total * 0.76), total - again - Math.round(total * 0.04) - Math.round(total * 0.76)], reviewAnswers: Math.round(total * 0.62), fails: Math.round(total * 0.62 * 0.12), ms: total * 15800, newCards: Math.round(total * 0.14), grid: g };
+    return { byType: [[Math.round(total * 0.2), Math.round(total * 0.2 * 11400), Math.round(total * 0.2 * 0.3)], [Math.round(total * 0.62), Math.round(total * 0.62 * 17200), Math.round(total * 0.62 * 0.11)], [Math.round(total * 0.18), Math.round(total * 0.18 * 14100), Math.round(total * 0.18 * 0.22)], [0, 0, 0]], buttons: [again, Math.round(total * 0.04), Math.round(total * 0.76), total - again - Math.round(total * 0.04) - Math.round(total * 0.76)], reviewAnswers: Math.round(total * 0.62), fails: Math.round(total * 0.62 * 0.12), ms: total * 15800, newCards: Math.round(total * 0.14), grid: g };
   };
   window.OKS = {
     today: TODAY,
-    studyToday: { cards: 142, seconds: 1080, pace: 7.6, retention: 89.4, newCards: 20, due: { new: 20, learn: 12, review: 96, total: 128 }, estimateSeconds: 1330, paces: { learning: 7.1, review: 7.1, relearning: 8.7, answersPerNew: 2.9 } },
+    studyToday: { cards: 142, seconds: 1080, pace: 7.6, retention: 89.4, newCards: 20, byType: [[48, 330000, 14], [80, 590000, 8], [14, 160000, 3], [0, 0, 0]], due: { new: 20, learn: 12, review: 96, total: 128 }, estimateSeconds: 1330, paces: { learning: 7.1, review: 7.1, relearning: 8.7, answersPerNew: 2.9 } },
     version: '1.8.0',
     pomo: { since: back(90), sessions, breaks, idlePauses: 27, resets: 4 },
     reviews: {

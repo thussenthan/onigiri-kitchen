@@ -29,13 +29,18 @@
           : { weekday: 'short', month: 'short', day: 'numeric' };
     return toDate(s).toLocaleDateString(undefined, o);
   }
-  // 95 → "1 h 35 m", 25 → "25 m"
+  // the two largest units that make sense: 25 m, 3 h 25 m, 2 d 5 h, 1 w 3 d, 2 mo 1 w, 1 y 2 mo
+  const UNITS = [['y', 525960], ['mo', 43830], ['w', 10080], ['d', 1440], ['h', 60], ['m', 1]];
   function dur(minutes) {
     if (minutes == null || Number.isNaN(minutes)) return '–';
-    const m = Math.round(minutes);
+    let m = Math.round(minutes);
     if (m < 60) return `${m} m`;
-    const h = Math.floor(m / 60);
-    return m % 60 ? `${num(h)} h ${m % 60} m` : `${num(h)} h`;
+    const i = UNITS.findIndex(([, size]) => m >= size);
+    const [u1, s1] = UNITS[i];
+    const big = Math.floor(m / s1);
+    const [u2, s2] = UNITS[i + 1];
+    const small = Math.floor((m - big * s1) / s2);
+    return small ? `${num(big)} ${u1} ${small} ${u2}` : `${num(big)} ${u1}`;
   }
   const hm = (v) => (v >= 60 ? `${round1(v / 60)}h` : `${Math.round(v)}m`);
   const kfmt = (v) => (v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${round1(v / 1000)}k` : `${Math.round(v)}`);
@@ -198,6 +203,21 @@
     return area(items, fmt, opts);
   }
 
+  // every card type side by side: answers, time, pace, and how often you got it
+  const TYPES = [['Learning', 'New cards in their learning steps'], ['Review', 'Cards coming back for review'], ['Relearning', 'Cards you forgot, back in their steps'], ['Filtered', 'Answers in filtered decks']];
+  function typeTable(byType) {
+    const rowsHtml = TYPES.map(([label, note], i) => {
+      const [cnt, ms, fails] = (byType || [])[i] || [0, 0, 0];
+      if (i === 3 && !cnt) return '';
+      const pass = cnt ? `${round1((1 - (fails || 0) / cnt) * 100)}%` : '–';
+      return `<tr data-tip="${esc(`<b>${label}</b>\n${note}`)}"><th>${label}</th><td>${num(cnt)}</td><td>${dur((ms || 0) / 60000)}</td>` +
+        `<td>${cnt ? `${round1(ms / 1000 / cnt)} s` : '–'}</td><td>${pass}</td></tr>`;
+    }).join('');
+    const tot = (byType || []).reduce((a, r) => [a[0] + (r[0] || 0), a[1] + (r[1] || 0), a[2] + (r[2] || 0)], [0, 0, 0]);
+    return `<table class="oks-table"><thead><tr><th></th><th>Answers</th><th>Time</th><th>Pace</th><th data-tip="Answers that weren't Again">Got it</th></tr></thead><tbody>${rowsHtml}</tbody>` +
+      `<tfoot><tr><th>All</th><td>${num(tot[0])}</td><td>${dur(tot[1] / 60000)}</td><td>${tot[0] ? `${round1(tot[1] / 1000 / tot[0])} s` : '–'}</td><td>${tot[0] ? `${round1((1 - tot[2] / tot[0]) * 100)}%` : '–'}</td></tr></tfoot></table>`;
+  }
+
   function section(el, jp, en, sub, html) {
     el.innerHTML = `<div class="oks-sec-head"><span class="jp">${jp}</span><b>${en}</b>${sub ? `<span class="oks-sec-sub">${sub}</span>` : ''}</div>${html}`;
   }
@@ -235,6 +255,7 @@
         { label: 'Relearning', value: pc.relearning || 0, shown: `${pc.relearning || '–'} s`, tip: 'Seconds per answer for cards you forgot' },
         { label: 'Answers per new card', value: 0, shown: `${pc.answersPerNew || '–'}`, tip: 'How many answers a new card takes before it leaves its learning steps' },
       ])) +
+      card('Today by card type', 'answers, time, pace and how often you got it', typeTable(t.byType), 'wide') +
       '</div>';
     section($('oks-today'), '今日', 'Today', fmtDay(TODAY, 'year'), html);
   }
@@ -242,7 +263,7 @@
   // --------------------------------------------------------- 集中 pomodoro
   function renderPomo() {
     const p = D.pomo || {};
-    const all = (p.sessions || []).map(([date, hour, wd, secs, cards, how]) => ({ date, hour, wd, min: secs / 60, cards, how }));
+    const all = (p.sessions || []).map(([date, hour, wd, secs, cards, how, rev, fails, ms]) => ({ date, hour, wd, min: secs / 60, cards, how, rev: rev || 0, fails: fails || 0, ms: ms || 0 }));
     const first = all.reduce((a, s) => (!a || s.date < a ? s.date : a), null);
     const start = rangeStart(first);
     const S = all.filter((s) => s.date >= start);
@@ -286,6 +307,8 @@
       tile('Long breaks', num(Bk.filter((b) => b[2]).length), 'after a full cycle') +
       tile('Breaks skipped', num(Bk.filter((b) => b[3]).length)) +
       tile('Endless share', n ? pct(Math.round((endless / n) * 100)) : '–', '∞ mode sessions') +
+      tile('Retention in focus', (() => { const rv = S.reduce((a, s) => a + s.rev, 0); const f = S.reduce((a, s) => a + s.fails, 0); return rv ? pct(round1((1 - f / rv) * 100)) : '–'; })(), 'review cards remembered while focusing') +
+      tile('Answer time in focus', cards ? `${round1(S.reduce((a, s) => a + s.ms, 0) / 1000 / cards)} s` : '–', 'per card, as timed by Anki') +
       tile('Idle pauses', num(p.idlePauses), `all time · ${num(p.resets)} resets`) +
       '</div>';
 
@@ -375,6 +398,8 @@
       tile('All-time reviews', num(allTotal), first ? `since ${fmtDay(first, 'year')}` : '') +
       tile('All-time days', num(daily.length), `${num(daily.length ? Math.round(allTotal / daily.length) : 0)} per study day`) +
       tile('All-time study time', dur((((r.ranges || {}).all || {}).ms || 0) / 60000), 'every answer, as timed by Anki') +
+      tile('All-time pace', allTotal ? `${round1((((r.ranges || {}).all || {}).ms || 0) / 1000 / allTotal)} s` : '–', 'per card') +
+      tile('All-time retention', (() => { const a = (r.ranges || {}).all || {}; return a.reviewAnswers ? pct(round1((1 - a.fails / a.reviewAnswers) * 100)) : '–'; })(), 'review cards remembered') +
       '</div>';
 
     const b = buckets(start);
@@ -398,10 +423,7 @@
         [['Learning', 'New cards in their learning steps'], ['Review', 'Cards coming back for review'], ['Relearning', 'Cards you forgot, back in their steps'], ['Filtered', 'Answers in filtered decks']]
           .map(([label, note], i) => ({ slot: i + 1, label, value: Math.round((((rg.byType || [])[i] || [0, 0])[1]) / 60000), note: `${note} · minutes` }))
           .filter((p, i) => i < 3 || p.value)), 'wide') +
-      card('Pace by card type', `seconds per answer, as timed by Anki · ${rangeName()}`, rows(
-        [['Learning', 'New cards in their learning steps'], ['Review', 'Cards coming back for review'], ['Relearning', 'Cards you forgot, back in their steps'], ['Filtered', 'Answers in filtered decks']]
-          .map(([label, note], i) => { const [cnt, ms] = (rg.byType || [])[i] || [0, 0]; return { label, value: cnt ? round1(ms / 1000 / cnt) : 0, shown: cnt ? `${round1(ms / 1000 / cnt)} s · ${num(cnt)}` : '–', tip: `<b>${label}</b>\n${note}${cnt ? `\n${num(cnt)} answers · ${dur(ms / 60000)} in all` : ''}` }; })
-          .filter((r, i) => i < 3 || ((rg.byType || [])[3] || [0])[0])), 'wide') +
+      card('By card type', `answers, time, pace and how often you got it · ${rangeName()}`, typeTable(rg.byType), 'wide') +
       card('Answer buttons', rangeName(), stack([
         { slot: 1, label: 'Again', value: btn[0] }, { slot: 2, label: 'Hard', value: btn[1] },
         { slot: 3, label: 'Good', value: btn[2] }, { slot: 4, label: 'Easy', value: btn[3] },
