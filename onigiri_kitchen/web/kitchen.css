@@ -659,6 +659,8 @@ body { background-image: none !important; font-family: var(--sans); }
 .ok-sign::before, .ok-sign::after { display: none; }
 .ok-sign-name { font-family: var(--sans); font-weight: 800; font-size: 20px; letter-spacing: 0.01em; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45); }
 .ok-sign-sub { color: rgba(255, 246, 230, 0.85); font-weight: 600; }
+.ok-sign-top { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.ok-sign-anki { font: 700 15px var(--mincho); letter-spacing: 0.08em; color: rgba(255, 246, 230, 0.85); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45); flex: none; }
 .ok-xp { background: rgba(255, 255, 255, 0.22); height: 5px; }
 
 .ok-timer, .ok-purse, .ok-foot-btn, .ok-toast {

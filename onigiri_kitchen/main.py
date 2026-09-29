@@ -143,7 +143,7 @@ def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
         if _dialog is not None:
             _eval_kitchen("OK.onBreakDone()")
         else:
-            tooltip("Break's over. Back to the books! 頑張って", period=4000)
+            tooltip("Break's over. Back to the books! 頑張って (you've got this!)", period=4000)
 
 
 pomo = Pomodoro(conf, _on_timer_change, _on_timer_event)

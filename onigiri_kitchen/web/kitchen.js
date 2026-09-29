@@ -4038,7 +4038,8 @@
     const waiting = (S.guestsWaiting || 0) + customers.length;
     b.hidden = !(waiting > 0 && timer.phase !== 'focus');
     b.classList.toggle('on', rush);
-    b.innerHTML = rush ? '<span class="jp">急</span> 4× on' : '<span class="jp">急</span> Serve faster';
+    b.innerHTML = rush ? '<span class="jp">文</span> Collect all' : '<span class="jp">急</span> Serve faster';
+    b.title = rush ? 'Serving at 4×. Click again to collect every tip at once' : 'Serve waiting guests at 4× speed';
   }
   setInterval(renderRushBtn, 1000);
 
@@ -4081,19 +4082,6 @@
   }
 
   // After a big study session: choose how to catch up.
-  function maybeCatchUp() {
-    const waiting = S.guestsWaiting || 0;
-    if (waiting < 6 || !$('ok-modal').hidden) return false;
-    modal('大入り', `Full house! ${waiting} guests are waiting`,
-      'Great study session! Nothing was lost. How would you like to catch up?',
-      [
-        ['<span class="jp">急</span> Serve everyone at 4×', 'ok-hanko', startRush],
-        ['<span class="jp">文</span> Collect all tips now', 'ok-foot-btn', serveAll],
-        ['At my own pace', 'ok-ghost', null],
-      ]);
-    return true;
-  }
-
   function feedbackModal() {
     OKSound.pluck(4);
     modal('目安箱', 'Suggestion box',
@@ -4209,7 +4197,8 @@
   $('ok-idea').addEventListener('click', () => send('idea'));
   $('ok-tour-replay').addEventListener('click', () => { $('ok-settings').hidden = true; startTour(); });
   $('ok-b-rush').addEventListener('click', () => {
-    if (rush) { rush = false; renderRushBtn(); updateStatus(); } else startRush();
+    // first click: serve at 4×; second click: collect everyone's tips at once
+    if (rush) { rush = false; serveAll(); renderRushBtn(); updateStatus(); } else startRush();
   });
   $('ok-version').textContent = INIT.version ? 'v' + INIT.version : '';
   $('ok-t-reset').addEventListener('click', () => {
@@ -4596,7 +4585,6 @@
     $('ok-tour').hidden = true;
     send('tutorial', 'done');
     S.tutorialDone = true;
-    setTimeout(maybeCatchUp, 400);
   }
 
   function tourGo(i) {
@@ -4844,7 +4832,7 @@
       (waiting ? `<b>${waiting}</b> guest${waiting === 1 ? ' is' : 's are'} waiting to be seated.` : 'The kitchen is warm and ready.') +
       (info && info.daruma ? `<br>達磨 Both eyes painted: <b>+${info.daruma}</b> mon!` : '') +
       `<br>Relax for about <b>${mins || 1}</b> minute${mins === 1 ? '' : 's'}.`,
-      [['いただきます<small>&nbsp;Let\'s eat!</small>', 'ok-hanko ok-hanko-wide', () => { OKSound.pluck(5); setTimeout(maybeCatchUp, 300); }]]
+      [['いただきます<small>&nbsp;Let\'s eat!</small>', 'ok-hanko ok-hanko-wide', () => OKSound.pluck(5)]]
     );
     if (OKSound.enabled) OKSound.phraseUp();
     if (long) { for (let i = 0; i < 3; i++) setTimeout(firework, i * 400); }
@@ -4854,7 +4842,7 @@
     modal(
       '再開',
       "Break's over",
-      'Your guests will keep arriving while you study.<br>Every review sends someone your way. 頑張って!',
+      'Your guests will keep arriving while you study.<br>Every review sends someone your way. 頑張って! (You\'ve got this!)',
       [
         ['勉強<small>Back to studying</small>', 'ok-hanko ok-hanko-wide', () => send('study')],
         ['Stay a little', 'ok-ghost', null],
@@ -5047,7 +5035,7 @@
     if (!S.tutorialDone && INIT.reason !== 'break') { startTour(); return; }
     const greeted = greetOnOpen();
     if (INIT.reason === 'break') breakWelcome();
-    else if (!maybeCatchUp() && !greeted) say(chefLine());
+    else if (!greeted) say(chefLine());
   }, 600);
   }
 
