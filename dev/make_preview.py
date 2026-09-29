@@ -54,6 +54,8 @@ if _real:
 def block(pal):
     return "".join(f"--oni-{k}:{v};" for k, v in pal.items())
 
+import shutil
+
 theme = ""
 if "--plain" not in os.sys.argv:
     theme = (f'<style id="ok-onigiri-theme">:root{{{block(SAMPLE["light"])}}}'
@@ -61,7 +63,6 @@ if "--plain" not in os.sys.argv:
     # With Onigiri installed, the sign uses Onigiri's wooden banner. Borrow it
     # from a local Onigiri install for the preview (dev/assets is gitignored,
     # so Onigiri's image is never committed to this repo).
-    import shutil
     wood_src = os.path.expanduser(
         "~/Library/Application Support/Anki2/addons21/1011095603/system_files/"
         "gamification_images/restaurant_folder/wooden_bg.png")
