@@ -32,7 +32,7 @@ CATALOG: List[Dict[str, Any]] = [
     {"id": "furin", "name": "Wind chime", "jp": "風鈴", "level": 2, "price": 25,
      "desc": "Glass fūrin by the window. Tap it, or let the breeze ring it."},
     {"id": "kakejiku", "name": "Hanging scroll", "jp": "掛け軸", "level": 4, "price": 35,
-     "desc": "継続: keep going. 継続は力なり: consistency is power."},
+     "desc": "Calligraphy of 継続 (keizoku): keep going.\nFrom the saying 継続は力なり: consistency is power."},
     {"id": "maneki", "name": "Maneki-neko", "jp": "招き猫", "level": 6, "price": 50,
      "desc": "The beckoning cat. Every guest tips +1 mon."},
     {"id": "daruma", "name": "Daruma", "jp": "達磨", "level": 8, "price": 45,
