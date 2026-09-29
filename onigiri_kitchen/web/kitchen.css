@@ -297,7 +297,7 @@ button { font: inherit; color: inherit; }
 .ok-tip {
   position: absolute;
   z-index: 6;
-  max-width: 300px;
+  max-width: 260px;
   padding: 6px 10px;
   border-radius: 8px;
   background: rgba(34, 26, 20, 0.92);
