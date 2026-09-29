@@ -15,7 +15,7 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
 
 - **Open the kitchen:** click the restaurant picture on Onigiri's main screen, click the
   little shop-front icon next to Onigiri's buttons, click the dango timer in the corner, or use
-  **Tools → Onigiri Kitchen** (Ctrl+Shift+K). Shift-click the picture to get Onigiri's normal
+  **Tools → Onigiri Kitchen** (Ctrl+Shift+K, or Cmd+Shift+K on a Mac). Shift-click the picture to get Onigiri's normal
   expanded view.
 - **Guests come from studying:** every 10 reviews in a deck brings a guest from that deck. There's no limit, so
   study in one big batch and catch up later: serve everyone at 4× or collect all tips at once.

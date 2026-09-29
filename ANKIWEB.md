@@ -44,7 +44,7 @@ You study, guests arrive. You take a break, you get to enjoy them.
 ![Night and festival](https://raw.githubusercontent.com/thussenthan/onigiri-kitchen/main/docs/night.png)
 
 ### How to open it
-Click the restaurant picture on Onigiri's main screen (Shift-click keeps Onigiri's normal view), click the shop-front icon next to Onigiri's buttons, click the dango timer in the corner, or use **Tools → Onigiri Kitchen** (Ctrl+Shift+K).
+Click the restaurant picture on Onigiri's main screen (Shift-click keeps Onigiri's normal view), click the shop-front icon next to Onigiri's buttons, click the dango timer in the corner, or use **Tools → Onigiri Kitchen** (Ctrl+Shift+K, or Cmd+Shift+K on a Mac).
 
 ### Your data
 Onigiri Kitchen never modifies Onigiri. It only reads your restaurant name, level, theme and Specials Book. Your XP and Taiyaki coins are untouched. Onigiri is recommended but not required.

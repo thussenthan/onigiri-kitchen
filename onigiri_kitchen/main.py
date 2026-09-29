@@ -846,22 +846,6 @@ def around_finished_screen(overview: Any, _old: Any) -> Any:
                 debug_log(f"confetti failed: {e!r}")
 
 
-def test_confetti() -> None:
-    """Tools menu: play the celebration over the current main screen, to check
-    it shows up (e.g. on Onigiri's congrats page) without finishing a deck."""
-    c = conf()
-    opts = {"deck": "Test", "sound": bool(c.get("sound", True)), "volume": float(c.get("volume", 0.5))}
-    try:
-        theme = onigiri_link.read_theme()
-        if theme:
-            opts["accent"] = theme["light"].get("--accent-color")
-    except Exception:
-        pass
-    script = _read_web("sound.js") + "\n" + _read_web("celebrate.js") + f"\nOKCelebrate({json.dumps(opts)});"
-    mw.web.eval(script)
-    debug_log(f"test confetti played (screen: {mw.state})")
-
-
 def _install_celebration() -> None:
     from anki.hooks import wrap
 
@@ -937,10 +921,6 @@ def _add_menu() -> None:
         open_action.setShortcut(QKeySequence(shortcut))
     open_action.triggered.connect(lambda: open_kitchen())
     menu.addAction(open_action)
-
-    test_action = QAction("Onigiri Kitchen: Test Confetti", mw)
-    test_action.triggered.connect(test_confetti)
-    menu.addAction(test_action)
 
     focus_action = QAction("Onigiri Kitchen: Start Focus Timer", mw)
     focus_action.triggered.connect(lambda: pomo.start_focus())

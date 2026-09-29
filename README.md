@@ -113,7 +113,7 @@ Onigiri is recommended but optional. Without it, the kitchen uses its own washi-
 
 **Opening the kitchen:** click the restaurant picture on Onigiri's main screen (Shift-click keeps Onigiri's
 own expand view), click the shop-front icon next to Onigiri's buttons, click the corner dango timer, or use
-**Tools → Onigiri Kitchen** (Ctrl+Shift+K).
+**Tools → Onigiri Kitchen** (Ctrl+Shift+K, or Cmd+Shift+K on a Mac).
 
 ## Home-screen widget
 
