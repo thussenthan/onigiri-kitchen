@@ -56,6 +56,7 @@
   };
   window.OKS = {
     today: TODAY,
+    studyToday: { cards: 142, seconds: 1080, pace: 7.6, retention: 89.4, newCards: 20, due: { new: 20, learn: 12, review: 96, total: 128 }, estimateSeconds: 1330, paces: { learning: 7.1, review: 7.1, relearning: 8.7, answersPerNew: 2.9 } },
     version: '1.8.0',
     pomo: { since: back(90), sessions, breaks, idlePauses: 27, resets: 4 },
     reviews: {

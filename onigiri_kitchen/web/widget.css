@@ -147,3 +147,10 @@
 @container (max-width: 300px) and (max-height: 150px) {
   .okw-row .okw-btn { display: inline-block; }
 }
+
+/* today's row (cards, time, pace, time left): only on big widgets, two rows
+   tall and two columns wide; the others show it in their hover title */
+.okw-row-today { display: none; }
+@container (min-height: 170px) and (min-width: 300px) {
+  .okw-row-today { display: flex; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border, #e0d4bf); }
+}

@@ -213,10 +213,25 @@
         stat(num(st.days), short(st.days), st.days === 1 ? 'day' : 'days', st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
         stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'best streak', 'Your longest-ever streak: the most days in a row you have reviewed')
       : '';
+    // today: cards, time, pace, and how long what's due will take at your pace
+    const t = d.studyToday;
+    const mins = (secs) => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`; };
+    const todayTip = t
+      ? `Today: ${t.cards} cards in ${mins(t.seconds)}${t.pace ? `, ${t.pace} s a card` : ''}${t.retention != null ? `, ${t.retention}% retention` : ''}.` +
+        ` Due: ${t.due.total} cards (${t.due.new} new, ${t.due.learn} learning, ${t.due.review} review), about ${mins(t.estimateSeconds)} at your pace.`
+      : '';
+    const today = t
+      ? stat(num(t.cards), short(t.cards), 'today', 'today', `${t.cards} cards studied today`) +
+        stat(mins(t.seconds), mins(t.seconds), 'studied', 'studied', 'Time spent reviewing today, as timed by Anki') +
+        stat(t.pace ? `${t.pace}s` : '–', t.pace ? `${t.pace}s` : '–', 'per card', '/card', 'Your pace today: seconds per card') +
+        stat(t.due.total ? `~${mins(t.estimateSeconds)}` : 'done', t.due.total ? `~${mins(t.estimateSeconds)}` : 'done', t.due.total ? `left · ${num(t.due.total)} due` : 'nothing due', 'left', esc(todayTip))
+      : '';
+    el.title = t ? `Open Onigiri Kitchen\n${todayTip}` : 'Open Onigiri Kitchen';
     info.innerHTML =
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
       `<div class="okw-big">${big}</div>` +
       `<div class="okw-sub"><span title="${d.mon} mon (文): tips from your guests">文 ${d.mon}</span>${p.species ? `<span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span>` : ''}</div>` +
+      (today ? `<div class="okw-row okw-row-today"><span class="okw-stats">${today}</span></div>` : '') +
       `<div class="okw-row">` +
       `<span class="okw-stats">${stats}</span>` +
       '' +

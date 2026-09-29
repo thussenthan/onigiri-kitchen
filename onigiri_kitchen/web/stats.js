@@ -202,6 +202,43 @@
     el.innerHTML = `<div class="oks-sec-head"><span class="jp">${jp}</span><b>${en}</b>${sub ? `<span class="oks-sec-sub">${sub}</span>` : ''}</div>${html}`;
   }
 
+  // --------------------------------------------------------------- 今日 today
+  // (the same every range: it's about today)
+  function renderToday() {
+    const t = D.studyToday;
+    const sessions = ((D.pomo || {}).sessions || []).filter((s) => s[0] === TODAY);
+    const focusMin = sessions.reduce((a, s) => a + s[3] / 60, 0);
+    const kday = ((D.kitchen || {}).days || []).find((d) => d[0] === TODAY) || [TODAY, 0, 0, 0];
+    if (!t) { section($('oks-today'), '今日', 'Today', '', '<div class="oks-note">Couldn\'t read today\'s reviews.</div>'); return; }
+    const due = t.due || {};
+    const pc = t.paces || {};
+    let html = '<div class="oks-hero">' +
+      hero('Cards today', num(t.cards), `${num(t.newCards)} new`) +
+      hero('Time today', dur(t.seconds / 60), 'as timed by Anki') +
+      hero('Pace', t.pace ? `${t.pace} s` : '–', 'per card today') +
+      hero('Time left', due.total ? `~${dur(t.estimateSeconds / 60)}` : 'All done', due.total ? `${num(due.total)} cards due, at your pace` : 'nothing due right now',
+        'Your cards still due today, times your own average seconds per answer (last 30 days), counting the answers a new card usually takes') +
+      '</div><div class="oks-grid">' +
+      tile('Retention today', pct(t.retention), 'review cards remembered') +
+      tile('Focus today', dur(focusMin), `${num(sessions.length)} session${sessions.length === 1 ? '' : 's'}`) +
+      tile('Guests today', num(kday[1]), `${num(kday[2])} 文 earned`) +
+      tile('Finish around', due.total ? new Date(Date.now() + t.estimateSeconds * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '–', due.total ? 'if you start now' : '') +
+      '</div><div class="oks-charts">' +
+      card('Due today', `${num(due.total)} cards · about ${dur(t.estimateSeconds / 60)}`, stack([
+        { slot: 1, label: 'New', value: due.new || 0, note: `About ${pc.answersPerNew || '–'} answers each, ${pc.learning || '–'} s an answer` },
+        { slot: 2, label: 'Learning', value: due.learn || 0, note: `${pc.relearning || '–'} s an answer` },
+        { slot: 3, label: 'Review', value: due.review || 0, note: `${pc.review || '–'} s an answer` },
+      ])) +
+      card('Your pace', 'last 30 days, as timed by Anki', rows([
+        { label: 'Learning', value: pc.learning || 0, shown: `${pc.learning || '–'} s`, tip: 'Seconds per answer for new cards in their learning steps' },
+        { label: 'Review', value: pc.review || 0, shown: `${pc.review || '–'} s`, tip: 'Seconds per answer for review cards' },
+        { label: 'Relearning', value: pc.relearning || 0, shown: `${pc.relearning || '–'} s`, tip: 'Seconds per answer for cards you forgot' },
+        { label: 'Answers per new card', value: 0, shown: `${pc.answersPerNew || '–'}`, tip: 'How many answers a new card takes before it leaves its learning steps' },
+      ])) +
+      '</div>';
+    section($('oks-today'), '今日', 'Today', fmtDay(TODAY, 'year'), html);
+  }
+
   // --------------------------------------------------------- 集中 pomodoro
   function renderPomo() {
     const p = D.pomo || {};
@@ -469,6 +506,7 @@
     applyTheme();
     $('oks-sub').textContent = `Everything Onigiri Kitchen keeps count of · ${fmtDay(TODAY, 'year')}`;
     renderRange();
+    renderToday();
     renderPomo();
     renderReviews();
     renderKitchen();

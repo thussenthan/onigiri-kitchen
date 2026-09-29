@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from aqt import gui_hooks, mw
 from aqt.deckbrowser import DeckBrowser
@@ -807,6 +807,7 @@ def stats_payload() -> Dict[str, Any]:
         "pomo": _pomo_stats(today),
         "reviews": _review_stats(today),
         "kitchen": _kitchen_stats(),
+        "studyToday": study_today(),
         "themeMode": conf().get("theme_mode", "anki"),
         "version": VERSION,
     }
@@ -880,6 +881,66 @@ def restaurant_progress() -> Dict[str, Any]:
     return progress
 
 
+_today_cache: Dict[str, Any] = {"key": None, "value": None}
+
+
+def study_today() -> Optional[Dict[str, Any]]:
+    """Today's studying (cards, time, pace, retention) and what's still due,
+    with an estimate of how long it will take at your own pace: seconds per
+    answer by card type and answers per new card, from the last 30 days (all
+    time if that's empty)."""
+    try:
+        cutoff = int(mw.col.sched.day_cutoff)
+        db = mw.col.db
+        start_ms = (cutoff - 86400) * 1000
+        today_n = int(db.scalar("select count() from revlog where type in (0, 1, 2, 3) and id > ?", start_ms) or 0)
+    except Exception:
+        return None
+    key = (cutoff, today_n, mw.col.mod if hasattr(mw.col, "mod") else 0)
+    if _today_cache["key"] == key:
+        return _today_cache["value"]
+    try:
+        ms = int(db.scalar("select coalesce(sum(time), 0) from revlog where type in (0, 1, 2, 3) and id > ?", start_ms) or 0)
+        rev = db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", start_ms) or (0, 0)
+        new_today = int(db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", start_ms) or 0)
+
+        def paces(since: int) -> Dict[int, Tuple[int, int]]:
+            return {int(t): (int(c), int(m or 0)) for t, c, m in db.all(
+                "select type, count(), sum(time) from revlog where type in (0, 1, 2) and id > ? group by type", since)}
+
+        month = paces((cutoff - 30 * 86400) * 1000)
+        if not month:
+            month = paces(0)
+        new_seen = db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", (cutoff - 30 * 86400) * 1000) or 0
+
+        def per(t: int, default: float) -> float:
+            c, m = month.get(t, (0, 0))
+            return m / 1000 / c if c else default
+
+        learn_s = per(0, 8.0)
+        review_s = per(1, 8.0)
+        relearn_s = per(2, learn_s)
+        answers_per_new = (month.get(0, (0, 0))[0] / new_seen) if new_seen else 2.5
+        tree = mw.col.sched.deck_due_tree()
+        due_new, due_learn, due_review = int(tree.new_count), int(tree.learn_count), int(tree.review_count)
+    except Exception as e:
+        print(f"Onigiri Kitchen: couldn't estimate today's time: {e}")
+        return None
+    estimate = due_new * answers_per_new * learn_s + due_learn * relearn_s + due_review * review_s
+    value = {
+        "cards": today_n,
+        "seconds": round(ms / 1000),
+        "pace": round(ms / 1000 / today_n, 1) if today_n else None,
+        "retention": round(100 * (1 - (rev[1] or 0) / rev[0]), 1) if rev[0] else None,
+        "newCards": new_today,
+        "due": {"new": due_new, "learn": due_learn, "review": due_review, "total": due_new + due_learn + due_review},
+        "estimateSeconds": round(estimate),
+        "paces": {"learning": round(learn_s, 1), "review": round(review_s, 1), "relearning": round(relearn_s, 1), "answersPerNew": round(answers_per_new, 1)},
+    }
+    _today_cache.update(key=key, value=value)
+    return value
+
+
 def widget_payload() -> Dict[str, Any]:
     _sync_with_log()
     progress = onigiri_link.read_progress()
@@ -892,6 +953,7 @@ def widget_payload() -> Dict[str, Any]:
         "reviews": int(state.data["today"].get("reviews", 0)),
         "focusDone": int(state.data["today"].get("focus_done", 0)),
         "stats": lifetime_stats(int(state.data["today"].get("reviews", 0))),
+        "studyToday": study_today(),
         "mon": int(state.data.get("mon", 0)),
         "pet": state.pet.snapshot(),
         "puffleColor": (PUFFLE_COLORS_BY_ID.get(state.data.get("puffle_color") or "blue") or PUFFLE_COLORS[0])["hex"],
