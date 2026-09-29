@@ -1752,7 +1752,7 @@
     ellipse(hx, hy, 3, 2, CAT.fur);
     P(hx - 2, hy - 3, CAT.fur); P(hx + 2, hy - 3, CAT.fur); P(hx + 2, hy - 2, col.a);
     R(hx - 2, hy, 1, 1, C.ink); R(hx + 1, hy, 2, 1, C.ink);
-    sleepZ(hx - 1, hy - 7);
+    sleepZ(hx + 5, hy - 6); // upper right of the head
   }
 
   function catSleep(cx, by) {
@@ -1964,7 +1964,7 @@
   function drawBird(cx, by, dir, o) {
     o = o || {};
     const head = birdBody(cx, by, dir, o, birdCols(o.color));
-    if (o.sleep) sleepZ(head.x + 3, head.y - 7);
+    if (o.sleep) sleepZ(head.x + 6, head.y - 6);
   }
 
   function birdBody(cx, by, dir, o, col) {
@@ -3118,7 +3118,7 @@
       const ay = Math.round(a.y == null ? FLOOR_Y : a.y);
       const asleep = pose === 'sleep' && !a.air;
       art(Math.round(a.x), ay, a.dir, a.air ? 'fly' : asleep && !SLEEP_ART.has(a.id) ? 'rest' : pose, walkFrame, a);
-      if (asleep) sleepZ(Math.round(a.x) + 5, ay - (a.id === 'tsuru' ? 30 : 18));
+      if (asleep) sleepZ(Math.round(a.x) + 9, ay - (a.id === 'tsuru' ? 30 : 17));
       const info = animalInfo(a.id);
       const h = a.id === 'tsuru' ? 27 : a.id === 'usagi' ? 17 : 17;
       regions.push({ x: a.x - 10, y: ay - h, w: 20, h, label: `<b>${info.jp}</b> ${info.name}\n${info.perk}`, click: () => reactResident(a) });

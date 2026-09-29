@@ -170,12 +170,16 @@
     if (p.species && sleepy && time % 3 < 2.4) {
       const c = time % 3;
       const zc = '#d8c8ab';
-      const right = tx + 20 <= W;
+      // start just past the pet's head (its right edge and top differ by
+      // species) and rise up and to the right; up-left when there's no room
+      const edge = p.species === 'cat' ? 8 : p.species === 'bird' ? 4 : 5;
+      const top = p.species === 'puffle' ? 28 : 30;
+      const right = tx + edge + 2 + 17 <= W;
       // 5x5 (the smallest that reads as a Z), a pixel apart, rising gently
       for (let k = 0; k < 3; k++) {
         if (c < k * 0.6) continue;
-        const zx = right ? tx + 3 + k * 6 : tx - 8 - k * 6;
-        const zy = 21 - k * 4;
+        const zx = right ? tx + edge + 2 + k * 6 : tx - edge - 7 - k * 6;
+        const zy = top - 5 - k * 4;
         R(zx, zy, 5, 1, zc);
         for (let j = 1; j <= 3; j++) R(zx + 4 - j, zy + j, 1, 1, zc);
         R(zx, zy + 4, 5, 1, zc);
