@@ -18,7 +18,7 @@ restaurant's name, level and theme colour. Without it, the kitchen still works o
   **Tools → Onigiri Kitchen** (Ctrl+Shift+K, or Cmd+Shift+K on a Mac). Shift-click the picture to get Onigiri's normal
   expanded view.
 - **Guests come from studying:** every 10 reviews in a deck brings a guest from that deck. There's no limit, so
-  study in one big batch and catch up later: serve everyone at 4× or collect all tips at once.
+  study in one big batch and catch up later: 急 Serve faster serves everyone at 4×, and tapped again collects all tips at once.
   Each deck has its own look. Getting a leech card right sends a grumpy sour-plum guest who
   cheers up once fed. Finishing a focus session sends a golden guest, and if you own the
   daruma, your 4th session of the day paints its second eye for +30 mon.

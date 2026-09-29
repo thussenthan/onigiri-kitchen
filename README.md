@@ -29,8 +29,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   the next time you visit, and he cheers when your Onigiri restaurant levels up. Without Onigiri, the house onigiri flavours unlock as your restaurant levels up.
 - **A daily goal party.** Reach your daily card goal (100 by default, change it in ⚙) and your restaurant throws a
   little party with fireworks the next time you visit.
-- **Study in one big batch, catch up later.** There's no limit on waiting guests. After a big session you can
-  serve everyone at 4× speed or collect every tip at once. Guests last until Anki's day rolls over, and anyone
+- **Study in one big batch, catch up later.** There's no limit on waiting guests. After a big session, tap
+  急 Serve faster to serve everyone at 4×, and tap it again to collect every tip at once. Guests last until Anki's day rolls over, and anyone
   still waiting then takes takeout and still leaves a tip.
 - **Pomodoro timer.** One dango per focus session. When a break starts, the restaurant opens. When the
   break ends, you get a gentle nudge back to your cards. Long breaks are festival nights with fireworks.

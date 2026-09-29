@@ -4081,7 +4081,6 @@
     });
   }
 
-  // After a big study session: choose how to catch up.
   function feedbackModal() {
     OKSound.pluck(4);
     modal('目安箱', 'Suggestion box',
@@ -4561,7 +4560,7 @@
     { jp: '店', title: 'The shop', text: 'Spend mon on decor and pets: the starters you didn\'t pick and big milestone friends who move in, each with a perk. Some unlock at higher restaurant levels.', dom: '#ok-b-decor' },
     { jp: () => sp().jp, title: () => `${pet.name}, your ${sp().name.toLowerCase()}`, text: () => `A gentle virtual pet. ${They()} eats while you review, gets a ${sp().food} for every guest, and grows as you study. ${They()} can't get sick or run away. The Pet button opens ${sp().their} care card.`, scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
     { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session. Rather skip the breaks? Tap ∞ for endless focus: it counts up, and every session still counts.', dom: '#ok-timer' },
-    { jp: '大入り', title: 'Big study sessions', text: () => `Prefer to study in one go? Go ahead. When you come back, you can serve everyone at 4× speed or collect every tip at once.${conf.daily_card_goal === 0 ? '' : ` Reach ${conf.daily_card_goal || 100} cards in a day and your restaurant throws a little party (change the goal in ⚙).`}`, dom: '#ok-status' },
+    { jp: '大入り', title: 'Big study sessions', text: () => `Prefer to study in one go? Go ahead. When you come back, tap 急 Serve faster to serve everyone at 4×, and tap it again to collect every tip at once.${conf.daily_card_goal === 0 ? '' : ` Reach ${conf.daily_card_goal || 100} cards in a day and your restaurant throws a little party (change the goal in ⚙).`}`, dom: '#ok-status' },
     { jp: '目安箱', title: 'Ideas & bugs', text: 'Use the suggestion box on the wall (or ⚙ settings) to suggest features or report bugs. You can replay this tour from ⚙.', scene: () => ({ x: MEYASU.x - 3, y: MEYASU.y - 5, w: MEYASU.w + 6, h: MEYASU.h + 7 }) },
   ];
   let tourIdx = -1;
