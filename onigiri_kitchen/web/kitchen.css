@@ -667,6 +667,23 @@ body { background-image: none !important; font-family: var(--sans); }
   box-shadow: none;
 }
 .ok-timer { border-radius: 15px; }
+/* 継続は力なり, between the sign and the timer (hidden when there's no room) */
+.ok-motto {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: center;
+  padding-left: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--ink-3);
+}
+.ok-motto .jp { font: 700 15px var(--mincho); letter-spacing: 0.08em; color: var(--ink-2); }
+.ok-motto-en { font-size: 11px; font-weight: 600; }
+#ok-head .ok-timer { flex-shrink: 0; }
+@media (max-width: 860px) { .ok-motto { display: none; } }
 .ok-phase { font-family: var(--sans); font-weight: 700; letter-spacing: 0.02em; }
 .ok-clock { font-weight: 800; }
 
