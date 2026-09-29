@@ -3851,7 +3851,9 @@
     drawCounter();
     drawCounterDecor();
     drawFloorDecor();
-    customers.slice().sort((a, b) => a.y - b.y).forEach(drawCustomer);
+    // guests walking in or out pass behind the seated ones, never in front
+    const walking = (c) => (c.state === 'walk' || c.state === 'leave' ? 0 : 1);
+    customers.slice().sort((a, b) => walking(a) - walking(b) || a.y - b.y).forEach(drawCustomer);
     drawTables();
     drawPlates();
     drawCoins();
