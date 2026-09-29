@@ -689,6 +689,9 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
             mature = db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", since) or (0, 0)
             ms = db.scalar(f"select coalesce(sum(time), 0) from revlog where {where}", since) or 0
             new = db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", since) or 0
+            # answers and time by kind: 0 learning (new cards), 1 review, 2 relearning, 3 filtered deck
+            by_type = {int(t): [int(c), int(m or 0)] for t, c, m in db.all(
+                f"select type, count(), sum(time) from revlog where {where} group by type", since)}
             grid = [0] * 168
             for wd, h, c in db.all(
                 "select cast(strftime('%w', id / 1000, 'unixepoch', 'localtime') as integer), "
@@ -704,6 +707,7 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
                 "fails": int(mature[1] or 0),
                 "ms": int(ms),
                 "newCards": int(new),
+                "byType": [by_type.get(t, [0, 0]) for t in (0, 1, 2, 3)],
                 "grid": grid,
             }
         cards = db.first(

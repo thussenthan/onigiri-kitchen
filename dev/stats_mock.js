@@ -52,7 +52,7 @@
       [8, 12, 15, 19, 20, 21, 22, 23, 0].forEach((h, j) => { g[wd * 24 + h] += Math.round(c * [0.04, 0.06, 0.08, 0.12, 0.16, 0.18, 0.17, 0.12, 0.07][j]); });
     });
     const again = Math.round(total * 0.13);
-    return { buttons: [again, Math.round(total * 0.04), Math.round(total * 0.76), total - again - Math.round(total * 0.04) - Math.round(total * 0.76)], reviewAnswers: Math.round(total * 0.62), fails: Math.round(total * 0.62 * 0.12), ms: total * 15800, newCards: Math.round(total * 0.14), grid: g };
+    return { byType: [[Math.round(total * 0.2), Math.round(total * 0.2 * 11400)], [Math.round(total * 0.62), Math.round(total * 0.62 * 17200)], [Math.round(total * 0.18), Math.round(total * 0.18 * 14100)], [0, 0]], buttons: [again, Math.round(total * 0.04), Math.round(total * 0.76), total - again - Math.round(total * 0.04) - Math.round(total * 0.76)], reviewAnswers: Math.round(total * 0.62), fails: Math.round(total * 0.62 * 0.12), ms: total * 15800, newCards: Math.round(total * 0.14), grid: g };
   };
   window.OKS = {
     today: TODAY,

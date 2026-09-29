@@ -4009,8 +4009,22 @@
   }
 
   let toastTimer = null;
+  // A bigger pop-down for good news worth a moment (still out of the way:
+  // it goes by itself, no click needed).
+  function bigToast(jp, title, html) {
+    const el = $('ok-toast');
+    el.classList.add('big');
+    el.innerHTML = `<b class="ok-toast-seal">${jp}</b><span><b>${title}</b><br>${html}</span>`;
+    el.hidden = false;
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = '';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 6500);
+  }
   function toast(text) {
     const el = $('ok-toast');
+    el.classList.remove('big');
     el.textContent = text;
     el.hidden = false;
     el.style.animation = 'none';
@@ -4087,11 +4101,10 @@
       if (k.golden) extras.push(`${k.golden} golden`);
       if (k.leech) extras.push(`${k.leech} sour plum${k.leech === 1 ? '' : 's'}`);
       const deckCount = Object.keys(res.decks || {}).length;
-      modal('全員満足', 'Everyone served!',
-        `Served <b>${count}</b> guest${count === 1 ? '' : 's'}${extras.length ? ' (' + extras.join(', ') + ')' : ''}` +
-        `${deckCount ? ` from <b>${deckCount}</b> deck${deckCount === 1 ? '' : 's'}` : ''}.<br>` +
-        `Tips: <b>+${res.mon} mon</b> · ${esc(pet.name)} got <b>${Math.min(count, 20)}</b> ${Math.min(count, 20) === 1 ? sp().food : foods()} saved.`,
-        [['やった!<small>Nice</small>', 'ok-hanko ok-hanko-wide', null]]);
+      bigToast('全員満足', 'Everyone served!',
+        `<b>${count}</b> guest${count === 1 ? '' : 's'}${extras.length ? ' (' + extras.join(', ') + ')' : ''}` +
+        `${deckCount ? ` from <b>${deckCount}</b> deck${deckCount === 1 ? '' : 's'}` : ''} · ` +
+        `<b>+${res.mon} mon</b> · ${esc(pet.name)} got <b>${Math.min(count, 20)}</b> ${Math.min(count, 20) === 1 ? sp().food : foods()} saved`);
     });
   }
 
@@ -4833,6 +4846,8 @@
     });
     $('ok-modal').hidden = false;
   }
+  // clicking outside a card closes it, like the お品書き menu (Esc does too)
+  $('ok-modal').addEventListener('click', (e) => { if (e.target === $('ok-modal')) $('ok-modal').hidden = true; });
 
   // "25 min", "90 s", for the break card
   function spanText(secs) {

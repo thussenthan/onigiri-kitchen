@@ -355,6 +355,10 @@
       card('Time of day', total ? `busiest around ${hourName(hours.indexOf(Math.max(...hours)))}` : 'reviews', columns(hours.map((v, h) => ({ label: h % 6 === 0 ? hourLabel(h) : '', value: v, tip: `<b>${hourName(h)}–${hourName((h + 1) % 24)}</b>\n${perReview(v)}` })), kfmt, { every: 1 })) +
       card('Day of the week', 'reviews', columns(wd.map((v, i) => ({ label: WD[i], value: v, tip: `<b>${WD_JP[i]} ${WD[i]}</b>\n${perReview(v)}` })), kfmt, { every: 1 })) +
       card('Answer time', `seconds per card, as timed by Anki · ${unitWord(bt.unit)} · lower is faster`, area(answerSeries, (v) => `${round1(v)}s`), 'wide') +
+      card('Pace by card type', `seconds per answer, as timed by Anki · ${rangeName()}`, rows(
+        [['Learning', 'New cards in their learning steps'], ['Review', 'Cards coming back for review'], ['Relearning', 'Cards you forgot, back in their steps'], ['Filtered', 'Answers in filtered decks']]
+          .map(([label, note], i) => { const [cnt, ms] = (rg.byType || [])[i] || [0, 0]; return { label, value: cnt ? round1(ms / 1000 / cnt) : 0, shown: cnt ? `${round1(ms / 1000 / cnt)} s · ${num(cnt)}` : '–', tip: `<b>${label}</b>\n${note}${cnt ? `\n${num(cnt)} answers · ${dur(ms / 60000)} in all` : ''}` }; })
+          .filter((r, i) => i < 3 || ((rg.byType || [])[3] || [0])[0])), 'wide') +
       card('Answer buttons', rangeName(), stack([
         { slot: 1, label: 'Again', value: btn[0] }, { slot: 2, label: 'Hard', value: btn[1] },
         { slot: 3, label: 'Good', value: btn[2] }, { slot: 4, label: 'Easy', value: btn[3] },
