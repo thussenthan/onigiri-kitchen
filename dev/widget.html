@@ -10,6 +10,14 @@ h3 { font-size:13px; color:var(--fg-subtle); margin:18px 0 8px; }
 </style>
 <script>window.pycmd=(m)=>{document.title=m};</script>
 <link rel="stylesheet" href="../onigiri_kitchen/web/widget.css">
+<script>{ // ?hour=11: pretend it's that time of day (the widget follows the real clock)
+  const h = new URLSearchParams(location.search).get('hour');
+  if (h !== null) {
+    const Real = Date;
+    window.Date = class extends Real {
+      constructor(...a) { if (a.length) super(...a); else { super(); this.setHours(parseFloat(h), 0, 0, 0); } }
+    };
+  } }</script>
 <script>{ // ?at=2: start the widgets 2 s in (screenshots catch all three sleepy Zs)
   const at = parseFloat(new URLSearchParams(location.search).get('at') || '0');
   const load = () => { const sc = document.createElement('script'); sc.src = '../onigiri_kitchen/web/widget.js'; document.head.appendChild(sc); };
