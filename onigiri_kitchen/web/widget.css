@@ -148,10 +148,9 @@
   .okw-row .okw-btn { display: inline-block; }
 }
 
-/* today's row (cards, time, pace, time left): only on big widgets, two rows
-   tall and two columns wide; the others show it in their hover title */
-.okw-row-today, .okw-stat-hours { display: none !important; }
+/* extra stats (hours studied, time left) only on big widgets, two rows tall and
+   two columns wide; every widget's hover shows them */
+.okw-stat-big { display: none !important; }
 @container (min-height: 170px) and (min-width: 300px) {
-  .okw-stat-hours { display: flex !important; }
-  .okw-row-today { display: flex !important; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border, #e0d4bf); }
+  .okw-stat-big { display: flex !important; }
 }

@@ -207,34 +207,27 @@
     const short = (n) => (n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n || 0));
     const two = (l, sh) => `<span class="okw-l">${l}</span><span class="okw-s">${sh}</span>`;
     const stat = (v, vs, label, ls, tip) => `<span class="okw-stat" title="${tip}"><b>${two(v, vs)}</b><small>${two(label, ls)}</small></span>`;
+    // how long what's still due will take at your pace (the one thing about
+    // today that Onigiri doesn't already show)
+    const t = d.studyToday;
+    const mins = (secs) => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`; };
+    const due = t && t.due ? t.due.total : 0;
+    const leftTip = t ? (due ? `About ${mins(t.estimateSeconds)} left: ${due} cards due (${t.due.new} new, ${t.due.learn} learning, ${t.due.review} review), at your own pace` : 'Nothing due right now') : '';
+    const left = t ? stat(due ? `~${mins(t.estimateSeconds)}` : 'done', due ? `~${mins(t.estimateSeconds)}` : 'done', due ? 'left' : 'all due', due ? 'left' : 'due', esc(leftTip)).replace('okw-stat"', 'okw-stat okw-stat-big"') : '';
+    const allTip = st.hours != null ? `\nAll time: ${Number(st.total || 0).toLocaleString()} reviews in ${st.hours} hours.` : '';
+    el.title = `Open Onigiri Kitchen${leftTip ? `\n${leftTip}.` : ''}${allTip}`;
     const stats = d.stats
       ? stat(num(st.total), short(st.total), 'reviews', 'reviews', `${Number(st.total || 0).toLocaleString()} reviews all time`) +
         stat(num(st.average), short(st.average), 'per day', '/day', 'Average reviews on the days you studied') +
         stat(num(st.days), short(st.days), st.days === 1 ? 'day' : 'days', st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
         stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'best streak', 'Your longest-ever streak: the most days in a row you have reviewed') +
-        (st.hours != null ? stat(`${num(Math.round(st.hours))}h`, `${short(Math.round(st.hours))}h`, 'studied', 'studied', `${st.hours} hours of reviewing, all time (as timed by Anki)`).replace('okw-stat"', 'okw-stat okw-stat-hours"') : '')
+        (st.hours != null ? stat(`${num(Math.round(st.hours))}h`, `${short(Math.round(st.hours))}h`, 'studied', 'studied', `${st.hours} hours of reviewing, all time (as timed by Anki)`).replace('okw-stat"', 'okw-stat okw-stat-big"') : '') +
+        left
       : '';
-    // today: cards, time, pace, and how long what's due will take at your pace
-    const t = d.studyToday;
-    const mins = (secs) => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`; };
-    const todayTip = t
-      ? `Today: ${t.cards} cards in ${mins(t.seconds)}${t.pace ? `, ${t.pace} s a card` : ''}${t.retention != null ? `, ${t.retention}% retention` : ''}.` +
-        ` Due: ${t.due.total} cards (${t.due.new} new, ${t.due.learn} learning, ${t.due.review} review), about ${mins(t.estimateSeconds)} at your pace.`
-      : '';
-    const today = t
-      ? stat(num(t.cards), short(t.cards), 'today', 'today', `${t.cards} cards studied today`) +
-        stat(mins(t.seconds), mins(t.seconds), 'studied', 'studied', 'Time spent reviewing today, as timed by Anki') +
-        stat(t.pace ? `${t.pace}s` : '–', t.pace ? `${t.pace}s` : '–', 'per card', '/card', 'Your pace today: seconds per card') +
-        stat(t.retention != null ? `${Math.round(t.retention)}%` : '–', t.retention != null ? `${Math.round(t.retention)}%` : '–', 'retention', 'kept', 'Review cards you remembered today') +
-        stat(t.due.total ? `~${mins(t.estimateSeconds)}` : 'done', t.due.total ? `~${mins(t.estimateSeconds)}` : 'done', t.due.total ? `left · ${num(t.due.total)} due` : 'nothing due', 'left', esc(todayTip))
-      : '';
-    const allTip = st.hours != null ? `\nAll time: ${Number(st.total || 0).toLocaleString()} reviews in ${st.hours} hours.` : '';
-    el.title = `Open Onigiri Kitchen${t ? `\n${todayTip}` : ''}${allTip}`;
     info.innerHTML =
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
       `<div class="okw-big">${big}</div>` +
       `<div class="okw-sub"><span title="${d.mon} mon (文): tips from your guests">文 ${d.mon}</span>${p.species ? `<span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span>` : ''}</div>` +
-      (today ? `<div class="okw-row okw-row-today"><span class="okw-stats">${today}</span></div>` : '') +
       `<div class="okw-row">` +
       `<span class="okw-stats">${stats}</span>` +
       '' +
