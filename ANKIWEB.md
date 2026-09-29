@@ -11,7 +11,7 @@ To publish an update: run `./build.sh`, open the AnkiWeb page while logged in, c
 | **Support page** | https://github.com/thussenthan/onigiri-kitchen/issues |
 | **Branches** | minimum `23.10.0`, maximum the newest Anki you've tested (from Help → About, e.g. `25.09.2`; no `-` prefix, so newer versions can still download it). A blank maximum gives "invalid version range". |
 
-The AnkiWeb title is also the name people see in Anki's add-on list, so keep it as the Japanese name.
+Anki names AnkiWeb installs after the download's file name, which AnkiWeb makes from the title with anything non-ASCII removed (`Onigiri_Kitchen__.ankiaddon`), so the add-on list shows plain "Onigiri Kitchen". The title still shows in full on AnkiWeb, so keep the Japanese in it.
 
 
 ## Description (paste into the description box, which accepts Markdown)
