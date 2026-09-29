@@ -122,9 +122,9 @@ def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
         state.log_focus(info.get("seconds", 0), info.get("cards", 0), info.get("how", "f"))
         if info.get("credited"):
             info.update(_focus_credit())
-        msg = "休憩 Break time! Your restaurant is open."
+        msg = "休憩 Short break! Your restaurant is open."
         if info.get("long"):
-            msg = "祭り Long break! It's festival night at your restaurant."
+            msg = "休憩 Long break! Your restaurant is open."
         if c.get("auto_open_kitchen_on_break", True):
             open_kitchen(reason="break")
         else:
@@ -677,7 +677,7 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
         cutoff = int(mw.col.sched.day_cutoff)
         db = mw.col.db
         rows = db.all(
-            "select cast((id / 1000 - ?) / 86400.0 + 100000 as integer) as d, count() "
+            "select cast((id / 1000 - ?) / 86400.0 + 100000 as integer) as d, count(), coalesce(sum(time), 0) "
             "from revlog where type in (0, 1, 2, 3) group by d order by d",
             cutoff,
         )
@@ -723,9 +723,9 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
         print(f"Onigiri Kitchen: couldn't read review history for stats: {e}")
         return None
     # day index 99999 is today (Anki's day, with its own rollover hour)
-    daily = [[(today - datetime.timedelta(days=99999 - int(d))).isoformat(), int(c)] for d, c in rows]
+    daily = [[(today - datetime.timedelta(days=99999 - int(d))).isoformat(), int(c), int(ms)] for d, c, ms in rows]
     return {
-        "daily": daily,  # [date, reviews], every day you reviewed
+        "daily": daily,  # [date, reviews, answer ms], every day you reviewed
         "ranges": ranges,
         "collection": {
             "cards": int(cards[0] or 0),

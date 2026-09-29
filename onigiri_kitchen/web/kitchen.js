@@ -4834,15 +4834,26 @@
     $('ok-modal').hidden = false;
   }
 
+  // "25 min", "90 s", for the break card
+  function spanText(secs) {
+    if (secs < 60) return `${Math.round(secs)} s`;
+    const m = Math.round(secs / 60);
+    return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ''}`.trim() : `${m} min`;
+  }
   function breakWelcome(info) {
     const long = timer.longBreak || (info && info.long);
-    const cards = info && info.cards != null ? info.cards : timer.focusCards;
+    const last = info && info.seconds != null ? info : timer.lastFocus || {};
+    const cards = last.cards != null ? last.cards : info && info.cards != null ? info.cards : timer.focusCards;
+    const secs = last.seconds || 0;
     const waiting = S.guestsWaiting || 0;
     const mins = Math.round(remaining() / 60000);
+    // the session in one line: cards, how long, the pace, and how it ended if not by the timer
+    const ended = last.how === 'g' ? '<br>You reached your card goal.' : last.how === 'x' ? '<br>You ended it early.' : '';
+    const pace = cards && secs ? ` · <b>${Math.round((secs / cards) * 10) / 10} s</b> a card` : '';
     modal(
-      long ? '祭り' : '休憩',
-      long ? 'Festival night!' : 'Break time',
-      `You studied <b>${cards || 0}</b> card${cards === 1 ? '' : 's'} that session.<br>` +
+      '休憩',
+      long ? 'Long break' : 'Short break',
+      `You studied <b>${cards || 0}</b> card${cards === 1 ? '' : 's'}${secs ? ` in <b>${spanText(secs)}</b>` : ''}${pace}.${ended}<br>` +
       (waiting ? `<b>${waiting}</b> guest${waiting === 1 ? ' is' : 's are'} waiting to be seated.` : 'The kitchen is warm and ready.') +
       (info && info.daruma ? `<br>達磨 Both eyes painted: <b>+${info.daruma}</b> mon!` : '') +
       `<br>Relax for about <b>${mins || 1}</b> minute${mins === 1 ? '' : 's'}.`,

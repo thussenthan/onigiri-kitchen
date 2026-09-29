@@ -125,21 +125,34 @@
     return `<div class="oks-cols">${gridlines(max, fmt)}<div class="oks-bars">${bars}</div></div>${axis(items, opts.every || labelEvery(items.length))}`;
   }
 
-  // an area chart: a 2px line over a light wash, with a hover crosshair and dot per point
+  // an area chart: a 2px line over a light wash, with a hover crosshair and dot per
+  // point. A null value is a gap (nothing to measure that day), not a zero.
   function area(items, fmt, opts) {
     opts = opts || {};
     const n = items.length;
-    const max = scaleMax(items.map((i) => i.value), opts.minutes);
+    const max = scaleMax(items.map((i) => i.value || 0), opts.minutes);
     const W = 1000;
     const H = 100;
     const x = (i) => (n === 1 ? W / 2 : (i / (n - 1)) * W);
     const y = (v) => H - (v / max) * H;
-    const pts = items.map((it, i) => `${x(i).toFixed(1)},${y(it.value).toFixed(1)}`);
-    const line = `M${pts.join(' L')}`;
-    const wash = `M${x(0)},${H} L${pts.join(' L')} L${x(n - 1)},${H} Z`;
-    const hits = items.map((it, i) => `<div class="oks-hit" style="left:${n === 1 ? 50 : (i / (n - 1)) * 100}%;width:${100 / Math.max(1, n - 1)}%" data-tip="${esc(it.tip)}"><i style="bottom:${(it.value / max) * 100}%"></i></div>`).join('');
+    // runs of points with data; each gets its own line and wash
+    const runs = [];
+    let run = [];
+    items.forEach((it, i) => {
+      if (it.value == null) { if (run.length) runs.push(run); run = []; } else run.push(i);
+    });
+    if (run.length) runs.push(run);
+    let paths = '';
+    for (const r of runs) {
+      const pts = r.map((i) => `${x(i).toFixed(1)},${y(items[i].value).toFixed(1)}`);
+      if (r.length === 1) pts.push(pts[0]);
+      paths += `<path class="oks-wash" d="M${x(r[0])},${H} L${pts.join(' L')} L${x(r[r.length - 1])},${H} Z"/>` +
+        `<path class="oks-line" d="M${pts.join(' L')}" vector-effect="non-scaling-stroke"/>`;
+    }
+    const solo = new Set(runs.filter((r) => r.length === 1).map((r) => r[0])); // a lone day: show its dot
+    const hits = items.map((it, i) => `<div class="oks-hit${solo.has(i) ? ' solo' : ''}" style="left:${n === 1 ? 50 : (i / (n - 1)) * 100}%;width:${100 / Math.max(1, n - 1)}%" data-tip="${esc(it.tip)}">${it.value == null ? '' : `<i style="bottom:${(it.value / max) * 100}%"></i>`}</div>`).join('');
     return `<div class="oks-cols oks-area">${gridlines(max, fmt)}` +
-      `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="oks-wash" d="${wash}"/><path class="oks-line" d="${line}" vector-effect="non-scaling-stroke"/></svg>` +
+      `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${paths}</svg>` +
       `<div class="oks-hits">${hits}</div></div>${axis(items, opts.every || labelEvery(n))}`;
   }
 
@@ -212,6 +225,8 @@
     const best = dayList.reduce((a, e) => (!a || e[1].min > a[1].min ? e : a), null);
     const st = streaks(all.map((s) => s.date));
     const spanDays = between(start, TODAY) + 1;
+    // fastest pace in a session of at least 10 cards
+    const fastest = S.filter((s) => s.cards >= 10).reduce((a, s) => (!a || s.min / s.cards < a.min / a.cards ? s : a), null);
 
     let html = '';
     if (!all.length) html += '<div class="oks-note">Pomodoro stats start counting from version 1.8.0. Finish a focus session and they\'ll show up here.</div>';
@@ -219,11 +234,12 @@
       hero('Focus time', dur(minutes), `${num(n)} session${n === 1 ? '' : 's'} in ${rangeName()}`) +
       hero('Current streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one focus session') +
       hero('Completion rate', timed ? pct(Math.round(((full + goal) / timed) * 100)) : '–', 'timed sessions finished', 'Timed sessions that ran their full length or reached your card goal, out of all timed sessions (endless ones aren\'t timed)') +
-      hero('Cards in focus', num(cards), n ? `${round1(cards / n)} per session` : '') +
+      hero('Pace', cards ? `${round1((minutes * 60) / cards)} s` : '–', cards ? `a card · ${num(cards)} cards in focus` : 'seconds per card while focusing', 'Focus time divided by the cards you reviewed in it') +
       '</div><div class="oks-grid">' +
       tile('Average session', dur(n ? minutes / n : null)) +
       tile('Longest session', dur(n ? Math.max(...S.map((s) => s.min)) : null)) +
-      tile('Cards per minute', minutes ? round1(cards / minutes) : '–', 'while focusing') +
+      tile('Cards per session', n ? round1(cards / n) : '–', `${num(cards)} cards in focus`) +
+      tile('Fastest session', fastest ? `${round1(fastest.min * 60 / fastest.cards)} s` : '–', fastest ? `a card · ${fmtDay(fastest.date, 'year')}` : 'needs 10+ cards') +
       tile('Focus per day', dur(minutes / spanDays), `over ${num(spanDays)} day${spanDays === 1 ? '' : 's'}`) +
       tile('Active days', num(dayList.length), `${Math.round((dayList.length / spanDays) * 100)}% of days`) +
       tile('Per active day', dur(dayList.length ? minutes / dayList.length : null), dayList.length ? `${round1(n / dayList.length)} sessions` : '') +
@@ -237,6 +253,9 @@
 
     const b = buckets(start);
     S.forEach((s) => fill(b, s.date, s.min, 1));
+    const bp = buckets(start);
+    S.forEach((s) => fill(bp, s.date, s.min * 60, s.cards)); // seconds, cards
+    const paceSeries = bp.list.map((x) => ({ label: x.label, value: x.extra ? round1(x.value / x.extra) : null, tip: `<b>${bucketTitle(x)}</b>\n${x.extra ? `${round1(x.value / x.extra)} s a card · ${num(x.extra)} cards` : 'No cards'}` }));
     const series = b.list.map((x) => ({ label: x.label, value: Math.round(x.value), tip: `<b>${bucketTitle(x)}</b>\n${dur(x.value)} · ${x.extra} session${x.extra === 1 ? '' : 's'}` }));
     const grid = new Array(168).fill(0);
     const wd = new Array(7).fill(0);
@@ -249,6 +268,7 @@
       card('When you focus', `weekday × hour · ${rangeName()}`, punchcard(grid, focusOf), 'wide') +
       card('Time of day', n ? `busiest around ${hourName(peak)}` : 'focus time', columns(hours.map((v, h) => ({ label: h % 6 === 0 ? hourLabel(h) : '', value: Math.round(v), tip: `<b>${hourName(h)}–${hourName((h + 1) % 24)}</b>\n${focusOf(v)}` })), hm, { minutes: true, every: 1 })) +
       card('Day of the week', 'focus time', columns(wd.map((v, i) => ({ label: WD[i], value: Math.round(v), tip: `<b>${WD_JP[i]} ${WD[i]}</b>\n${focusOf(v)}` })), hm, { minutes: true, every: 1 })) +
+      card('Pace', `seconds per card while focusing · ${unitWord(bp.unit)} · lower is faster`, area(paceSeries, (v) => `${round1(v)}s`), 'wide') +
       card('How sessions ended', rangeName(), stack([
         { slot: 1, label: 'Full length', value: full, note: 'Ran the whole focus timer' },
         { slot: 2, label: 'Card goal', value: goal, note: 'Ended when you reached your card goal' },
@@ -320,6 +340,9 @@
 
     const b = buckets(start);
     inRange.forEach(([d, cnt]) => fill(b, d, cnt));
+    const bt = buckets(start);
+    inRange.forEach(([d, cnt, ms]) => fill(bt, d, (ms || 0) / 1000, cnt)); // seconds, cards
+    const answerSeries = bt.list.map((x) => ({ label: x.label, value: x.extra ? round1(x.value / x.extra) : null, tip: `<b>${bucketTitle(x)}</b>\n${x.extra ? `${round1(x.value / x.extra)} s a card · ${num(x.extra)} reviews` : 'No reviews'}` }));
     const series = b.list.map((x) => ({ label: x.label, value: x.value, tip: `<b>${bucketTitle(x)}</b>\n${num(x.value)} review${x.value === 1 ? '' : 's'}` }));
     const wd = new Array(7).fill(0);
     const hours = new Array(24).fill(0);
@@ -331,6 +354,7 @@
       card('When you review', `weekday × hour · ${rangeName()}`, punchcard(rg.grid || new Array(168).fill(0), perReview), 'wide') +
       card('Time of day', total ? `busiest around ${hourName(hours.indexOf(Math.max(...hours)))}` : 'reviews', columns(hours.map((v, h) => ({ label: h % 6 === 0 ? hourLabel(h) : '', value: v, tip: `<b>${hourName(h)}–${hourName((h + 1) % 24)}</b>\n${perReview(v)}` })), kfmt, { every: 1 })) +
       card('Day of the week', 'reviews', columns(wd.map((v, i) => ({ label: WD[i], value: v, tip: `<b>${WD_JP[i]} ${WD[i]}</b>\n${perReview(v)}` })), kfmt, { every: 1 })) +
+      card('Answer time', `seconds per card, as timed by Anki · ${unitWord(bt.unit)} · lower is faster`, area(answerSeries, (v) => `${round1(v)}s`), 'wide') +
       card('Answer buttons', rangeName(), stack([
         { slot: 1, label: 'Again', value: btn[0] }, { slot: 2, label: 'Hard', value: btn[1] },
         { slot: 3, label: 'Good', value: btn[2] }, { slot: 4, label: 'Easy', value: btn[3] },

@@ -36,6 +36,7 @@ class Pomodoro:
         self.rounds = 0  # focus sessions finished in the current cycle
         self.long_break = False
         self.focus_cards = 0
+        self.last_focus: Optional[Dict[str, Any]] = None  # the last finished session, for the break card
         # Idle pause: focus only counts down while you're actually reviewing.
         self.last_activity = time.time()
         self.idle_paused = False
@@ -312,6 +313,7 @@ class Pomodoro:
         studied = max(0.0, float(self.total or 0) - left)
         # for the stats: ran the full time, ended at the card goal, or cut short
         how = "x" if not credited else ("g" if left > 1 else "f")
+        self.last_focus = {"seconds": int(studied), "cards": cards, "how": how}
         self.start_break()
         self._on_event("focus_done", {"credited": credited, "cards": cards, "long": self.long_break, "seconds": studied, "how": how})
 
@@ -357,6 +359,7 @@ class Pomodoro:
             "cycle": self._cycle(),
             "longBreak": self.long_break,
             "focusCards": self.focus_cards,
+            "lastFocus": self.last_focus,
             "cardGoal": self._card_goal(),
             "now": int(time.time() * 1000),
         }

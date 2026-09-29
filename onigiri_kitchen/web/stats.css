@@ -166,6 +166,7 @@ body .oks-range button.on, body .oks-range button.on:hover { background: var(--s
 .oks-hit i { position: absolute; left: 50%; width: 9px; height: 9px; margin: 0 0 -5px -5px; border-radius: 50%; background: var(--shu); box-shadow: 0 0 0 2px var(--card); opacity: 0; }
 .oks-hit::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px solid var(--ink-3); opacity: 0; }
 .oks-hit:hover i, .oks-hit:hover::before { opacity: 1; }
+.oks-hit.solo i { opacity: 1; }
 
 /* categorical slots, in fixed order (validated for colour-blind separation) */
 .s1 { background: #2a78d6; } .s2 { background: #eb6834; } .s3 { background: #1baf7a; } .s4 { background: #eda100; } .s5 { background: #e87ba4; }

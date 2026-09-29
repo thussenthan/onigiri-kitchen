@@ -23,7 +23,7 @@
     const off = rnd() < (wd >= 5 ? 0.1 : 0.16);
     // reviews
     const reviews = off ? 0 : Math.round((80 + rnd() * 220) * ramp * (wd === 6 ? 1.3 : 1));
-    if (reviews) daily.push([d, reviews]);
+    if (reviews) daily.push([d, reviews, Math.round(reviews * (13000 + rnd() * 6000 - i * 8))]);
     // focus sessions (recorded for the last ~90 days)
     let guests = 0;
     let mon = 0;
