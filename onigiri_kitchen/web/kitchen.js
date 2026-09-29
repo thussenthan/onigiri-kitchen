@@ -869,7 +869,9 @@
     const t = SPECIALS.today;
     if (!t) return `<b>本日</b> Today's special\n${S.today.reviews || 0} cards reviewed today`;
     const d = MENU_DISHES.today;
-    return `<b>本日</b> Today's special: ${esc(t.name)}\n${t.done ? `✓ Prepared in Onigiri! Golden guests tip +${TODAY_DONE_BONUS} more for it` : `${t.progress}/${t.target} cards in Onigiri · golden guests order it (finish it for +${TODAY_DONE_BONUS})`}\n${esc(d.desc || '')}`;
+    const rar = RARITY[d.rarity] || RARITY.common;
+    return `<b>本日</b> Today's special: <b>${esc(t.name)}</b> <span style="color:${rar.c}">●</span>\n${d.desc ? esc(d.desc) + '\n' : ''}` +
+      (t.done ? `<b>済</b> ✓ Prepared in Onigiri! Golden guests tip +${TODAY_DONE_BONUS} more for it` : `${t.progress}/${t.target} cards in Onigiri · golden guests order it (finish it for +${TODAY_DONE_BONUS})`);
   }
   function drawMenu() {
     R(102, 20, 66, 2, C.woodDk);
@@ -885,7 +887,7 @@
         R(x + 2 + sw, 41, 6, 6, '#fff8ee');
         R(x + 2 + sw, 41, 6, 1, '#f3e6d2');
       }
-      const label = i === 4 ? specialTag() : tag ? `${tag.label}\nClick to play a note ♪` : `<b>${m.jp}</b> ${m.en}`;
+      const label = i === 4 ? `${specialTag()}\nClick to play a note ♪` : tag ? `${tag.label}\nClick to play a note ♪` : `<b>${m.jp}</b> ${m.en}`;
       regions.push({ x, y: 22, w: 10, h: 28, label, click: () => { shake['menu' + i] = 0.4; OKSound.pluck(3 + i); } });
     });
   }
@@ -1174,7 +1176,6 @@
     flip.shown = null; // fresh cards, no flip on switching
     OKSound.koto(OKSound.scaleNote(0), 0, 1.2);
     OKSound.koto(OKSound.scaleNote(3), 0.18, 1.4);
-    toast(conf.clock_style === 'flip' ? 'パタパタ · Flip clock' : '柱時計 · Wall clock');
   }
   function updateClock(dt) {
     if (clockStyle() !== 'flip') return;
@@ -1324,7 +1325,7 @@
         for (let i = 0; i < 10; i++) particles.push({ x: d.x + rand(0, 16), y: d.y + rand(0, 10), vx: rand(-8, 2), vy: rand(4, 10), life: rand(2, 4), c: pick(['#f7c6d4', '#f2a9c0']), type: 'petal' });
         OKSound.pluck(8);
         break;
-      case 'radio': radioOn = !radioOn; OKSound.blip(); toast(radioOn ? '♪ Radio on: a little koto music' : 'Radio off'); break;
+      case 'radio': radioOn = !radioOn; OKSound.blip(); break;
       case 'tanuki':
         OKSound.koto(98, 0, 0.35); OKSound.koto(98, 0.18, 0.35);
         spawnHearts(d.x + 8, d.y + 10, 1);
@@ -1362,9 +1363,9 @@
   }
   function dharmaText() {
     const n = S.today.focus_done || 0;
-    if (n >= 4) return `達磨: both eyes painted. Wish granted for today (+${DARUMA_BONUS} mon)!`;
-    if (n >= 1) return `達磨: one eye painted. Finish 4 focus sessions to paint the other (+${DARUMA_BONUS} mon).`;
-    return '達磨: finish a focus session today to paint the first eye.';
+    if (n >= 4) return `達磨 Daruma: Both eyes painted. Wish granted for today (+${DARUMA_BONUS} mon)!`;
+    if (n >= 1) return `達磨 Daruma: One eye painted. Finish 4 focus sessions today to paint the other (+${DARUMA_BONUS} mon).`;
+    return `達磨 Daruma: Finish a focus session today to paint the first eye.`;
   }
 
   // -------------------------------------------------------------- counter
@@ -2437,13 +2438,22 @@
     }
     if (tama.t >= tama.dur) {
       if (tama.state === 'sleep') { tamaSet('stretch', 1.1); return; }
+      if (tama.resume) { const r = tama.resume; tama.resume = null; tamaGo(r.x, r.then); return; }
       tamaDecide();
     }
   }
 
   function tamaReact(kind) {
-    if (tama.state === 'walk' || tama.air || feather) return;
     const hy = (tama.y == null ? FLOOR_Y : tama.y) - 16;
+    // flying or chasing the toy: hearts, but no stopping
+    if (tama.air || feather) { if (kind === 'pet') { spawnHearts(tama.x, hy, 2); voice(); } return; }
+    // walking somewhere: stop for the pat, then carry on (to the bowl, to bed…)
+    if (tama.state === 'walk') {
+      if (kind !== 'pet') return;
+      tama.resume = tama.target == null ? null : { x: tama.target, then: tama.then };
+      tama.target = null;
+      tama.then = null;
+    }
     if (kind === 'pet') { tamaSet(aloft(tama) ? 'perch' : 'purr', 3.5); spawnHearts(tama.x, hy, 2); voice(); }
     else if (kind === 'brush') {
       tamaSet('purr', 4);
@@ -2675,7 +2685,7 @@
           drawGiftSprite(gf.id, 0, 0, cv.getContext('2d'));
           cell.appendChild(cv);
           cell.title = `${gf.jp} ${gf.name}: ${gf.desc}`;
-          cell.insertAdjacentHTML('beforeend', `<span>${gf.jp}</span>${count > 1 ? `<em>×${count}</em>` : ''}`);
+          cell.insertAdjacentHTML('beforeend', `<span>${gf.jp}</span><small>${esc(gf.name)}</small>${count > 1 ? `<em>×${count}</em>` : ''}`);
         } else {
           cell.innerHTML = rare ? '<b>★</b>' : '<b>?</b>';
           cell.title = rare ? 'A rare keepsake. Only brought when love is 90 or more.' : 'Not found yet. A happy, well-fed pet brings gifts now and then.';
@@ -3006,7 +3016,7 @@
     if (tama.state !== 'sleep') tamaGo(BED_X, () => tamaSet('sleep', rand(40, 70)));
     residents.forEach((a) => sendToBed(a));
     OKSound.phraseDown();
-    say(['おやすみ…', residents.length ? 'Good night, everyone.' : `Good night, ${pet.name}.`], { x: BED_X + 30 + bedExtra() / 2, y: 150 });
+    say(['おやすみ…', residents.length ? 'Good night, everyone.' : `Good night, ${pet.name}.`], { x: BED_X + bedExtra() / 2, y: 150 });
   }
 
   function animalInfo(id) {
@@ -3969,8 +3979,17 @@
     if (el.hidden || !bubbleAnchor) return;
     const stage = $('ok-stage').getBoundingClientRect();
     const r = view.getBoundingClientRect();
-    el.style.left = (r.left - stage.left + (bubbleAnchor.x / W) * r.width) + 'px';
-    el.style.top = (r.top - stage.top + (bubbleAnchor.y / H) * r.height) + 'px';
+    const ax = r.left - stage.left + (bubbleAnchor.x / W) * r.width;
+    const ay = r.top - stage.top + (bubbleAnchor.y / H) * r.height;
+    // keep the whole bubble inside the room; the tail still points at the spot
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const lo = r.left - stage.left + w / 2 + 6;
+    const hi = r.right - stage.left - w / 2 - 6;
+    const x = lo > hi ? (lo + hi) / 2 : clamp(ax, lo, hi);
+    el.style.left = x + 'px';
+    el.style.top = Math.max(ay, r.top - stage.top + h + 6) + 'px';
+    el.style.setProperty('--tail', clamp(w / 2 + (ax - x), 16, w - 16) + 'px');
   }
 
   let toastTimer = null;
@@ -4542,7 +4561,7 @@
   // ------------------------------------------------------------ tutorial
   const TOUR = [
     { jp: 'ようこそ', title: 'Welcome to your restaurant!', text: 'This little onigiri shop runs by itself. Watch it, or click around, since almost everything does something.' },
-    { jp: '音', title: 'Sound on: highly recommended!', text: 'The kitchen is best with sound: soft koto notes, wind chimes, your pet\'s little noises and celebration fanfares. It\'s on by default, and this speaker button mutes it any time.', dom: '#ok-b-sound' },
+    { jp: '音', title: 'Sound on: highly recommended!', text: 'The kitchen is best with sound: soft koto music, wind chimes, your pet\'s little noises and celebration fanfares. It\'s on by default, and this speaker button mutes it any time.', dom: '#ok-b-sound' },
     { jp: 'お客さん', title: 'Guests come from studying', text: 'Every 10 reviews in a deck sends a guest from that deck. They wait outside the door until you visit, so nothing is lost if you study for a long time.', scene: () => ({ x: 254, y: 18, w: 48, h: 112 }) },
     { jp: '大将', title: 'The chef', text: () => (MENU_DISHES.book.length
       ? `Guests order from your menu: the ${MENU_DISHES.book.length} specials in your Onigiri Specials Book (it grows as you finish more). The chef cooks each order; tap him to make dishes ahead for the tray.`
@@ -4992,7 +5011,8 @@
   // dev preview only: draw sprites onto a test canvas
   if (window.OK_DEBUG_HOOKS) {
     window.OKD = {
-      tama, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish, openOshinagaki,
+      tama, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish, openOshinagaki, specialTag, dharmaText,
+      hitAt(x, y) { render(); const r = hit({ x, y }); return r && r.label; },
       step(n) { for (let i = 0; i < n; i++) update(1 / 30); },
       draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, withPet, ANIMAL_ART }); } finally { gRef = prev; } },
     };
