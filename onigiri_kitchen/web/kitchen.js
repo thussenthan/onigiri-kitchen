@@ -757,7 +757,7 @@
     const sway = Math.round(Math.sin(time * 0.9) * 0.7);
     R(245, 14, 1, 6, '#2b1c12');
     chochin(245 + sway, 20, 16, '#c8412f', lit);
-    regions.push({ x: 237, y: 18, w: 17, h: 22, label: '<b>赤提灯</b> Akachōchin\nThe red lantern of a cozy eatery', click: toggleLanterns });
+    regions.push({ x: 237, y: 18, w: 17, h: 22, label: '<b>赤提灯</b> Akachōchin\nThe red lantern of a cozy eatery, marked 食堂 (shokudō, restaurant)', click: toggleLanterns });
   }
 
   function toggleLanterns() {
@@ -871,7 +871,7 @@
     const d = MENU_DISHES.today;
     const rar = RARITY[d.rarity] || RARITY.common;
     return `<b>本日</b> Today's special: <b>${esc(t.name)}</b> <span style="color:${rar.c}">●</span>\n${d.desc ? esc(d.desc) + '\n' : ''}` +
-      (t.done ? `<b>済</b> ✓ Prepared in Onigiri! Golden guests tip +${TODAY_DONE_BONUS} more for it` : `${t.progress}/${t.target} cards in Onigiri · golden guests order it (finish it for +${TODAY_DONE_BONUS})`);
+      (t.done ? `<b>済</b> (done) ✓ Prepared in Onigiri! Golden guests tip +${TODAY_DONE_BONUS} more for it` : `${t.progress}/${t.target} cards in Onigiri · golden guests order it (finish it for +${TODAY_DONE_BONUS})`);
   }
   function drawMenu() {
     R(102, 20, 66, 2, C.woodDk);

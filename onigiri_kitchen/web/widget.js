@@ -212,7 +212,7 @@
     info.innerHTML =
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
       `<div class="okw-big">${big}</div>` +
-      `<div class="okw-sub"><span>文 ${d.mon}</span>${p.species ? `<span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span>` : ''}</div>` +
+      `<div class="okw-sub"><span title="${d.mon} mon (文): tips from your guests">文 ${d.mon}</span>${p.species ? `<span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span>` : ''}</div>` +
       `<div class="okw-row">` +
       `<span class="okw-stats">${stats}</span>` +
       '' +

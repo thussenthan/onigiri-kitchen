@@ -97,10 +97,11 @@
     }
     toggle.innerHTML = p.phase === 'idle' || p.paused ? '&#x25B6;&#xFE0E;' : '&#x23F8;&#xFE0E;';
     chip.title =
-      p.phase === 'focus' && p.idle ? 'Focus paused while you were away. Answer a card to resume.' :
-      p.phase === 'focus' && p.endless ? 'Endless focus: no breaks' :
-      p.phase === 'focus' ? 'Focus session' :
-      p.phase === 'break' ? 'Break: your restaurant is open' : 'Onigiri Kitchen';
+      p.phase === 'focus' && p.idle ? '休止 Paused: focus stopped while you were away. Answer a card to resume.' :
+      p.phase === 'focus' && p.endless ? '無限 Endless focus: no breaks' :
+      p.phase === 'focus' ? '集中 Focus session' :
+      p.phase === 'break' ? (p.longBreak ? '祭り Festival night: a long break, and your restaurant is open' : '休憩 Break: your restaurant is open') :
+      '食堂 Shokudō (restaurant): Onigiri Kitchen';
     const frac = p.endless
       ? (((p.elapsed || 0) + (p.paused ? 0 : Math.max(0, Date.now() - (p.now || Date.now())))) % (p.total || 1)) / (p.total || 1)
       : p.total ? 1 - remaining(p) / p.total : 0;
