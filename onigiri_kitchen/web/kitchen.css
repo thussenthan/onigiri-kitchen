@@ -1285,28 +1285,23 @@ button.ok-grid-head:focus-visible { outline: 2px solid var(--shu); }
 .ok-caret { width: 0; height: 0; align-self: center; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid var(--ink-3); transition: transform 0.15s; margin-right: 2px; }
 button.ok-grid-head.closed .ok-caret { transform: rotate(-90deg); }
 
-/* the pet card's tabs: one big tab per pet */
-.ok-pet-switch { display: flex; gap: 6px; padding: 10px 12px 0; }
+/* the pet card's tabs, along the bottom: one small tab per pet */
+.ok-pet-switch { display: flex; justify-content: center; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid var(--line); background: var(--paper-2); }
 .ok-pet-switch[hidden] { display: none; }
 .ok-pet-switch button {
-  all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 6px 4px 5px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); cursor: pointer;
-  font: 700 12px var(--sans); color: var(--ink-2);
+  all: unset; box-sizing: border-box; flex: 0 1 112px; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  padding: 6px 8px 5px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer;
+  font: 700 11.5px var(--sans); color: var(--ink-2);
 }
-.ok-pet-switch button canvas { width: 45px; height: 39px; image-rendering: pixelated; }
+.ok-pet-switch button canvas { display: block; width: 36px; height: 30px; image-rendering: pixelated; }
 .ok-pet-switch button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ok-pet-switch button:hover { border-color: var(--shu); }
 .ok-pet-switch button.on { border-color: var(--shu); background: color-mix(in srgb, var(--shu) 14%, var(--card)); color: var(--ink); }
 .ok-pet-switch button:focus-visible { outline: 2px solid var(--shu); outline-offset: 1px; }
 
-/* Open stats: big, first thing in the settings */
-.ok-stats-big {
-  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 14px; width: 100%; cursor: pointer;
-  padding: 14px 16px; border-radius: 16px; background: var(--shu); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--shu) 35%, transparent);
-}
-.ok-stats-big:hover { filter: brightness(1.07); }
-.ok-stats-big:focus-visible { outline: 3px solid color-mix(in srgb, var(--shu) 40%, #fff); outline-offset: 2px; }
-.ok-stats-big .ok-stats-ico { font-size: 28px; line-height: 1; }
-.ok-stats-big b { display: block; font-size: 16px; font-weight: 800; }
-.ok-stats-big b .jp { font-family: var(--mincho); margin-right: 4px; }
-.ok-stats-big small { display: block; font-size: 12px; opacity: 0.9; margin-top: 2px; font-weight: 500; }
+/* scroll bars that belong to the theme: thin, rounded, quiet until hovered */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink) 22%, transparent); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; min-height: 36px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--shu) 70%, transparent); background-clip: content-box; }

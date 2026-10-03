@@ -68,7 +68,7 @@
       since: back(90), days, served: 4821, byKind: { regular: 4280, golden: 212, leech: 329 },
       mon: 186, bySource: { tips: 14210, takeout: 640, daruma: 390, rabbit: 120, gifts: 60, keepsakes: 0 },
       topDecks: [['Japanese::Kanji', 1840], ['Japanese::Vocab', 1210], ['Pharmacology', 812], ['Anatomy', 544], ['Biochemistry', 290], ['Spanish', 125]],
-      onigiriMade: 96, fishFed: 104, daysOpen: 89, firstSeen: back(90), items: 11, pets: 3, rewards: 2, catalog: 17,
+      onigiriMade: 96, fishFed: 104, daysOpen: 89, firstSeen: back(90), items: 11, animals: 3, animalTotal: 6, rewards: 2, catalog: 17,
       level: 24, levelFrom: 'onigiri', specials: 11,
       pet: { name: 'Tama', species: 'cat', stage: '看板猫 Shop cat', studyDays: 64, petted: 530, gifts: 9, giftsTotal: 15 },
     },

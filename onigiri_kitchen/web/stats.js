@@ -47,6 +47,14 @@
   const hourLabel = (h) => (h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`);
   const hourName = (h) => hourLabel(h).replace('a', ' am').replace('p', ' pm');
 
+  // the page being shown (the window always opens on Today)
+  const PAGES = ['today', 'pomo', 'rev', 'kitchen'];
+  let page = 'today';
+  try {
+    const savedPage = new URLSearchParams(location.search).get('page'); // (always opens on Today)
+    if (savedPage && PAGES.includes(savedPage)) page = savedPage;
+  } catch (e) {}
+
   // the chosen range (remembered between visits)
   let range = '30';
   try {
@@ -287,10 +295,10 @@
     const fastest = S.filter((s) => s.cards >= 10).reduce((a, s) => (!a || s.min / s.cards < a.min / a.cards ? s : a), null);
 
     let html = '';
-    if (!all.length) html += '<div class="oks-note">Pomodoro stats start counting from version 1.8.0. Finish a focus session and they\'ll show up here.</div>';
+    if (!all.length) html += '<div class="oks-note">No focus sessions yet. Finish one and the numbers will show up here.</div>';
     html += '<div class="oks-hero">' +
       hero('Focus time', dur(minutes), `${num(n)} session${n === 1 ? '' : 's'} in ${rangeName()}`) +
-      hero('Current streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one focus session') +
+      hero('Focus streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one focus session') +
       hero('Completion rate', timed ? pct(Math.round(((full + goal) / timed) * 100)) : '–', 'timed sessions finished', 'Timed sessions that ran their full length or reached your card goal, out of all timed sessions (endless ones aren\'t timed)') +
       hero('Pace', cards ? `${round1((minutes * 60) / cards)}s` : '–', cards ? `a card · ${num(cards)} cards in focus` : 'seconds per card while focusing', 'Focus time divided by the cards you reviewed in it') +
       '</div><div class="oks-grid">' +
@@ -387,7 +395,7 @@
       hero('Reviews', num(total), `in ${rangeName()}`) +
       hero('Per day', num(Math.round(total / spanDays)), `${num(inRange.length ? Math.round(total / inRange.length) : 0)} per study day`) +
       hero('Retention', pct(retention), 'review cards remembered', 'Share of answers on review cards that weren\'t Again') +
-      hero('Current streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`) +
+      hero('Review streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one review') +
       '</div><div class="oks-grid">' +
       tile('Days studied', num(inRange.length), `${Math.round((inRange.length / spanDays) * 100)}% of days`) +
       tile('Busiest day', busiest ? num(busiest[1]) : '–', busiest ? fmtDay(busiest[0], 'year') : '') +
@@ -395,11 +403,12 @@
       tile('Per card', total ? `${round1((rg.ms || 0) / 1000 / total)}s` : '–', 'average answer time') +
       tile('Cards learned', num(rg.newCards), 'first seen as new') +
       tile('Again rate', presses ? pct(round1((btn[0] / presses) * 100)) : '–', `${num(btn[0])} presses`) +
-      tile('All-time reviews', num(allTotal), first ? `since ${fmtDay(first, 'year')}` : '') +
-      tile('All-time days', num(daily.length), `${num(daily.length ? Math.round(allTotal / daily.length) : 0)} per study day`) +
-      tile('All-time study time', dur((((r.ranges || {}).all || {}).ms || 0) / 60000), 'every answer, as timed by Anki') +
-      tile('All-time pace', allTotal ? `${round1((((r.ranges || {}).all || {}).ms || 0) / 1000 / allTotal)}s` : '–', 'per card') +
-      tile('All-time retention', (() => { const a = (r.ranges || {}).all || {}; return a.reviewAnswers ? pct(round1((1 - a.fails / a.reviewAnswers) * 100)) : '–'; })(), 'review cards remembered') +
+      (range === 'all' || (first && first >= start) ? '' : // (when the range already covers everything, these would just repeat it)
+        tile('All-time reviews', num(allTotal), first ? `since ${fmtDay(first, 'year')}` : '') +
+        tile('All-time days', num(daily.length), 'studied, ever') +
+        tile('All-time study time', dur((((r.ranges || {}).all || {}).ms || 0) / 60000), 'every answer, as timed by Anki') +
+        tile('All-time pace', allTotal ? `${round1((((r.ranges || {}).all || {}).ms || 0) / 1000 / allTotal)}s` : '–', 'per card') +
+        tile('All-time retention', (() => { const a = (r.ranges || {}).all || {}; return a.reviewAnswers ? pct(round1((1 - a.fails / a.reviewAnswers) * 100)) : '–'; })(), 'review cards remembered')) +
       '</div>';
 
     const b = buckets(start);
@@ -466,7 +475,7 @@
       tile('Fish fed', num(k.fishFed)) +
       tile('Onigiri made ahead', num(k.onigiriMade), 'for the tray') +
       tile('Decor owned', `${num(k.items)} / ${num(k.catalog)}`) +
-      tile('Companions', num(k.pets), 'milestone pets') +
+      tile('Companions', `${num(k.animals)} / ${num(k.animalTotal)}`, 'animals moved in') +
       tile('Rewards earned', num(k.rewards), 'from Onigiri specials') +
       tile('Specials on the menu', num(k.specials), 'in your Specials Book') +
       tile('Days open', num(k.daysOpen), k.firstSeen ? `since ${fmtDay(k.firstSeen, 'year')}` : '') +
@@ -488,16 +497,35 @@
     section($('oks-kitchen'), '食堂', 'Kitchen', k.since ? `Recorded since ${fmtDay(k.since, 'year')}` : '', html);
   }
 
-  // ------------------------------------------------------------ range bar
-  function renderRange() {
-    $('oks-range').innerHTML = '<span>Show</span>' + RANGES.map(([id, label]) => `<button type="button" data-range="${id}" class="${id === range ? 'on' : ''}">${label}</button>`).join('');
+  // ------------------------------------------------- pages and the range bar
+  // One page at a time. The time range only matters to the pages that have one
+  // (not Today, which is about today), so the bar only shows on those.
+  function renderPages() {
+    document.querySelectorAll('[data-page]').forEach((b) => {
+      const on = b.dataset.page === page;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    PAGES.forEach((id) => { $('oks-' + id).hidden = id !== page; });
+    const bar = $('oks-range');
+    bar.hidden = page === 'today';
+    if (!bar.hidden) {
+      bar.innerHTML = '<span>Show</span>' + RANGES.map(([id, label]) => `<button type="button" data-range="${id}" class="${id === range ? 'on' : ''}">${label}</button>`).join('');
+    }
+    document.body.dataset.page = page;
   }
   document.addEventListener('click', (e) => {
-    const b = e.target.closest && e.target.closest('[data-range]');
-    if (!b) return;
-    range = b.dataset.range;
-    try { localStorage.setItem('oksRange', range); } catch (err) {}
-    render();
+    const t = e.target.closest && e.target.closest('[data-range], [data-page]');
+    if (!t) return;
+    if (t.dataset.range) {
+      range = t.dataset.range;
+      try { localStorage.setItem('oksRange', range); } catch (err) {}
+      render();
+    } else {
+      page = t.dataset.page;
+      renderPages();
+      window.scrollTo(0, 0);
+    }
   });
 
   // --------------------------------------------------------------- tooltip
@@ -531,13 +559,13 @@
   }
   function render() {
     applyTheme();
-    $('oks-sub').textContent = `Everything Onigiri Kitchen keeps count of · ${fmtDay(TODAY, 'year')}`;
-    renderRange();
+    $('oks-sub').hidden = true; // (each page says what it covers)
+    renderPages();
     renderToday();
     renderPomo();
     renderReviews();
     renderKitchen();
-    $('oks-foot').textContent = `Onigiri Kitchen${D.version ? ' v' + D.version : ''} · Pomodoro and kitchen numbers are recorded from 1.8.0 on; reviews come from your whole Anki history.`;
+    $('oks-foot').textContent = `Onigiri Kitchen${D.version ? ' v' + D.version : ''} · Reviews come from your whole Anki history.`;
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
   else render();

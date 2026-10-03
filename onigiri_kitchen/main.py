@@ -23,7 +23,7 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.10.0"
+VERSION = "1.10.1"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 AUTHOR_NAME = "Thussenthan Walter-Angelo"
 AUTHOR_URL = "https://github.com/thussenthan"
@@ -889,10 +889,11 @@ def _kitchen_stats() -> Dict[str, Any]:
         "fishFed": int(d.get("fish_fed", 0)),
         "daysOpen": days_open,
         "firstSeen": d.get("first_seen"),
-        "items": len([i for i in owned if CATALOG_BY_ID[i].get("kind") not in ("pet", "reward")]),
-        "pets": len([i for i in owned if CATALOG_BY_ID[i].get("kind") == "pet"]),
+        "items": len([i for i in owned if CATALOG_BY_ID[i].get("kind") not in ("pet", "reward", "animal")]),
+        "animals": len([i for i in owned if CATALOG_BY_ID[i].get("kind") == "animal"]),
+        "animalTotal": len([c for c in CATALOG if c.get("kind") == "animal"]),
         "rewards": len([i for i in owned if CATALOG_BY_ID[i].get("kind") == "reward"]),
-        "catalog": len([c for c in CATALOG if c.get("kind") not in ("pet", "reward")]),
+        "catalog": len([c for c in CATALOG if c.get("kind") not in ("pet", "reward", "animal")]),
         "level": int(progress.get("level", 0)),
         "levelFrom": progress.get("levelFrom", "onigiri"),
         "specials": book,

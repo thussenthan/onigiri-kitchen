@@ -107,6 +107,7 @@
   .okw-big { font-size: 13px; }
   .okw-big b { font-size: 16px; }
   .okw-btn { border-color: rgba(255, 255, 255, 0.45); padding: 3px 8px; }
+  .okw-collect { color: #fff; border-color: rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.14); }
 }
 /* Tall (2+ rows): scene on top, info below */
 @container (min-height: 170px) and (min-width: 300px) {
@@ -177,13 +178,15 @@
   .okw-sub { display: none; }
   .okw-meter { display: block; grid-area: meter; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--fg) 12%, transparent); overflow: hidden; }
   .okw-meter i { display: block; height: 100%; border-radius: 3px; background: var(--accent-color, #c8412f); transition: width 0.4s; }
-  .okw-stats { grid-area: stats; flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; overflow: visible; margin-top: 3px; }
-  .okw-stat { background: color-mix(in srgb, var(--fg) 7%, transparent); border-radius: 9px; padding: 4px 8px 5px; min-width: 0; }
-  .okw-stat b { font-size: 14px; }
-  .okw-stat small { font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+  .okw-stats { grid-area: stats; flex: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; overflow: visible; margin-top: 3px; }
+  .okw-stat { background: color-mix(in srgb, var(--fg) 7%, transparent); border-radius: 9px; padding: 5px 6px 6px; min-width: 0; align-items: center; text-align: center; }
+  .okw-stat b { font-size: 13.5px; }
+  .okw-stat small { font-size: 9.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .okw-stat-big:last-child b { color: var(--accent-color, #c8412f); }
   .okw-row.okw-has-collect .okw-primary { display: inline-block; }
 }
-@container (min-height: 170px) and (min-width: 440px) {
-  .okw-stats { grid-template-columns: repeat(6, 1fr); }
+@container (min-height: 170px) and (min-width: 420px) {
+  .okw-stat { padding: 6px 8px 7px; }
+  .okw-stat b { font-size: 15px; }
+  .okw-stat small { font-size: 10.5px; }
 }

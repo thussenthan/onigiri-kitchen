@@ -144,6 +144,7 @@ stats_page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Stats p
 <script>if (new URLSearchParams(location.search).get('night')) document.documentElement.className='nightMode night-mode';</script>
 </head><body>{stats_body}
 <script>if (new URLSearchParams(location.search).get('night')) document.body.className='nightMode';</script>
+<script>{{ const x = new URLSearchParams(location.search).get('script'); if (x) document.body.appendChild(Object.assign(document.createElement('script'), {{src: x}})); }}</script>
 </body></html>"""
 open(os.path.join(ROOT, "dev", "stats_order.html"), "w", encoding="utf-8").write(stats_page)
 print("wrote dev/stats_order.html")

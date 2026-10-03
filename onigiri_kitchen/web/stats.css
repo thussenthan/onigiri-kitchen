@@ -12,6 +12,7 @@
   --shu-dk: color-mix(in srgb, var(--shu) 78%, #000);
   --accent-fg: var(--oni-accent-fg, #fff8ee);
   --matcha: #6f9a5c;
+  --today: #2f8f6a;
   --gold: #e8c25a;
   --wood-dk: #3e2717;
   --sign-text: #fff6e6;
@@ -32,12 +33,14 @@
   --line: var(--oni-border, #463b31);
   --shu: var(--oni-accent-color, #e0604b);
   --stage-bg: var(--oni-canvas-inset, #140e0a);
+  --today: #4cc79a;
   --shadow: 0 6px 22px var(--oni-shadow-md, rgba(0, 0, 0, 0.45));
   --shadow-lg: 0 18px 50px var(--oni-shadow-lg, rgba(0, 0, 0, 0.6));
 }
 
 
 html, body { margin: 0 !important; padding: 0 !important; }
+html { overflow-y: scroll; scrollbar-gutter: stable; } /* (no jump when a short page comes and goes) */
 body {
   background: var(--paper) !important;
   color: var(--ink);
@@ -54,15 +57,27 @@ body {
 .oks-title b { font-size: 22px; font-weight: 800; }
 .oks-sub { color: var(--ink-2); font-size: 13px; }
 .oks-nav { display: flex; gap: 6px; flex-wrap: wrap; }
-body .oks-nav a {
-  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
-  color: var(--ink); text-decoration: none; font-weight: 700; font-size: 12.5px;
+body .oks-nav button {
+  margin: 0; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); font: 700 12.5px var(--sans); cursor: pointer; box-shadow: none;
 }
-body .oks-nav a:hover { border-color: var(--shu); color: var(--shu); }
-.oks-nav a .jp { margin-right: 4px; color: var(--shu); }
+body .oks-nav button:hover { border-color: var(--shu); color: var(--shu); background: var(--card); }
+body .oks-nav button.on, body .oks-nav button.on:hover { background: var(--shu); border-color: var(--shu); color: var(--accent-fg); }
+.oks-nav button .jp { margin-right: 4px; color: var(--shu); }
+.oks-nav button.on .jp { color: inherit; }
+/* Today has its own colour, so it stands apart from the history pages */
+body .oks-nav button.oks-today-tab { border-color: color-mix(in srgb, var(--today) 55%, var(--line)); color: var(--today); }
+body .oks-nav button.oks-today-tab .jp { color: var(--today); }
+body .oks-nav button.oks-today-tab.on, body .oks-nav button.oks-today-tab.on:hover { background: var(--today); border-color: var(--today); color: #fff; }
+body .oks-nav button.oks-today-tab.on .jp { color: #fff; }
 
 /* sections */
-.oks-sec { margin-top: 26px; }
+.oks-sec { margin-top: 20px; }
+.oks-sec[hidden] { display: none; }
+#oks-today .oks-sec-head { border-bottom-color: var(--today); }
+#oks-today .oks-sec-head .jp { color: var(--today); }
+#oks-today .oks-hero-tile { background: linear-gradient(140deg, color-mix(in srgb, var(--today) 14%, var(--card)) 0%, var(--card) 70%); border-color: color-mix(in srgb, var(--today) 30%, var(--line)); }
+#oks-today .oks-hero-tile::after { background: color-mix(in srgb, var(--today) 10%, transparent); }
 .oks-sec-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); margin-bottom: 14px; }
 .oks-sec-head .jp { font-size: 22px; letter-spacing: 0.08em; }
 .oks-sec-head b { font-size: 17px; font-weight: 800; }
@@ -131,13 +146,12 @@ body .oks-nav a:hover { border-color: var(--shu); color: var(--shu); }
 
 /* ------------------------------------------------ range, heroes, polish */
 .oks-range {
-  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  margin: 0 -26px; padding: 10px 26px; background: color-mix(in srgb, var(--paper) 86%, transparent);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 4px; padding: 0;
 }
+.oks-range[hidden] { display: none; }
 .oks-range span { color: var(--ink-2); font-size: 12px; font-weight: 700; margin-right: 4px; }
 body .oks-range button {
-  margin: 0; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+  margin: 0; width: 92px; padding: 6px 0; text-align: center; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
   color: var(--ink); font: 700 12.5px var(--sans); cursor: pointer; box-shadow: none;
 }
 body .oks-range button:hover { border-color: var(--shu); color: var(--shu); background: var(--card); }
@@ -212,3 +226,10 @@ body .oks-range button.on, body .oks-range button.on:hover { background: var(--s
   .oks-charts { grid-template-columns: 1fr; }
   .oks-head { flex-direction: column; align-items: flex-start; }
 }
+
+/* scroll bars that belong to the theme: thin, rounded, quiet until hovered */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink) 22%, transparent); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; min-height: 36px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--shu) 70%, transparent); background-clip: content-box; }

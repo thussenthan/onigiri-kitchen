@@ -109,6 +109,15 @@
       R(wx + 9, 7, 1, 12, '#5a3a22');
     }
 
+    // wide scenes get two low tables with a candle, so the room isn't bare
+    if (W >= 110) {
+      [Math.round(W * 0.14), Math.round(W * 0.7)].forEach((tx0) => {
+        R(tx0, 29, 15, 2, '#a8743f'); R(tx0, 29, 15, 1, '#c28a52');
+        R(tx0 + 1, 31, 2, 5, '#5a3a22'); R(tx0 + 12, 31, 2, 5, '#5a3a22');
+        R(tx0 + 7, 25, 1, 4, '#f3ecd8'); if (Math.floor(time * 3) % 2) R(tx0 + 7, 24, 1, 1, '#ffd27a'); else R(tx0 + 7, 24, 1, 1, '#f59a3a');
+      });
+    }
+
     // Tama (and any other pets you have, standing beside)
     const p = d.pet || {};
     const phase = (d.timer && d.timer.pomo && d.timer.pomo.phase) || 'idle';

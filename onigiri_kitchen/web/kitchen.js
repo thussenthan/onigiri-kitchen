@@ -2910,17 +2910,29 @@
       b.type = 'button';
       b.className = x === viewSp ? 'on' : '';
       b.setAttribute('role', 'tab');
-      const cv = document.createElement('canvas');
-      cv.width = 30;
-      cv.height = 26;
+      // draw the pet big, then centre whatever was drawn (sprites differ in width and height)
+      const scratch = document.createElement('canvas');
+      scratch.width = 60;
+      scratch.height = 50;
       const prev = gRef;
-      gRef = cv.getContext('2d');
+      gRef = scratch.getContext('2d');
       withPet({ species: x, stage: 2 }, () => {
-        if (x === 'puffle') drawPuffle(15, 25, { color: S.puffleColor, happy: x === viewSp });
-        else if (x === 'bird') drawBird(15, 25, 1, { color: S.birdColor, happy: x === viewSp });
-        else catSit(15, 25, { happy: x === viewSp });
+        if (x === 'puffle') drawPuffle(30, 46, { color: S.puffleColor, happy: x === viewSp });
+        else if (x === 'bird') drawBird(30, 46, 1, { color: S.birdColor, happy: x === viewSp });
+        else catSit(30, 46, { happy: x === viewSp });
       });
       gRef = prev;
+      const px = scratch.getContext('2d').getImageData(0, 0, 60, 50).data;
+      let x0 = 60, x1 = -1, y0 = 50, y1 = -1;
+      for (let yy = 0; yy < 50; yy++) for (let xx = 0; xx < 60; xx++) if (px[(yy * 60 + xx) * 4 + 3] > 40) { x0 = Math.min(x0, xx); x1 = Math.max(x1, xx); y0 = Math.min(y0, yy); y1 = Math.max(y1, yy); }
+      const cv = document.createElement('canvas');
+      cv.width = 24;
+      cv.height = 20;
+      if (x1 >= x0) {
+        const bw = Math.min(24, x1 - x0 + 1);
+        const bh = Math.min(20, y1 - y0 + 1);
+        cv.getContext('2d').drawImage(scratch, x0, y0, bw, bh, Math.floor((24 - bw) / 2), Math.floor((20 - bh) / 2), bw, bh);
+      }
       b.appendChild(cv);
       b.insertAdjacentHTML('beforeend', `<span>${esc(p0.name || x)}</span>`);
       b.onclick = () => { viewSp = x; OKSound.blip(); voice(x); renderPetPanel(); };
@@ -4655,7 +4667,8 @@
     const b = btn.getBoundingClientRect();
     const gap = 8;
     const above = b.top > window.innerHeight / 2;
-    el.style.right = 'auto';
+    el.style.left = 'auto';
+    el.style.right = '16px';
     if (above) {
       el.style.top = 'auto';
       el.style.bottom = window.innerHeight - b.top + gap + 'px';
@@ -4665,8 +4678,6 @@
       el.style.top = b.bottom + gap + 'px';
       el.style.maxHeight = Math.max(200, window.innerHeight - b.bottom - gap - 16) + 'px';
     }
-    const w = el.offsetWidth;
-    el.style.left = clamp(b.left + b.width / 2 - w / 2, 12, window.innerWidth - w - 12) + 'px';
   }
   // Settings you changed but haven't saved: closing asks first, like closing a
   // Word document (Save / Don't save / Cancel).
