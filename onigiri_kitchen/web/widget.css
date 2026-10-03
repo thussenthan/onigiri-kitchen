@@ -86,6 +86,8 @@
   color: inherit;
 }
 .okw-btn:hover { border-color: var(--accent-color, #c8412f); color: var(--accent-color, #c8412f); }
+.okw-collect { border-color: var(--accent-color, #c8412f); color: var(--accent-color, #c8412f); }
+.okw-collect:disabled { opacity: 0.5; cursor: default; }
 .okw-primary { background: var(--accent-color, #c8412f); border-color: transparent; color: #fff; }
 .okw-primary:hover { filter: brightness(1.07); color: #fff; }
 
@@ -122,7 +124,7 @@
 /* Narrow and only one row tall: the whole card opens the kitchen anyway, so
    the Visit button makes room for the stats */
 @container (max-width: 420px) and (max-height: 150px) {
-  .okw-row .okw-btn { display: none; }
+  .okw-row .okw-btn:not(.okw-collect) { display: none; }
   .okw-stats { gap: 7px; }
   .okw-stat b { font-size: 12px; }
   .okw-stat small { font-size: 9.5px; }
@@ -153,4 +155,9 @@
 .okw-stat-big { display: none !important; }
 @container (min-height: 170px) and (min-width: 300px) {
   .okw-stat-big { display: flex !important; }
+}
+
+/* "Collect all" is the action while guests wait; the whole card already opens the kitchen, so Visit makes room */
+@container (max-width: 520px) {
+  .okw-row.okw-has-collect .okw-primary { display: none; }
 }

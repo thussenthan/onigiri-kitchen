@@ -68,9 +68,9 @@ class Pomodoro:
         if not c.get("pause_focus_when_idle", True):
             return None
         try:
-            return max(30.0, float(c.get("idle_pause_minutes", 1)) * 60)
+            return max(30.0, float(c.get("idle_pause_minutes", 2)) * 60)
         except (TypeError, ValueError):
-            return 60.0
+            return 120.0
 
     def _card_goal(self) -> int:
         try:

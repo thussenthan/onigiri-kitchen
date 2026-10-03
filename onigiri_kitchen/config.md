@@ -20,4 +20,6 @@ Most of these can also be changed from the timer panel inside the kitchen (the d
 - `shortcut`: keyboard shortcut for Tools → Onigiri Kitchen (restart Anki after changing it). `Ctrl` means Cmd on a Mac.
 - `show_home_widget_without_onigiri`: without Onigiri, show the kitchen widget under the deck list on Anki's main screen. With Onigiri, place the widget with Onigiri's own layout editor instead (Onigiri settings → main menu layout; it's listed as "Onigiri Kitchen · おにぎり食堂").
 - `celebrate_deck_finish`: confetti and a little fanfare when you finish a deck (the "Congratulations" screen right after reviewing). It's skipped if your system has "reduce motion" turned on.
-- `pause_focus_when_idle` / `idle_pause_minutes`: the focus countdown pauses after this many minutes without reviewing (and gives that idle time back), then resumes when you answer your next card. Turn it off if you use the timer for studying outside Anki.
+- `onigiri_progress_popups`: show Onigiri's "Daily Special: 25% / 50% / 75% complete" pop-ups while you study (default off; the pop-up when you unlock the dish is unaffected).
+- `onigiri_news`: announce new Specials-Book dishes and Onigiri level-ups with a cheer when you open the kitchen (default off). Finishing today's special or your daily goal always gets a celebration.
+- `pause_focus_when_idle` / `idle_pause_minutes`: the focus countdown pauses after this many minutes (default `2`) without reviewing (and gives that idle time back), then resumes when you answer your next card. Turn it off if you use the timer for studying outside Anki.

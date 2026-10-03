@@ -35,13 +35,13 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **Pomodoro timer.** One dango per focus session. When a break starts, the restaurant opens. When the
   break ends, you get a gentle nudge back to your cards. Long breaks are festival nights with fireworks.
   A small dango timer sits in the corner of Anki's main screens. Focus only counts while you're actually reviewing:
-  after 1 minute without activity it pauses (and gives that time back), then resumes on your next card.
+  after 2 minutes without activity it pauses (and gives that time back), then resumes on your next card.
   The ↺ button next to the timer resets the cycle. Rather study without breaks? Tap **∞ endless focus**: the clock
   counts up, no break pop-ups interrupt you, and every focus-length you study still counts as a finished session.
 - **Choose your starter pet.** The first time you open the kitchen, pick a partner: Tama the cat, a puffle
   (in the colour of your choice) or a 文鳥 Java sparrow (grey, white, sakura or cinnamon, with silver and cream in
   the shop), who flies about the restaurant between perches on the
-  window sill, the menu rail, the door frame, the counter, the rice cooker and any empty place at the tables. The other two can be adopted later from the shop.
+  window sill, the menu rail, the door frame, the counter, the rice cooker and any empty place at the tables. The other two can be adopted later from the shop, and once you have more than one, the **Pets** card lets you switch which one is your main pet.
 
   ![Choosing a starter pet](docs/starter.png)
 - **Your shop pet.** A virtual pet with needs (tummy, love, energy) that your studying fills.
@@ -177,5 +177,7 @@ open a pre-filled GitHub issue containing only version info. You can also
 [open an issue](https://github.com/thussenthan/onigiri-kitchen/issues/new/choose) directly.
 
 ## License
+
+Made by [Thussenthan Walter-Angelo](https://github.com/thussenthan) ([@thussenthan](https://github.com/thussenthan)).
 
 MIT. Onigiri is a separate add-on by its own author, and this project isn't affiliated with it.

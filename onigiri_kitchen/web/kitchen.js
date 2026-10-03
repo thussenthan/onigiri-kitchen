@@ -552,9 +552,21 @@
   const bg = document.createElement('canvas');
   bg.width = W;
   bg.height = H;
+  // A top layer for birds in flight: drawn after everything else, hi-res text
+  // included, so a sparrow never flies behind a menu tag, the clock or a lantern.
+  const topLayer = document.createElement('canvas');
+  topLayer.width = W;
+  topLayer.height = H;
+  const gTop = topLayer.getContext('2d');
+  let lightDim = 0; // the room's darkness this frame, so the top layer can match it
   // Drawing helpers write to gRef, so the same code can paint the static
   // background layer and the little decor icons in the shop.
   let gRef = g;
+  function onTop(fn) {
+    const prev = gRef;
+    gRef = gTop;
+    try { fn(); } finally { gRef = prev; }
+  }
   function bindHelpers() {
     R = function (x, y, w, h, c) { gRef.fillStyle = c; gRef.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
     P = function (x, y, c) { gRef.fillStyle = c; gRef.fillRect(Math.round(x), Math.round(y), 1, 1); };
@@ -769,7 +781,7 @@
   // Each table candle (and the igloo lamp) is its own little flame: click to
   // light or snuff it. The flame grows and fades, with sparks on lighting and
   // a curl of smoke when it goes out.
-  const LAMP_IDS = ['t0', 't1', 't2', 'kama'];
+  const LAMP_IDS = ['t0', 't1', 't2', 'kama', 's0', 's1'];
   const lamps = {};
   {
     const dark = darkness(hourNow()) > 0.05;
@@ -801,8 +813,9 @@
   }
   function toggleLamp(id, x, y) { lampOn(id, !lamps[id].on, x, y); }
   // A little candle flame: (cx, base) is its bottom centre; h its full height.
-  function flame(cx, base, h, l) {
+  function flame(cx, base, h, l, pal) {
     if (l.glow <= 0.02) return;
+    pal = pal || ['#f59a3a', '#ffd27a', '#fff3c4'];
     const fh = Math.max(1, Math.round(h * l.glow * flicker(l)));
     const sway = Math.round(Math.sin(time * 7 + l.seed) * 0.6);
     const a = gRef.globalAlpha;
@@ -811,10 +824,14 @@
       const f = j / fh;
       const x = cx + (f > 0.5 ? sway : 0);
       const w = f < 0.4 && fh > 2 ? 3 : 1;
-      R(x - Math.floor(w / 2), base - j, w, 1, f < 0.34 ? '#f59a3a' : f < 0.72 ? '#ffd27a' : '#fff3c4');
+      R(x - Math.floor(w / 2), base - j, w, 1, f < 0.34 ? pal[0] : f < 0.72 ? pal[1] : pal[2]);
     }
     gRef.globalAlpha = a;
   }
+  const SHELF_CANDLES = [
+    { id: 's0', jp: '緑の蝋燭', en: 'Green', body: '#4f9a5a', hi: '#7cc487', dk: '#2f6a3b', flame: ['#2fae55', '#8ef08a', '#e4ffd8'], glow: '120,230,140' },
+    { id: 's1', jp: '赤の蝋燭', en: 'Red', body: '#c8412f', hi: '#e8705a', dk: '#8a2a1c', flame: ['#e0452f', '#ff8a5a', '#ffe0c8'], glow: '255,110,90' },
+  ];
   const lampTip = (l, what) => `${what}\n${l.on ? 'Click to snuff the candle' : 'Click to light the candle'}`;
 
   // ------------------------------------------------------------ menu tags
@@ -1100,6 +1117,7 @@
   }
 
   // Specials Book rewards (earned by collecting Onigiri specials)
+  const specialsN = (n) => `${n} special${n === 1 ? '' : 's'}`;
   function drawRewards() {
     const book = MENU_DISHES.book;
     if (has('kin_gaku')) {
@@ -1119,7 +1137,7 @@
       const y = 40;
       R(x, y, 15, 34, '#5a3a22'); R(x + 1, y + 1, 13, 32, '#7a4d2c'); R(x + 2, y + 2, 11, 30, '#efe6cf');
       R(x + 7, y - 3, 1, 3, '#2b1c12');
-      regions.push({ x, y: y - 3, w: 15, h: 37, label: `<b>品書き</b> Specials board · ${kanjiNum(book.length)}品\n${book.length} specials collected in your Onigiri Specials Book\nTap to open the menu`, click: openOshinagaki });
+      regions.push({ x, y: y - 3, w: 15, h: 37, label: `<b>品書き</b> Specials board · ${kanjiNum(book.length)}品\n${specialsN(book.length)} collected in your Onigiri Specials Book\nTap to open the menu`, click: openOshinagaki });
     }
     if (has('densetsu_bocho')) {
       // the legendary knife on a little rack above the chef
@@ -1280,11 +1298,17 @@
       regions.push({ x: d.x, y: d.y, w: d.w, h: d.h, label: decorLabel(id), click: () => decorClick(id) });
     }
     // shelf
-    R(197, 58, 38, 2, C.woodDk); R(199, 60, 2, 3, C.woodDk); R(231, 60, 2, 3, C.woodDk);
-    if (!has('radio')) {
-      R(220, 50, 5, 8, '#6f9a5c'); R(220, 50, 5, 1, '#8cbf5e');
-      R(227, 52, 5, 6, '#c9793a'); R(227, 52, 5, 1, '#e0a13a');
-    }
+    R(197, 58, 42, 2, C.woodDk); R(199, 60, 2, 3, C.woodDk); R(234, 60, 2, 3, C.woodDk);
+    // two candles, green and red: click to light or snuff them
+    SHELF_CANDLES.forEach((cd, i) => {
+      const x = has('radio') ? [214, 234][i] : [221, 229][i];
+      const l = lamps[cd.id];
+      R(x - 1, 57, 5, 1, '#6b4426');
+      R(x, 51, 3, 6, cd.body); R(x, 51, 1, 6, cd.hi); R(x + 2, 51, 1, 6, cd.dk);
+      P(x + 1, 50, '#3b2d28');
+      flame(x + 1, 49, 4, l, cd.flame);
+      regions.push({ x: x - 2, y: 42, w: 7, h: 16, label: lampTip(l, `<b>${cd.jp}</b> ${cd.en} candle`), click: () => toggleLamp(cd.id, x + 1, 47) });
+    });
     for (const id of ['daruma', 'radio']) {
       if (!has(id)) continue;
       const d = DECOR[id];
@@ -1554,6 +1578,8 @@
   const slotX = (i) => BED_X + i * SLOT;
   const bedExtra = () => (bedSlots - 1) * SLOT;
   const SUN_X = 64;
+  // the beam slants across the floor (0.6 px right per px down): its middle where the pet's feet are
+  const SUN_SLEEP_X = SUN_X + 1 + Math.round((174 - 160) * 0.6);
   const tama = { x: BED_X, y: FLOOR_Y, air: null, flap: null, dir: 1, state: 'sleep', t: 0, dur: rand(8, 16), target: null, then: null, hop: 0, paw: 0, blink: 2, wantsFish: false };
   let feather = null;
   let floorGifts = [];
@@ -1609,12 +1635,12 @@
       // a row of zabuton, one per pet
       for (let i = 0; i < bedSlots; i++) {
         const cx = slotX(i);
-        const w = i === 0 ? 23 : SLOT + 1;
-        const x0 = i === 0 ? cx - 11 : cx - 8 + 3;
+        const w = i === 0 ? 23 : SLOT - 1;
+        const x0 = i === 0 ? cx - 11 : cx - 9; // (centred under the pet who sleeps there)
         R(x0, FLOOR_Y - 3, w, 4, '#8e3b46');
         R(x0, FLOOR_Y - 3, w, 1, '#ad5561');
         P(x0, FLOOR_Y - 3, '#6b2a33'); P(x0 + w - 1, FLOOR_Y - 3, '#6b2a33');
-        P(i === 0 ? cx : cx + 3, FLOOR_Y - 2, '#e0a13a');
+        P(cx, FLOOR_Y - 2, '#e0a13a');
       }
     }
     regions.push({ x: BED_X - 13, y: FLOOR_Y - 11, w: 27 + ex, h: 13, label: `<b>寝床</b> Bed\nTap to tuck ${residents.some((a) => a.slot != null) ? 'everyone' : esc(pet.name)} in`, click: bedtime });
@@ -2208,7 +2234,7 @@
     const d = tama.dir;
     if (tama.air || st === 'play-fly' || st === 'play-hover') {
       flightShadow(x, by);
-      drawBird(x, by + Math.round(Math.sin(time * 16) * 0.6), d, { flying: true, wing: st === 'play-hover' ? 'flap' : tama.flap || 'flap', happy: st !== 'fly' });
+      onTop(() => drawBird(x, by + Math.round(Math.sin(time * 16) * 0.6), d, { flying: true, wing: st === 'play-hover' ? 'flap' : tama.flap || 'flap', happy: st !== 'fly' }));
     } else if (st === 'perch') {
       // looks around, sings now and then, preens
       const ph = Math.floor(tama.t * 1.2) % 8;
@@ -2223,7 +2249,8 @@
     } else if (st === 'roll') {
       // a little loop through the air
       const f = clamp(tama.t / tama.dur, 0, 1);
-      drawBird(x + Math.round(Math.sin(f * Math.PI * 2) * 8), by, f < 0.5 ? d : -d, { hop: Math.round(Math.sin(f * Math.PI) * 16), wing: 'flap', flying: f > 0.05 && f < 0.95, happy: true });
+      const loop = () => drawBird(x + Math.round(Math.sin(f * Math.PI * 2) * 8), by, f < 0.5 ? d : -d, { hop: Math.round(Math.sin(f * Math.PI) * 16), wing: 'flap', flying: f > 0.05 && f < 0.95, happy: true });
+      if (f > 0.05 && f < 0.95) onTop(loop); else loop();
     } else if (st === 'trick' || st === 'beckon') {
       const s0 = pet.stage || 0;
       if (s0 >= 2 && st === 'trick') {
@@ -2343,7 +2370,7 @@
       return;
     }
     if (sleepy && Math.random() < 0.75) {
-      const spot = sunbeam() && Math.random() < 0.6 ? SUN_X : BED_X;
+      const spot = sunbeam() && Math.random() < 0.6 ? SUN_SLEEP_X : BED_X;
       tamaGo(spot, () => tamaSet('sleep', rand(30, 70)));
       return;
     }
@@ -2355,7 +2382,7 @@
     const roll = Math.random();
     if (roll < 0.35) tamaGo(rand(20, 290), () => tamaSet('sit', rand(5, 10)));
     else if (roll < 0.5) tamaSet('groom', rand(3, 5));
-    else if (roll < 0.62 && sunbeam()) tamaGo(SUN_X, () => tamaSet('sleep', rand(20, 40)));
+    else if (roll < 0.62 && sunbeam()) tamaGo(SUN_SLEEP_X, () => tamaSet('sleep', rand(20, 40)));
     else if (roll < 0.74) tamaGo(rand(40, 110), () => tamaSet('watch', rand(4, 7)));
     else if (roll < 0.82 && customers.length) tamaGo(clamp(pick(customers).x, 20, 280), () => tamaSet('sit', rand(4, 8)));
     else tamaSet('sit', rand(4, 8));
@@ -2665,15 +2692,16 @@
       : '✦ All three at 70+ gives <b>+1 tip</b> from every guest.';
     $('ok-pet-foodjp').textContent = P0.foodJp;
     $('ok-pet-fish').textContent = pet.fish;
-    document.querySelector('[data-pet="feed"]').title = `Feed ${P0.them} a ${P0.food} (${pet.fish} saved)`;
+    setTip(document.querySelector('[data-pet="feed"]'), `Feed ${P0.them} a ${P0.food} (${pet.fish} saved)`);
     renderPlayButton();
     const trickBtn = document.querySelector('[data-pet="trick"]');
     trickBtn.querySelector('small').textContent = pet.stage >= 1 ? P0.tricks[Math.min(3, pet.stage) - 1] : 'Trick';
-    trickBtn.title = pet.stage >= 1 ? '' : `Learns tricks at ${(PET_STAGES[1] || {}).jp || 'the next stage'}`;
+    setTip(trickBtn, pet.stage >= 1 ? 'Show off a trick' : `Learns tricks at ${(PET_STAGES[1] || {}).jp || 'the next stage'}`);
     trickBtn.disabled = pet.stage < 1;
 
     // style
     renderAccessories();
+    renderPetSwap();
 
     // keepsakes
     const found = PET_GIFTS.filter((gf) => pet.gifts && pet.gifts[gf.id]).length;
@@ -2711,11 +2739,82 @@
     renderPetPanel();
   }));
 
-  // Footer: 猫 / パフル / 文鳥 Pet
+  // Every pet you have: your main one (with the care card) and the shop pets
+  // you've adopted, any of whom you can swap in as your main pet.
+  const PET_SHOP = { cat: 'mike', puffle: 'puffle', bird: 'buncho' };
+  function myPets() {
+    if (!pet.species) return [];
+    const list = [{ species: pet.species, name: pet.name, main: true }];
+    for (const id of ['cat', 'puffle', 'bird']) {
+      if (id === pet.species || !S.owned.includes(PET_SHOP[id])) continue;
+      list.push({ species: id, name: (S.petNames || {})[id] || (SPECIES[id] || {}).defaultName || id, main: false });
+    }
+    return list;
+  }
+  function renderPetSwap() {
+    const box = $('ok-pet-swap');
+    const pets = myPets();
+    box.hidden = pets.length < 2;
+    if (box.hidden) return;
+    box.innerHTML = '<span class="ok-pet-swap-label">Your pets · switch:</span>';
+    for (const p0 of pets) {
+      const b = document.createElement('button');
+      b.className = p0.main ? 'on' : '';
+      const cv = document.createElement('canvas');
+      cv.width = 22;
+      cv.height = 18;
+      const prev = gRef;
+      gRef = cv.getContext('2d');
+      withPet({ species: p0.species, stage: 1 }, () => {
+        if (p0.species === 'puffle') drawPuffle(11, 17, { color: S.puffleColor });
+        else if (p0.species === 'bird') drawBird(11, 17, 1, { color: S.birdColor });
+        else catSit(11, 17, {});
+      });
+      gRef = prev;
+      b.appendChild(cv);
+      b.insertAdjacentHTML('beforeend', `${esc(p0.name)}${p0.main ? ' ✓' : ''}`);
+      if (p0.main) setTip(b, `${p0.name} is your pet right now`);
+      else {
+        setTip(b, `Make ${p0.name} your main pet. ${esc(pet.name)} moves to the shop pets and you keep both.`);
+        b.onclick = () => swapPet(p0.species);
+      }
+      box.appendChild(b);
+    }
+  }
+  function swapPet(species) {
+    send('swappet', species, (res) => {
+      if (!res) return;
+      if (res.state) S = Object.assign(S, res.state);
+      if (!res.ok) { toast(res.msg); return; }
+      pet = res.pet;
+      if (res.stages) PET_STAGES = res.stages;
+      feather = null;
+      tama.air = null;
+      tama.state = 'sit';
+      tama.t = 0;
+      tama.y = FLOOR_Y;
+      tama.target = null;
+      tama.then = null;
+      tama.resume = null;
+      syncResidents();
+      renderPetButton();
+      renderPlayButton();
+      renderPetPanel();
+      if (!$('ok-decor').hidden) renderDecor();
+      OKSound.fanfare();
+      voice();
+      spawnHearts(tama.x, FLOOR_Y - 20, 3);
+      toast(res.msg);
+    });
+  }
+
+  // Footer: 猫 / パフル / 文鳥 Pet (Pets, once there's more than one)
   function renderPetButton() {
     const el = $('ok-pet-jp');
+    const pets = myPets();
+    $('ok-pet-label').textContent = pets.length > 1 ? 'Pets' : 'Pet';
     if (el) el.textContent = sp().jp;
-    $('ok-b-pet').title = pet.species ? `${pet.name}, your ${sp().name.toLowerCase()}` : 'Your pet';
+    setTip($('ok-b-pet'), pet.species ? (pets.length > 1 ? `Your pets: ${pets.map((x) => x.name).join(', ')}` : `${pet.name}, your ${sp().name.toLowerCase()}`) : 'Your pet');
   }
 
   // 遊ぶ ⇄ やめる: the toy button is a toggle
@@ -2723,7 +2822,7 @@
     const b = document.querySelector('[data-pet="play"]');
     if (!b) return;
     b.classList.toggle('on', !!feather);
-    b.title = feather ? '' : sp().toy;
+    setTip(b, feather ? 'Put the toy away' : sp().toy);
     b.innerHTML = feather
       ? '<b class="jp">やめる</b><small>Stop</small>'
       : '<b class="jp">遊ぶ</b><small>Play</small>';
@@ -3119,7 +3218,8 @@
       }
       const ay = Math.round(a.y == null ? FLOOR_Y : a.y);
       const asleep = pose === 'sleep' && !a.air;
-      art(Math.round(a.x), ay, a.dir, a.air ? 'fly' : asleep && !SLEEP_ART.has(a.id) ? 'rest' : pose, walkFrame, a);
+      const paint = () => art(Math.round(a.x), ay, a.dir, a.air ? 'fly' : asleep && !SLEEP_ART.has(a.id) ? 'rest' : pose, walkFrame, a);
+      if (a.air) onTop(paint); else paint();
       if (asleep) sleepZ(Math.round(a.x) + 9, ay - (a.id === 'tsuru' ? 30 : 17));
       const info = animalInfo(a.id);
       const h = a.id === 'tsuru' ? 27 : a.id === 'usagi' ? 17 : 17;
@@ -3570,6 +3670,7 @@
   function drawLighting(h) {
     const d = darkness(h);
     const dim = d > 0 ? d + (lanternsOn ? 0 : 0.18) : 0;
+    lightDim = dim;
     if (dim > 0) {
       g.fillStyle = `rgba(22,14,40,${dim})`;
       g.fillRect(0, 0, W, H);
@@ -3589,15 +3690,16 @@
     // each lit candle throws its own warm halo (faint by day)
     const glows = [];
     if (has('kamakura')) glows.push(['kama', 90, 101, 9]);
+    SHELF_CANDLES.forEach((cd, i) => glows.push([cd.id, (has('radio') ? [215, 235][i] : [222, 230][i]), 47, 9, cd.glow]));
     TABLES.forEach((t, i) => glows.push(['t' + i, candleX(i), 137, 11]));
     const strength = Math.max(0.3, d / 0.34);
     g.globalCompositeOperation = 'lighter';
-    for (const [id, x, y, r] of glows) {
+    for (const [id, x, y, r, rgb] of glows) {
       const l = lamps[id];
       if (l.glow <= 0.02) continue;
       const f = l.glow * flicker(l);
       for (let k = 3; k >= 1; k--) {
-        g.fillStyle = `rgba(255,160,70,${0.05 * strength * f})`;
+        g.fillStyle = `rgba(${rgb || '255,160,70'},${0.05 * strength * f})`;
         ellipseRaw(x, y, (r * k * (0.9 + 0.1 * f)) / 3, (r * k) / 3.4);
       }
     }
@@ -3850,6 +3952,7 @@
 
   function render() {
     regions = [];
+    gTop.clearRect(0, 0, W, H);
     const h = hourNow();
     lanternsAuto();
     g.drawImage(bg, 0, 0);
@@ -3889,6 +3992,14 @@
     v.clearRect(0, 0, view.width, view.height);
     v.drawImage(low, 0, 0, view.width, view.height);
     drawText();
+    // flying birds go over everything, dimmed like the rest of the room at night
+    if (lightDim > 0) {
+      gTop.globalCompositeOperation = 'source-atop';
+      gTop.fillStyle = `rgba(22,14,40,${lightDim})`;
+      gTop.fillRect(0, 0, W, H);
+      gTop.globalCompositeOperation = 'source-over';
+    }
+    v.drawImage(topLayer, 0, 0, view.width, view.height);
     positionBubble();
   }
 
@@ -3977,10 +4088,70 @@
   });
 
   // --------------------------------------------------------- speech bubble
+  // Pop-ups go away on a swipe up (or a flick of the trackpad, or a click):
+  // they follow the finger, fade, and are gone.
+  function dismissPopup(el) {
+    if (el.hidden) return;
+    el.classList.add('leaving');
+    clearTimeout(el.leaveT);
+    el.leaveT = setTimeout(() => {
+      el.hidden = true;
+      el.classList.remove('leaving');
+      el.style.removeProperty('--dy');
+      el.style.removeProperty('--op');
+    }, 190);
+  }
+  // showing it again cancels a dismissal that's still fading out
+  function reviveWindow(el) {
+    clearTimeout(el.leaveT);
+    el.classList.remove('leaving');
+    el.style.removeProperty('--dy');
+    el.style.removeProperty('--op');
+  }
+  function makeSwipeable(el, opts) {
+    const o = Object.assign({ click: true, leave: () => dismissPopup(el), drag: el }, opts);
+    let y0 = null;
+    let wheel = 0;
+    let wheelT = 0;
+    const reset = () => { o.drag.style.removeProperty('--dy'); o.drag.style.removeProperty('--op'); };
+    const move = (e) => {
+      if (y0 == null) return;
+      const dy = Math.min(0, e.clientY - y0);
+      o.drag.style.setProperty('--dy', dy + 'px');
+      o.drag.style.setProperty('--op', String(Math.max(0.2, 1 + dy / 90)));
+    };
+    const up = (e) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      if (y0 == null) return;
+      const dy = e.clientY - y0;
+      y0 = null;
+      if (dy < -24 || (o.click && Math.abs(dy) < 4)) o.leave(); // swiped up (or a plain click)
+      else reset();
+    };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button, a, input, select, textarea')) return;
+      y0 = e.clientY;
+      el.style.animation = 'none';
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+    // a two-finger swipe on a trackpad arrives as wheel events
+    el.addEventListener('wheel', (e) => {
+      if (e.target.closest('.ok-menu-list, textarea')) return;
+      e.preventDefault();
+      const now = performance.now();
+      if (now - wheelT > 400) wheel = 0;
+      wheelT = now;
+      wheel += Math.abs(e.deltaY);
+      if (wheel > 24) { wheel = 0; o.leave(); }
+    }, { passive: false });
+  }
   let bubbleTimer = null;
   let bubbleAnchor = null;
   function say(lineArr, anchor) {
     const el = $('ok-bubble');
+    reviveWindow(el);
     el.innerHTML = `<span class="jp">${lineArr[0]}</span><span class="en">${lineArr[1]}</span>`;
     el.hidden = false;
     el.style.animation = 'none';
@@ -3989,7 +4160,7 @@
     bubbleAnchor = anchor || { x: 121, y: 70 };
     positionBubble();
     clearTimeout(bubbleTimer);
-    bubbleTimer = setTimeout(() => { el.hidden = true; }, 4200);
+    bubbleTimer = setTimeout(() => dismissPopup(el), 3200);
   }
   function bubbleVisible() { return !$('ok-bubble').hidden; }
   function positionBubble() {
@@ -4015,6 +4186,7 @@
   // it goes by itself, no click needed).
   function bigToast(jp, title, html) {
     const el = $('ok-toast');
+    reviveWindow(el);
     el.classList.add('big');
     el.innerHTML = `<b class="ok-toast-seal">${jp}</b><span><b>${title}</b><br>${html}</span>`;
     el.hidden = false;
@@ -4022,10 +4194,11 @@
     void el.offsetWidth;
     el.style.animation = '';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.hidden = true; }, 6500);
+    toastTimer = setTimeout(() => dismissPopup(el), 4500);
   }
   function toast(text) {
     const el = $('ok-toast');
+    reviveWindow(el);
     el.classList.remove('big');
     el.textContent = text;
     el.hidden = false;
@@ -4033,8 +4206,49 @@
     void el.offsetWidth;
     el.style.animation = '';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.hidden = true; }, 3800);
+    toastTimer = setTimeout(() => dismissPopup(el), 2600);
   }
+
+  // Quick tooltips for the timer, footer and pet buttons (a browser's own title
+  // takes about a second to show). Buttons keep their text in data-tip.
+  function setTip(el, text) {
+    if (!el) return;
+    el.dataset.tip = text;
+    el.setAttribute('aria-label', text);
+    el.removeAttribute('title');
+  }
+  {
+    const tip = $('ok-btn-tip');
+    const SEL = '#ok-timer button, #ok-foot button, .ok-pet-actions button, .ok-pet-swap button, .ok-close';
+    let tipT = null;
+    let current = null;
+    const hideTip = () => { clearTimeout(tipT); tip.hidden = true; current = null; };
+    document.addEventListener('mouseover', (e) => {
+      const b = e.target.closest ? e.target.closest(SEL) : null;
+      if (b === current) return;
+      hideTip();
+      if (!b) return;
+      if (b.getAttribute('title')) setTip(b, b.getAttribute('title'));
+      const text = b.dataset.tip;
+      if (!text) return;
+      current = b;
+      tipT = setTimeout(() => {
+        tip.textContent = text;
+        tip.hidden = false;
+        const r = b.getBoundingClientRect();
+        const tw = tip.offsetWidth;
+        const th = tip.offsetHeight;
+        tip.style.left = clamp(r.left + r.width / 2 - tw / 2, 8, window.innerWidth - tw - 8) + 'px';
+        const below = r.bottom + 8 + th < window.innerHeight - 8 && r.top < window.innerHeight / 2;
+        tip.style.top = (below ? r.bottom + 8 : r.top - th - 8) + 'px';
+      }, 120);
+    });
+    document.addEventListener('mousedown', hideTip, true);
+    document.addEventListener('mouseleave', hideTip);
+  }
+
+  makeSwipeable($('ok-bubble'));
+  makeSwipeable($('ok-toast'));
 
   // ----------------------------------------------------------------- HUD
   function bumpPurse() {
@@ -4069,7 +4283,7 @@
     b.hidden = !(waiting > 0 && timer.phase !== 'focus');
     b.classList.toggle('on', rush);
     b.innerHTML = rush ? '<span class="jp">文</span> Collect all' : '<span class="jp">急</span> Serve faster';
-    b.title = rush ? 'Serving at 4×. Click again to collect every tip at once' : 'Serve waiting guests at 4× speed';
+    setTip(b, rush ? 'Serving at 4×. Click again to collect every tip at once' : 'Serve waiting guests at 4× speed');
   }
   setInterval(renderRushBtn, 1000);
 
@@ -4195,8 +4409,8 @@
     const main = $('ok-t-main');
     const endlessMode = !!(INIT_TIMER_MODE.endless);
     $('ok-t-endless').classList.toggle('on', endlessMode);
-    $('ok-t-endless').title = endlessMode ? 'Endless focus is on: no breaks. Tap to go back to the pomodoro countdown' : 'Endless focus: study without breaks';
-    $('ok-t-skip').title = timer.endless ? 'Stop endless focus' : 'Skip to the next step';
+    setTip($('ok-t-endless'), endlessMode ? 'Endless focus is on: no breaks. Tap to go back to the pomodoro countdown' : 'Endless focus: study without breaks');
+    setTip($('ok-t-skip'), timer.endless ? 'Stop endless focus' : timer.phase === 'break' ? 'Skip the break' : timer.phase === 'idle' ? 'Start the next session' : 'Skip to the next step (a break)');
     if (timer.phase === 'focus' && timer.endless) {
       phase.textContent = timer.idle ? '休止 · Paused while idle' : '無限 · Endless focus';
       clock.textContent = fmt(elapsed());
@@ -4219,7 +4433,7 @@
     if (main.dataset.state !== state) {
       main.dataset.state = state;
       main.innerHTML = state === 'start' ? `${PLAY}開始<small>Start</small>` : state === 'resume' ? `${PLAY}再開<small>Resume</small>` : `${PAUSE}一時停止<small>Pause</small>`;
-      main.title = state === 'start' ? (endlessMode ? 'Start endless focus (no breaks)' : 'Start a focus session') : state === 'resume' ? 'Resume the timer' : 'Pause the timer';
+      setTip(main, state === 'start' ? (endlessMode ? 'Start endless focus (no breaks)' : 'Start a focus session') : state === 'resume' ? 'Resume the timer' : 'Pause the timer');
     }
     main.classList.toggle('ok-t-paused', state === 'resume');
     // dango skewer
@@ -4295,9 +4509,45 @@
     const w = el.offsetWidth;
     el.style.left = clamp(b.left + b.width / 2 - w / 2, 12, window.innerWidth - w - 12) + 'px';
   }
+  // Settings you changed but haven't saved: closing asks first, like closing a
+  // Word document (Save / Don't save / Cancel).
+  function formValues() {
+    const out = {};
+    for (const el of $('ok-form').elements) {
+      if (!el.name) continue;
+      out[el.name] = el.type === 'checkbox' ? el.checked : el.tagName === 'SELECT' ? el.value : Number(el.value);
+    }
+    return out;
+  }
+  function settingsDirty() {
+    if ($('ok-settings').hidden) return false;
+    const now = formValues();
+    return Object.keys(now).some((k) => {
+      const was = conf[k];
+      if (typeof now[k] === 'boolean') return now[k] !== !!was;
+      if (typeof now[k] === 'number') return was != null && Math.abs(now[k] - Number(was)) > 1e-9;
+      return was != null && now[k] !== was;
+    });
+  }
+  // Runs `then` once it's safe to leave the settings; returns true if it had to ask.
+  function guardSettings(then, closing) {
+    if (!settingsDirty()) { then(); return false; }
+    modal('保存', 'Save your changes?', 'You changed some settings but haven\'t saved them.<br>Without saving, they\'ll be lost.', [
+      ['保存<small>&nbsp;Save</small>', 'ok-hanko', () => saveSettings(then)],
+      ['Don\'t save', 'ok-foot-btn', () => { fillForm(); then(); }],
+      [closing ? 'Cancel' : 'Keep editing', 'ok-ghost', null],
+    ]);
+    return true;
+  }
+  function closeSettings() {
+    guardSettings(() => { $('ok-settings').hidden = true; });
+  }
   function togglePanel(id) {
     const el = $(id);
     const show = el.hidden;
+    if (!$('ok-settings').hidden && id !== 'ok-settings' || (id === 'ok-settings' && !show)) {
+      if (settingsDirty()) { guardSettings(() => togglePanel(id)); return; }
+    }
     document.querySelectorAll('.ok-panel').forEach((p) => { p.hidden = true; });
     el.hidden = !show;
     if (show && id === 'ok-settings') fillForm();
@@ -4305,14 +4555,18 @@
     if (show) placePanel(el);
   }
   window.addEventListener('resize', () => document.querySelectorAll('.ok-panel:not([hidden])').forEach(placePanel));
-  document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => { $(b.dataset.close).hidden = true; }));
+  document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.close === 'ok-settings') closeSettings();
+    else $(b.dataset.close).hidden = true;
+  }));
   // Clicking anywhere outside an open panel closes it. A click on the scene
   // only closes the panel (it doesn't also pet or tap whatever is there).
   document.addEventListener('click', (e) => {
     const open = document.querySelector('.ok-panel:not([hidden])');
     if (!open || open.contains(e.target)) return;
     if (e.target.closest('#ok-b-pet, #ok-b-decor, #ok-t-set, .ok-modal, .ok-tour')) return;
-    open.hidden = true;
+    if (open.id === 'ok-settings') closeSettings();
+    else open.hidden = true;
     if (e.target === view) e.stopPropagation();
   }, true);
   document.addEventListener('keydown', (e) => {
@@ -4331,7 +4585,12 @@
     if (e.key === 'Escape' && e.target === $('ok-pet-nameinput')) { saveName(false); e.preventDefault(); e.stopPropagation(); return; }
     if (e.key === 'Escape') {
       const open = document.querySelector('.ok-panel:not([hidden]), .ok-modal:not([hidden])');
-      if (open) { open.hidden = true; e.preventDefault(); e.stopPropagation(); }
+      if (open) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (open.id === 'ok-settings') closeSettings();
+        else open.hidden = true;
+      }
     }
   }, true);
 
@@ -4357,14 +4616,8 @@
       else if (conf[el.name] != null) el.value = conf[el.name];
     }
   }
-  $('ok-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const updates = {};
-    for (const el of e.target.elements) {
-      if (!el.name) continue;
-      updates[el.name] = el.type === 'checkbox' ? el.checked : el.tagName === 'SELECT' ? el.value : Number(el.value);
-    }
-    send('conf', JSON.stringify(updates), (c) => {
+  function saveSettings(after) {
+    send('conf', JSON.stringify(formValues()), (c) => {
       if (c) conf = c;
       OKSound.configure({ volume: conf.volume });
       applyTheme();
@@ -4372,8 +4625,18 @@
       updateStatus();
       $('ok-settings').hidden = true;
       toast('Saved · 保存しました');
+      if (after) after();
     });
-  });
+  }
+  $('ok-form').addEventListener('submit', (e) => { e.preventDefault(); saveSettings(); });
+  $('ok-author').addEventListener('click', (e) => { e.preventDefault(); send('author'); });
+  $('ok-author-gh').addEventListener('click', (e) => { e.preventDefault(); send('author'); });
+  // closing the whole window with unsaved settings asks first (see KitchenDialog.closeEvent)
+  function askToSave() {
+    if (!settingsDirty()) return false;
+    guardSettings(() => send('closeforce'), true);
+    return true;
+  }
 
   $('ok-b-sound').addEventListener('click', () => {
     conf.sound = !conf.sound;
@@ -4385,14 +4648,14 @@
   function renderSoundBtn() {
     const b = $('ok-b-sound');
     b.classList.toggle('off', !conf.sound);
-    b.title = conf.sound ? 'Mute' : 'Unmute';
-    b.setAttribute('aria-label', b.title);
+    setTip(b, conf.sound ? 'Mute' : 'Unmute');
   }
   $('ok-b-decor').addEventListener('click', () => togglePanel('ok-decor'));
 
   // ----------------------------------------------------------------- decor
   const MON_SVG = document.querySelector('.ok-mon-icon').outerHTML;
   function renderDecor() {
+    renderPetButton();
     const grid = $('ok-decor-grid');
     grid.innerHTML = '';
     const level = onigiri.level || 0;
@@ -4426,7 +4689,7 @@
         drawRewardIcon(icon, item.id);
         card.appendChild(icon);
         card.insertAdjacentHTML('beforeend', `<div><div class="ok-item-name"><span class="jp">${item.jp}</span><span>${item.name}</span></div><p>${item.desc}</p></div>` +
-          `<div class="ok-item-foot"><span class="ok-lock">🔒 ${Math.min(have, n)}/${n} ${k === 'total' ? 'specials' : `${(RARITY[k] || {}).name || k} special${n === 1 ? '' : 's'}`}</span></div>`);
+          `<div class="ok-item-foot"><span class="ok-lock">🔒 ${Math.min(have, n)}/${n} ${k === 'total' ? `special${n === 1 ? '' : 's'}` : `${(RARITY[k] || {}).name || k} special${n === 1 ? '' : 's'}`}</span></div>`);
         grid.appendChild(card);
         continue;
       }
@@ -4523,7 +4786,8 @@
     const ck = colorKind(kind);
     const c = ck.list.find((x) => x.id === id);
     const owned = ck.owned.includes(id);
-    if (!c || ck.current === id) return;
+    // (the default colour is only really yours once it's owned: picking it the first time must not be ignored)
+    if (!c || (ck.current === id && owned)) return;
     send('petcolor', JSON.stringify({ kind, color: id }), (r) => {
       if (!r) return;
       if (r.state) S = Object.assign(S, r.state);
@@ -4633,18 +4897,14 @@
 
   // ------------------------------------------------------------ tutorial
   const TOUR = [
-    { jp: 'ようこそ', title: 'Welcome to your restaurant!', text: 'This little onigiri shop runs by itself. Watch it, or click around, since almost everything does something.' },
-    { jp: '音', title: 'Sound on: highly recommended!', text: 'The kitchen is best with sound: soft koto music, wind chimes, your pet\'s little noises and celebration fanfares. It\'s on by default, and this speaker button mutes it any time.', dom: '#ok-b-sound' },
-    { jp: 'お客さん', title: 'Guests come from studying', text: 'Every 10 reviews in a deck sends a guest from that deck. They wait outside the door until you visit, so nothing is lost if you study for a long time.', scene: () => ({ x: 254, y: 18, w: 48, h: 112 }) },
+    { jp: 'ようこそ', title: 'Welcome to your restaurant!', text: 'This little onigiri shop runs by itself, and almost everything in it does something when you click it. It\'s best with sound on (this button mutes it).', dom: '#ok-b-sound' },
+    { jp: 'お客さん', title: 'Guests and tips', text: 'Every 10 reviews sends a guest, who waits at the door until you visit, so nothing is lost. Happy guests leave mon (文): tap the coins, then spend them in the shop (店).', scene: () => ({ x: 254, y: 18, w: 48, h: 112 }) },
     { jp: '大将', title: 'The chef', text: () => (MENU_DISHES.book.length
-      ? `Guests order from your menu: the ${MENU_DISHES.book.length} specials in your Onigiri Specials Book (it grows as you finish more). The chef cooks each order; tap him to make dishes ahead for the tray.`
-      : 'Guests order onigiri from the menu on the wall, and more flavours unlock as your restaurant levels up. The chef cooks each order; tap him to make some ahead for the tray.'), scene: () => ({ x: 104, y: 72, w: 76, h: 34 }) },
-    { jp: '文', title: 'Tips', text: 'Happy guests leave mon (文). Tap coins to collect them, or they collect themselves. Rarer dishes tip more. Spend mon in the shop.', dom: '.ok-purse' },
-    { jp: '店', title: 'The shop', text: 'Spend mon on decor and pets: the starters you didn\'t pick and big milestone friends who move in, each with a perk. Some unlock at higher restaurant levels.', dom: '#ok-b-decor' },
-    { jp: () => sp().jp, title: () => `${pet.name}, your ${sp().name.toLowerCase()}`, text: () => `A gentle virtual pet. ${They()} eats while you review, gets a ${sp().food} for every guest, and grows as you study. ${They()} can't get sick or run away. The Pet button opens ${sp().their} care card.`, scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
-    { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study. When the break starts, the restaurant opens for you. Each dango is one finished session. Rather skip the breaks? Tap ∞ for endless focus: it counts up, and every session still counts.', dom: '#ok-timer' },
-    { jp: '大入り', title: 'Big study sessions', text: () => `Prefer to study in one go? Go ahead. When you come back, tap 急 Serve faster to serve everyone at 4×, and tap it again to collect every tip at once.${conf.daily_card_goal === 0 ? '' : ` Reach ${conf.daily_card_goal || 100} cards in a day and your restaurant throws a little party (change the goal in ⚙).`} Finish a deck and 紙吹雪 confetti and sakura petals celebrate it.`, dom: '#ok-status' },
-    { jp: '目安箱', title: 'Ideas & bugs', text: 'Use the suggestion box on the wall (or ⚙ settings) to suggest features or report bugs. You can replay this tour from ⚙.', scene: () => ({ x: MEYASU.x - 3, y: MEYASU.y - 5, w: MEYASU.w + 6, h: MEYASU.h + 7 }) },
+      ? 'He cooks every order from your Onigiri Specials Book. Tap him to make dishes ahead.'
+      : 'He cooks every order from the menu on the wall. Tap him to make some ahead.'), scene: () => ({ x: 104, y: 72, w: 76, h: 34 }) },
+    { jp: () => sp().jp, title: () => `${pet.name}, your ${sp().name.toLowerCase()}`, text: () => `${They()} eats while you review, gets a ${sp().food} for every guest, and grows as you study. The Pet button opens ${sp().their} care card.`, scene: () => ({ x: tama.x - 14, y: 154, w: 28, h: 25 }), dom2: '#ok-b-pet' },
+    { jp: 'タイマー', title: 'Pomodoro timer', text: 'Start a focus session and study; the restaurant opens for you at break time. Each dango is a finished session. Tap ∞ to study without breaks.', dom: '#ok-timer' },
+    { jp: '大入り', title: 'Big sessions & ideas', text: () => `After a long study, tap 急 Serve faster, then Collect all to serve everyone at once.${conf.daily_card_goal === 0 ? '' : ` Reach ${conf.daily_card_goal || 100} cards in a day for a little party.`} Ideas or bugs? Use the suggestion box on the wall. You can replay this tour from ⚙.`, scene: () => ({ x: MEYASU.x - 3, y: MEYASU.y - 5, w: MEYASU.w + 6, h: MEYASU.h + 7 }) },
   ];
   let tourIdx = -1;
 
@@ -4777,7 +5037,7 @@
     MENU_DISHES.house.forEach((d) => entry(d));
     const n = MENU_DISHES.book.length;
     $('ok-menu-count').textContent = n ? `${kanjiNum(n)}品` : '';
-    $('ok-menu-count').title = `${n} specials`;
+    $('ok-menu-count').title = specialsN(n);
     el.hidden = false;
     list.scrollTop = 0;
   }
@@ -4788,7 +5048,7 @@
   // The same card picks the free first colour for a puffle bought later.
   let chooser = null;
   function openChooser(mode, kind) {
-    chooser = { mode, species: mode === 'color' ? kind || 'puffle' : 'cat', colors: { puffle: 'blue', bird: 'grey' } };
+    chooser = { mode, species: mode === 'color' ? kind || 'puffle' : 'cat', colors: { puffle: 'blue', bird: 'grey' }, hover: null };
     const starter = mode !== 'color';
     $('ok-starter-kanji').textContent = starter ? '相棒' : '色';
     $('ok-starter-title').textContent = starter ? 'Choose your partner' : `Pick your ${colorKind(chooser.species).noun}'s colour`;
@@ -4805,7 +5065,8 @@
         b.className = 'ok-starter-opt';
         b.dataset.species = id;
         b.innerHTML = `<canvas width="40" height="30"></canvas><b><span class="jp">${info.jp}</span> ${info.name}</b><small>${info.desc || ''}</small>`;
-        b.onclick = () => { chooser.species = id; voice(id); renderChooser(); };
+        b.onclick = () => { chooser.species = id; chooser.hover = null; voice(id); renderChooser(); };
+        b.ondblclick = () => { chooser.species = id; renderChooser(); $('ok-starter-go').click(); };
         opts.appendChild(b);
       }
     }
@@ -4815,6 +5076,8 @@
   function renderChooser() {
     if (!chooser || $('ok-starter').hidden) return;
     const bounce = (tt) => Math.round(Math.abs(Math.sin(tt * 5)) * 3);
+    // the colour under the mouse is previewed on the pet before you pick it
+    const shownColor = (kind) => (chooser.hover && chooser.hover.kind === kind ? chooser.hover.id : chooser.colors[kind]);
     document.querySelectorAll('.ok-starter-opt').forEach((b) => {
       const id = b.dataset.species;
       const on = chooser.species === id;
@@ -4826,30 +5089,52 @@
       gRef = ctx;
       withPet({ species: id, stage: 1 }, () => {
         const up = on ? bounce(time) : 0;
-        if (id === 'puffle') drawPuffle(20, 28 - up, { color: chooser.colors.puffle, happy: on, squash: on && up === 0 });
-        else if (id === 'bird') drawBird(20, 28, 1, { color: chooser.colors.bird, hop: up, happy: on, wing: on && up > 1 ? 'up' : null });
+        if (id === 'puffle') drawPuffle(20, 28 - up, { color: shownColor('puffle'), happy: on, squash: on && up === 0 });
+        else if (id === 'bird') drawBird(20, 28, 1, { color: shownColor('bird'), hop: up, happy: on, wing: on && up > 1 ? 'up' : null });
         else catSit(20, 28 - up, { happy: on, fastTail: on });
       });
       gRef = prev;
     });
-    // colour swatches for the puffle and the sparrow (starter colours are free)
+    // colour swatches for the puffle and the sparrow: hover any of them to see
+    // it on the pet. The starter colours are free; the rest are 🔒 shop colours.
     const cols = $('ok-starter-colors');
     const colored = chooser.species === 'puffle' || chooser.species === 'bird';
     cols.hidden = !colored;
+    $('ok-starter-hint').hidden = !colored;
     let label = (SPECIES[chooser.species] || {}).name || '';
     if (colored) {
       const ck = colorKind(chooser.species);
       if (cols.dataset.kind !== ck.kind) {
         cols.dataset.kind = ck.kind;
-        cols.innerHTML = ck.list.filter((c) => c.starter).map((c) =>
-          `<button class="ok-swatch" data-color="${c.id}" title="${c.jp} ${c.name}" style="background:${ck.swatch(c)}"></button>`).join('');
-        cols.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => { chooser.colors[ck.kind] = b.dataset.color; voice(ck.kind); renderChooser(); }));
+        cols.innerHTML = ck.list.map((c) =>
+          `<button type="button" class="ok-swatch${c.starter ? '' : ' locked'}" data-color="${c.id}" aria-label="${c.jp} ${c.name}" style="background:${ck.swatch(c)}"></button>`).join('');
+        cols.querySelectorAll('[data-color]').forEach((b) => {
+          const c = ck.list.find((x) => x.id === b.dataset.color);
+          b.addEventListener('mouseenter', () => { chooser.hover = { kind: ck.kind, id: c.id }; });
+          b.addEventListener('mouseleave', () => { chooser.hover = null; });
+          b.addEventListener('focus', () => { chooser.hover = { kind: ck.kind, id: c.id }; });
+          b.addEventListener('blur', () => { chooser.hover = null; });
+          b.addEventListener('click', () => {
+            if (!c.starter) { toast(`${c.jp} ${c.name} is a shop colour (${PUFFLE_COLOR_PRICE} mon). Pick a free one now and buy this later.`); return; }
+            chooser.colors[ck.kind] = c.id;
+            voice(ck.kind);
+            renderChooser();
+          });
+        });
       }
       cols.querySelectorAll('[data-color]').forEach((b) => b.classList.toggle('on', b.dataset.color === chooser.colors[ck.kind]));
-      const c = ck.list.find((x) => x.id === chooser.colors[ck.kind]) || ck.list[0];
-      label = chooser.mode === 'color' ? `${c.jp} ${c.name}` : `${c.name.toLowerCase()} ${ck.noun}`;
+      const picked = ck.list.find((x) => x.id === chooser.colors[ck.kind]) || ck.list[0];
+      const seen = chooser.hover && chooser.hover.kind === ck.kind ? ck.list.find((x) => x.id === chooser.hover.id) || picked : picked;
+      const hint = `${seen.jp} ${seen.name}${seen.starter ? '' : ` · shop colour, ${PUFFLE_COLOR_PRICE} mon`}`;
+      if ($('ok-starter-hint').textContent !== hint) $('ok-starter-hint').textContent = hint;
+      label = chooser.mode === 'color' ? `${picked.jp} ${picked.name}` : `${picked.name.toLowerCase()} ${ck.noun}`;
     }
-    $('ok-starter-go').innerHTML = `この子にする<small>${chooser.mode === 'color' ? label : `Choose ${chooser.species === 'cat' ? 'cat' : label}`}</small>`;
+    const goHtml = `この子にする<small>${chooser.mode === 'color' ? label : `Choose ${chooser.species === 'cat' ? 'cat' : label}`}</small>`;
+    // (only when it changed: rebuilding the button under the mouse can swallow a click)
+    if ($('ok-starter-go').dataset.html !== goHtml) {
+      $('ok-starter-go').dataset.html = goHtml;
+      $('ok-starter-go').innerHTML = goHtml;
+    }
   }
   setInterval(renderChooser, 100);
   $('ok-starter-go').addEventListener('click', () => {
@@ -4887,6 +5172,7 @@
 
   // --------------------------------------------------------------- modals
   function modal(kanji, title, body, buttons) {
+    reviveWindow($('ok-modal').querySelector('.ok-card'));
     $('ok-card-kanji').textContent = kanji;
     $('ok-card-title').textContent = title;
     $('ok-card-body').innerHTML = body;
@@ -4903,6 +5189,17 @@
   }
   // clicking outside a card closes it, like the お品書き menu (Esc does too)
   $('ok-modal').addEventListener('click', (e) => { if (e.target === $('ok-modal')) $('ok-modal').hidden = true; });
+  // ...and so does a swipe up on the card
+  {
+    const card = $('ok-modal').querySelector('.ok-card');
+    makeSwipeable(card, {
+      click: false,
+      leave() {
+        card.classList.add('leaving');
+        setTimeout(() => { $('ok-modal').hidden = true; card.classList.remove('leaving'); card.style.removeProperty('--dy'); card.style.removeProperty('--op'); }, 200);
+      },
+    });
+  }
 
   // "25 min", "90 s", for the break card
   function spanText(secs) {
@@ -4927,17 +5224,33 @@
       (waiting ? `<b>${waiting}</b> guest${waiting === 1 ? ' is' : 's are'} waiting to be seated.` : 'The kitchen is warm and ready.') +
       (info && info.daruma ? `<br>達磨 Both eyes painted: <b>+${info.daruma}</b> mon!` : '') +
       `<br>Relax for about <b>${mins || 1}</b> minute${mins === 1 ? '' : 's'}.`,
-      [['いただきます<small>&nbsp;Let\'s eat!</small>', 'ok-hanko ok-hanko-wide', () => OKSound.pluck(5)]]
+      [
+        ['いただきます<small>&nbsp;Let\'s eat!</small>', 'ok-hanko ok-hanko-wide', () => OKSound.pluck(5)],
+        ['Skip break', 'ok-ghost', skipBreak],
+      ]
     );
     if (OKSound.enabled) OKSound.phraseUp();
     if (long) { for (let i = 0; i < 3; i++) setTimeout(firework, i * 400); }
   }
 
+  // Skip the rest of the break: straight back to studying
+  let skippingBreak = false;
+  function skipBreak() {
+    skippingBreak = true;
+    send('timer', 'skip', (r) => {
+      if (r) OK.onTimer(r);
+      skippingBreak = false;
+      OKSound.pluck(6);
+      send('study');
+    });
+  }
+
   function breakOver() {
+    if (skippingBreak) return;
     modal(
       '再開',
       "Break's over",
-      'Your guests will keep arriving while you study.<br>Every review sends someone your way.<br>頑張って! (You\'ve got this!)',
+      'Your guests will keep arriving while you study.<br>Every review sends someone your way.<span class="ok-cheer"><span class="jp">頑張って!</span><br>You\'ve got this!</span>',
       [
         ['勉強<small>Back to studying</small>', 'ok-hanko ok-hanko-wide', () => send('study')],
         ['Stay a little', 'ok-ghost', null],
@@ -5089,6 +5402,7 @@
     onReason(reason) {
       if (reason === 'break') breakWelcome();
     },
+    askToSave,
   };
 
   // ----------------------------------------------------------------- boot

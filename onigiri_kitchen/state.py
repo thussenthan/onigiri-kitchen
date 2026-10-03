@@ -671,6 +671,34 @@ class KitchenState:
         self.save()
         return {"ok": True, "msg": f"{c['jp']} {c['name']} unlocked!"}
 
+    def swap_pet(self, species: str) -> Dict[str, Any]:
+        """Make another pet you own your main one (the one with the care card).
+        The old one moves to the shop-pet spot, so you still have both. Care,
+        growth, keepsakes and the bed carry over; each pet keeps its own name."""
+        cur = self.pet.d.get("species")
+        new_id = PET_FOR_SPECIES.get(species)
+        if not cur or not new_id or species == cur:
+            return {"ok": False, "msg": "That's already your pet."}
+        owned = self.data["owned"]
+        if new_id not in owned:
+            return {"ok": False, "msg": "Adopt that pet from the shop first."}
+        names = self.data.setdefault("pet_names", {})
+        names[cur] = self.pet.d.get("name") or petmod.species_info(cur)["defaultName"]
+        owned.remove(new_id)
+        if new_id in self.data["hidden"]:
+            self.data["hidden"].remove(new_id)
+        if PET_FOR_SPECIES[cur] not in owned:
+            owned.append(PET_FOR_SPECIES[cur])
+        self.pet.d["species"] = species
+        self.pet.d["name"] = names.get(species) or petmod.species_info(species)["defaultName"]
+        for kind in COLOR_KINDS:
+            # a pet that came from the shop starts with its free first colour
+            if self.has_kind(kind) and not self.data.get(COLOR_KINDS[kind][1]):
+                self.grant_first_color(kind, COLOR_KINDS[kind][4])
+        self.apply_companion_perks()
+        self.save()
+        return {"ok": True, "msg": f"{self.pet.d['name']} is your pet now."}
+
     def puffle_color(self, color: str) -> Dict[str, Any]:
         return self.pet_color("puffle", color)
 
@@ -700,4 +728,5 @@ class KitchenState:
             "puffleColors": list(d.get("puffle_colors") or []),
             "birdColor": d.get("bird_color") or "",
             "birdColors": list(d.get("bird_colors") or []),
+            "petNames": dict(d.get("pet_names") or {}),
         }

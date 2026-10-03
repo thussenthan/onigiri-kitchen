@@ -433,3 +433,39 @@ def read_specials() -> Dict[str, Any]:
             "done": bool(target) and progress >= target,
         }
     return result
+
+
+# ------------------------------------------------- quieter Onigiri pop-ups
+PROGRESS_POPUP_PREFIX = "daily_special_progress_"
+
+
+def hide_progress_popups(allow: "Callable[[], bool]") -> bool:
+    """Onigiri pops up "Daily Special: 25% / 50% / 75% complete!" while you study
+    (the unlock pop-up at 100% is a different one). Wrap its dispatcher so only
+    those percentage ones are dropped, unless `allow()` says they're wanted.
+    Nothing in Onigiri's files is changed; this lasts until Anki closes."""
+    import importlib
+
+    pkg = find_onigiri_package()
+    if not pkg:
+        return False
+    try:
+        mod = importlib.import_module(f"{pkg}.gamification.restaurant_level")
+        cls = mod.RestaurantLevelManager
+        original = cls._dispatch_notifications
+    except Exception:
+        return False
+    if getattr(original, "_ok_wrapped", False):
+        return True
+
+    def wrapped(self: Any, notifications: Any) -> Any:
+        try:
+            if notifications and not allow():
+                notifications = [n for n in notifications if not str((n or {}).get("id", "")).startswith(PROGRESS_POPUP_PREFIX)]
+        except Exception:
+            pass
+        return original(self, notifications)
+
+    wrapped._ok_wrapped = True  # type: ignore[attr-defined]
+    cls._dispatch_notifications = wrapped
+    return True

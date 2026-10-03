@@ -18,7 +18,9 @@
     "show_home_widget_without_onigiri": true,
     "celebrate_deck_finish": true,
     "pause_focus_when_idle": true,
-    "idle_pause_minutes": 1,
+    "idle_pause_minutes": 2,
     "clock_style": "analog",
-    "theme_mode": "anki"
+    "theme_mode": "anki",
+    "onigiri_progress_popups": false,
+    "onigiri_news": false
 }

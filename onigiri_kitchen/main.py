@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from aqt import gui_hooks, mw
 from aqt.deckbrowser import DeckBrowser
@@ -18,13 +18,15 @@ from aqt.webview import AnkiWebView
 from . import onigiri_link
 from . import pet as petmod
 from .pomodoro import Pomodoro
-from .state import BIRD_COLORS, CATALOG, CATALOG_BY_ID, anki_today, earned_rewards, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
+from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_today, earned_rewards, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
 
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
+AUTHOR_NAME = "Thussenthan Walter-Angelo"
+AUTHOR_URL = "https://github.com/thussenthan"
 
 DEFAULT_CONF: Dict[str, Any] = {
     "focus_minutes": 25,
@@ -48,7 +50,9 @@ DEFAULT_CONF: Dict[str, Any] = {
     "show_home_widget_without_onigiri": True,
     "celebrate_deck_finish": True,
     "pause_focus_when_idle": True,
-    "idle_pause_minutes": 1,
+    "idle_pause_minutes": 2,
+    "onigiri_progress_popups": False,  # Onigiri's "Daily Special: 25% / 50% / 75% complete" pop-ups
+    "onigiri_news": False,  # announce new Specials-Book dishes and Onigiri level-ups when you visit
 }
 
 state = KitchenState(ADDON_DIR)
@@ -83,6 +87,38 @@ def write_conf(updates: Dict[str, Any]) -> None:
             continue
         current[key] = value
     mw.addonManager.writeConfig(__name__, current)
+
+
+# ------------------------------------------------------------ notifications
+# Never interrupt a card in progress: while a question or answer is on screen,
+# pop-ups (and the kitchen opening for a break) wait until you answer it.
+_pending_notes: List[Tuple[Callable[[], None], Optional[Callable[[], bool]]]] = []
+
+
+def _mid_card() -> bool:
+    try:
+        return mw.state == "review" and mw.reviewer.card is not None and mw.reviewer.state in ("question", "answer")
+    except Exception:
+        return False
+
+
+def notify(show: Callable[[], None], still_relevant: Optional[Callable[[], bool]] = None) -> None:
+    """Run `show` now, or right after your next answer if you're mid-card."""
+    if _mid_card():
+        _pending_notes.append((show, still_relevant))
+    else:
+        show()
+
+
+def _flush_notes() -> None:
+    notes = _pending_notes[:]
+    del _pending_notes[:]
+    for show, still_relevant in notes:
+        try:
+            if still_relevant is None or still_relevant():
+                show()
+        except Exception as e:
+            print(f"Onigiri Kitchen: notification failed: {e}")
 
 
 # --------------------------------------------------------------------- timer
@@ -128,11 +164,16 @@ def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
         msg = "休憩 Short break! Your restaurant is open."
         if info.get("long"):
             msg = "休憩 Long break! Your restaurant is open."
-        if c.get("auto_open_kitchen_on_break", True):
-            open_kitchen(reason="break")
-        else:
-            tooltip(msg, period=4000)
-        _eval_kitchen(f"OK.onFocusDone({json.dumps(info)})")
+        auto_open = c.get("auto_open_kitchen_on_break", True)
+
+        def show_break() -> None:
+            if auto_open:
+                open_kitchen(reason="break")
+            else:
+                tooltip(msg, period=2500)
+            _eval_kitchen(f"OK.onFocusDone({json.dumps(info)})")
+
+        notify(show_break)
     elif kind == "endless_block":
         # Endless focus: a focus-length studied, credited quietly (no break,
         # no pop-up): a dango on the skewer and a golden guest.
@@ -142,16 +183,19 @@ def _on_timer_event(kind: str, info: Dict[str, Any]) -> None:
     elif kind == "idle_paused":
         state.log_count("idle")
         mins = info.get("minutes", 1)
-        tooltip(
-            f"集中 Focus paused: no reviews for {mins:g} min.<br>It resumes when you answer your next card.",
-            period=5000,
+        notify(
+            lambda: tooltip(
+                f"集中 Focus paused: no reviews for {mins:g} min.<br>It resumes when you answer your next card.",
+                period=3000,
+            ),
+            lambda: pomo.idle_paused,
         )
     elif kind == "break_done":
         state.log_break(info.get("seconds", 0), bool(info.get("long")), bool(info.get("skipped")))
         if _dialog is not None:
             _eval_kitchen("OK.onBreakDone()")
         else:
-            tooltip("Break's over. Back to the books! 頑張って (you've got this!)", period=4000)
+            notify(lambda: tooltip("Break's over. Back to the books!<br><b>頑張って! (You've got this!)</b>", period=2500))
 
 
 pomo = Pomodoro(conf, _on_timer_change, _on_timer_event)
@@ -213,11 +257,14 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
     new_guest = state.add_review(deck, leech_success, conf().get("reviews_per_guest", 10), todays_reviews_by_deck())
     pomo.on_review()
     check_daily_goal()
+    if _pending_notes:
+        # you've just finished a card: now's a good moment for anything that waited
+        QTimer.singleShot(400, _flush_notes)
     grew = getattr(state, "pet_grew", None)
     if grew is not None:
         stage = state.pet.stages()[grew]
         name = state.pet.d.get("name", "Tama")
-        tooltip(f"🐾 {name} grew up! Now a {stage['jp']} {stage['name']}.", period=5000)
+        tooltip(f"🐾 {name} grew up! Now a {stage['jp']} {stage['name']}.", period=3000)
         _eval_kitchen(f"window.OK && OK.onPet({json.dumps(state.pet.snapshot())}, true)")
     if new_guest:
         _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
@@ -295,11 +342,17 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     seen = state.data.get("menu_seen")
     new_dishes = [n for n in names if n not in seen] if isinstance(seen, list) else []
     state.data["menu_seen"] = names
+    # New-dish and level-up announcements are opt-in (they're remembered either
+    # way, so turning them on later doesn't replay old news). Finishing today's
+    # special or your daily goal is always celebrated.
+    news = bool(conf().get("onigiri_news", False))
+    if not news:
+        new_dishes = []
     special_cheer = _special_cheer(specials)
     progress = restaurant_progress()
     last_level = state.data.get("last_level")
     state.data["last_level"] = int(progress.get("level", 0))
-    level_up = {"from": int(last_level), "to": int(progress["level"])} if last_level is not None and progress.get("level", 0) > last_level else None
+    level_up = {"from": int(last_level), "to": int(progress["level"])} if news and last_level is not None and progress.get("level", 0) > last_level else None
     away = state.pet.seen()
     # Anyone who already had all 12 keepsakes gets the set bonus once.
     set_bonus_now = False
@@ -342,6 +395,8 @@ class KitchenDialog(QDialog):
     def __init__(self, reason: str = "") -> None:
         super().__init__(mw)
         self._closed = False
+        self._force_close = False
+        self._asking = False
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowTitle("Onigiri Kitchen · おにぎり食堂")
         self.setMinimumSize(720, 520)
@@ -386,10 +441,13 @@ class KitchenDialog(QDialog):
         cmd, _, arg = message[len(CMD_PREFIX):].partition(":")
         return handle_kitchen_cmd(cmd, arg, self)
 
-    def close_soon(self) -> None:
+    def close_soon(self, force: bool = False) -> None:
         """Close once the current event (e.g. a call from the web page) has
         finished. Closing synchronously from inside a page callback tears the
-        page down mid-call and leaves an empty grey window (the Cmd+W bug)."""
+        page down mid-call and leaves an empty grey window (the Cmd+W bug).
+        Unless forced, unsaved settings in the page get a chance to ask first."""
+        if force:
+            self._force_close = True
         QTimer.singleShot(0, self.close)
 
     def reject(self) -> None:
@@ -397,9 +455,28 @@ class KitchenDialog(QDialog):
         self.close_soon()
 
     def closeEvent(self, event: Any) -> None:
+        if not self._force_close and not self._closed:
+            # The page offers Save / Don't save / Cancel if settings are unsaved.
+            event.ignore()
+            if not self._asking:
+                self._asking = True
+                try:
+                    self.web.evalWithCallback("window.OK && OK.askToSave ? OK.askToSave() : false", self._after_ask)
+                except Exception:
+                    self._after_ask(False)
+                # (if the page never answers, don't leave the window stuck open)
+                QTimer.singleShot(2000, lambda: self._after_ask(False) if self._asking else None)
+            return
         self._cleanup()
         # Accept directly: QDialog.closeEvent would call reject() again.
         event.accept()
+
+    def _after_ask(self, pending: Any) -> None:
+        if not self._asking:
+            return
+        self._asking = False
+        if not pending:
+            self.close_soon(force=True)
 
     def _cleanup(self) -> None:
         global _dialog
@@ -515,6 +592,10 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
             info = {}
         ok = state.choose_starter(str(info.get("species", "")), str(info.get("color", "")))
         return {"ok": ok, "pet": state.pet.snapshot(), "stages": state.pet.stages(), "state": state.snapshot()}
+    if cmd == "swappet":
+        result = state.swap_pet(arg)
+        result.update(pet=state.pet.snapshot(), stages=state.pet.stages(), state=state.snapshot())
+        return result
     if cmd == "pufflecolor":
         result = state.puffle_color(arg)
         result["state"] = state.snapshot()
@@ -585,9 +666,16 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
     if cmd == "tutorial":
         state.set_tutorial_done(arg != "reset")
         return None
+    if cmd == "author":
+        openLink(AUTHOR_URL)
+        return None
     if cmd == "close":
         if dialog is not None:
             dialog.close_soon()
+        return None
+    if cmd == "closeforce":
+        if dialog is not None:
+            dialog.close_soon(force=True)
         return None
     return None
 
@@ -930,10 +1018,15 @@ def study_today() -> Optional[Dict[str, Any]]:
             return {int(t): (int(c), int(m or 0)) for t, c, m in db.all(
                 "select type, count(), sum(time) from revlog where type in (0, 1, 2) and id > ? group by type", since)}
 
-        month = paces((cutoff - 30 * 86400) * 1000)
+        since = (cutoff - 30 * 86400) * 1000
+        month = paces(since)
         if not month:
+            since = 0
             month = paces(0)
-        new_seen = db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", (cutoff - 30 * 86400) * 1000) or 0
+        new_seen = db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", since) or 0
+        # how often a review fails, and how many relearning answers each lapse costs
+        rv = db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", since) or (0, 0)
+        lapse_rate = ((rv[1] or 0) / rv[0]) if rv[0] else 0.1
 
         def per(t: int, default: float) -> float:
             c, m = month.get(t, (0, 0))
@@ -943,12 +1036,34 @@ def study_today() -> Optional[Dict[str, Any]]:
         review_s = per(1, 8.0)
         relearn_s = per(2, learn_s)
         answers_per_new = (month.get(0, (0, 0))[0] / new_seen) if new_seen else 2.5
+        lapses = rv[1] or 0
+        answers_per_lapse = (month.get(2, (0, 0))[0] / lapses) if lapses else 1.5
+        # today's own pace beats the monthly one once there's enough of it
+        # (you're faster or slower than usual today, and that's what the rest
+        # of today will look like)
+        for t, c, m, _f in ((t, *today_types.get(t, [0, 0, 0])) for t in (0, 1, 2)):
+            if c >= 15 and m > 0:
+                blend = min(0.6, c / 100)
+                today_s = m / 1000 / c
+                if t == 0:
+                    learn_s = learn_s * (1 - blend) + today_s * blend
+                elif t == 1:
+                    review_s = review_s * (1 - blend) + today_s * blend
+                else:
+                    relearn_s = relearn_s * (1 - blend) + today_s * blend
         tree = mw.col.sched.deck_due_tree()
         due_new, due_learn, due_review = int(tree.new_count), int(tree.learn_count), int(tree.review_count)
     except Exception as e:
         print(f"Onigiri Kitchen: couldn't estimate today's time: {e}")
         return None
-    estimate = due_new * answers_per_new * learn_s + due_learn * relearn_s + due_review * review_s
+    # new cards take a few learning answers each; cards already in learning
+    # still need about one more (they have steps left, or come round again);
+    # reviews cost one answer plus, when they fail, the relearning that follows
+    estimate = (
+        due_new * answers_per_new * learn_s
+        + due_learn * learn_s * 1.3
+        + due_review * (review_s + lapse_rate * answers_per_lapse * relearn_s)
+    )
     value = {
         "cards": today_n,
         "seconds": round(ms / 1000),
@@ -979,6 +1094,9 @@ def widget_payload() -> Dict[str, Any]:
         "studyToday": study_today(),
         "mon": int(state.data.get("mon", 0)),
         "pet": state.pet.snapshot(),
+        # the shop pets standing beside your main pet (as species)
+        "companions": [pid_species for pid_species in ("cat", "puffle", "bird")
+                       if pid_species != state.pet.species and state.shown(PET_FOR_SPECIES[pid_species])],
         "puffleColor": (PUFFLE_COLORS_BY_ID.get(state.data.get("puffle_color") or "blue") or PUFFLE_COLORS[0])["hex"],
         "birdColor": state.data.get("bird_color") or "grey",
         "theme": progress.get("themeColor") or onigiri_link.DEFAULT_THEME_COLOR,
@@ -1063,6 +1181,11 @@ def on_js_message(handled: tuple, message: str, context: Any) -> tuple:
         return (True, None)
     if cmd == "timer":
         return (True, handle_kitchen_cmd("timer", arg, None))
+    if cmd == "collectall":
+        # the home-screen widget's "Collect all": serve everyone who's waiting
+        result = state.serve_all()
+        _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
+        return (True, {"count": result["count"], "mon": result["mon"], "widget": widget_payload()})
     return handled
 
 
@@ -1093,6 +1216,8 @@ def debug_log(msg: str) -> None:
 
 
 def on_state_will_change(new_state: str, old_state: str) -> None:
+    if _pending_notes and old_state == "review":
+        QTimer.singleShot(600, _flush_notes)  # left the reviewer: nothing to interrupt any more
     # Only celebrate when the congrats screen follows a review session, not
     # when you open a deck that's already finished.
     global _celebrate_next
@@ -1220,12 +1345,14 @@ def menu_bonus(guest: Dict[str, Any]) -> int:
 
 # --------------------------------------------------------------------- setup
 def on_profile_open() -> None:
+    onigiri_link.hide_progress_popups(lambda: bool(conf().get("onigiri_progress_popups", False)))
     state.load()
     state.menu_bonus = menu_bonus
 
 
 def on_profile_close() -> None:
     if _dialog is not None:
+        _dialog._force_close = True
         _dialog.close()
     pomo.reset()
     state.save()

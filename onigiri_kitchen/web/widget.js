@@ -6,8 +6,8 @@
   const W = 64;
   const H = 40;
 
-  function send(cmd) {
-    if (typeof pycmd === 'function') pycmd('okitchen:' + cmd);
+  function send(cmd, cb) {
+    if (typeof pycmd === 'function') pycmd('okitchen:' + cmd, cb);
   }
   function esc(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -109,60 +109,71 @@
       R(wx + 9, 7, 1, 12, '#5a3a22');
     }
 
-    // Tama
+    // Tama (and any other pets you have, standing beside)
     const p = d.pet || {};
     const phase = (d.timer && d.timer.pomo && d.timer.pomo.phase) || 'idle';
     const sleepy = p.energy < 35 || phase === 'focus' || hour >= 23.5 || hour < 5.5;
     // the pet stands on the right when text covers the left of the scene
     const tx = ctx.canvas.okwOverlay ? W - (W > 50 ? 9 : 6) : W >= 84 ? Math.round(W * 0.42) : Math.min(14, dx - 10);
-    if (!p.species) {
-      // no pet chosen yet
-    } else if (p.species === 'puffle') {
-      // a tiny puffle: spiky outline, one white eye patch, a smile
-      const c = d.puffleColor || '#3d7fd6';
-      const o = shade(c, -0.62);
-      const rows = sleepy
-        ? ['...o.o.o...', '..ofofofo..', '.offfffffo.', 'offfffffffo', 'offoofoofo.', 'offfffffffo', 'offffmmfffo', '.offfffffo.', '..ooooooo..']
-        : ['...o.o.o...', '..ofofofo..', '.offfffffo.', 'offwwwwwffo', 'offwkwkwffo', 'offwwwwwffo', 'offffmmfffo', '.offfffffo.', '..ooooooo..'];
-      const pal = { o, f: c, w: '#ffffff', k: '#2a2320', m: o };
-      const up = sleepy ? 0 : Math.round(Math.abs(Math.sin(time * 4)) * 2);
-      rows.forEach((row, j) => {
-        for (let i = 0; i < row.length; i++) if (pal[row[i]]) R(tx - 5 + i, 37 - rows.length + j - up, 1, 1, pal[row[i]]);
+
+    // one pet of any species, centred on x (bottom row 37)
+    const drawPet = (species, x, phase0) => {
+      if (species === 'puffle') {
+        // a tiny puffle: spiky outline, one white eye patch, a smile
+        const c = d.puffleColor || '#3d7fd6';
+        const o = shade(c, -0.62);
+        const rows = sleepy
+          ? ['...o.o.o...', '..ofofofo..', '.offfffffo.', 'offfffffffo', 'offoofoofo.', 'offfffffffo', 'offffmmfffo', '.offfffffo.', '..ooooooo..']
+          : ['...o.o.o...', '..ofofofo..', '.offfffffo.', 'offwwwwwffo', 'offwkwkwffo', 'offwwwwwffo', 'offffmmfffo', '.offfffffo.', '..ooooooo..'];
+        const pal = { o, f: c, w: '#ffffff', k: '#2a2320', m: o };
+        const up = sleepy ? 0 : Math.round(Math.abs(Math.sin(time * 4 + phase0)) * 2);
+        rows.forEach((row, j) => {
+          for (let i = 0; i < row.length; i++) if (pal[row[i]]) R(x - 5 + i, 37 - rows.length + j - up, 1, 1, pal[row[i]]);
+        });
+      } else if (species === 'bird') {
+        // a tiny Java sparrow in its colour: outline, cap, white cheek, pink beak
+        const pal = {
+          grey: ['#8f949f', '#1e1d23', '#232128'], white: ['#f6f3ec', '#f6f3ec', '#8e877c'], sakura: ['#8f949f', '#1e1d23', '#232128'],
+          cinnamon: ['#c9a58a', '#6b4a38', '#4a3326'], silver: ['#b8bfcc', '#565c69', '#3a3f49'], cream: ['#ecdfc8', '#b69c7b', '#7a6650'],
+        }[d.birdColor] || ['#8f949f', '#1e1d23', '#232128'];
+        const [body, cap, line] = pal;
+        const hop = sleepy ? 0 : Math.floor(time * 3 + phase0) % 4 === 0 ? 1 : 0;
+        const rows = ['...LLLL..', '..LccccL.', '.LLcwwepL', 'LbbLwwwLp', 'LbbbbbbL.', '.LbbbbL..', '..LLLL...'];
+        const map = { L: line, c: cap, w: sleepy ? cap : '#ffffff', e: sleepy ? cap : '#2a2320', p: '#f05a6e', b: body };
+        rows.forEach((row, j) => {
+          for (let i = 0; i < row.length; i++) if (map[row[i]]) R(x - 4 + i, 37 - rows.length + j - hop, 1, 1, map[row[i]]);
+        });
+        R(x - 1, 37 - hop, 1, 1, '#eea5ad'); R(x + 1, 37 - hop, 1, 1, '#eea5ad');
+      } else if (sleepy) {
+        R(x - 5, 33, 11, 4, '#fbf7ee');
+        R(x - 4, 33, 3, 2, '#e0a13a');
+        R(x + 2, 34, 3, 2, '#3b3030');
+        R(x + 4, 31, 4, 3, '#fbf7ee');
+        R(x + 4, 30, 1, 1, '#fbf7ee');
+        R(x + 7, 30, 1, 1, '#fbf7ee');
+        R(x - 6, 36, 5, 1, '#3b3030');
+      } else {
+        const tail = Math.round(Math.sin(time * 3 + phase0));
+        R(x - 3, 31, 7, 6, '#fbf7ee');
+        R(x - 3, 33, 3, 3, '#e0a13a');
+        R(x - 3, 26, 7, 5, '#fbf7ee');
+        R(x - 3, 25, 1, 1, '#fbf7ee');
+        R(x + 3, 25, 1, 1, '#3b3030');
+        R(x - 2, 28, 1, 1, '#2a2320');
+        R(x + 2, 28, 1, 1, '#2a2320');
+        R(x, 29, 1, 1, '#f3aaa0');
+        if ((p.stage || 0) >= 1) R(x - 2, 31, 5, 1, '#c8412f');
+        R(x + 4, 33 + tail, 1, 3, '#3b3030');
+      }
+    };
+    if (p.species) {
+      // the rest of your pets keep it company, to the side with room
+      (d.companions || []).forEach((sp0, i) => {
+        const step = 12 * (i + 1);
+        const x = tx - step >= 7 ? tx - step : tx + step;
+        if (x > 5 && x < W - 5) drawPet(sp0, x, 1.7 * (i + 1));
       });
-    } else if (p.species === 'bird') {
-      // a tiny Java sparrow in its colour: outline, cap, white cheek, pink beak
-      const pal = {
-        grey: ['#8f949f', '#1e1d23', '#232128'], white: ['#f6f3ec', '#f6f3ec', '#8e877c'], sakura: ['#8f949f', '#1e1d23', '#232128'],
-        cinnamon: ['#c9a58a', '#6b4a38', '#4a3326'], silver: ['#b8bfcc', '#565c69', '#3a3f49'], cream: ['#ecdfc8', '#b69c7b', '#7a6650'],
-      }[d.birdColor] || ['#8f949f', '#1e1d23', '#232128'];
-      const [body, cap, line] = pal;
-      const hop = sleepy ? 0 : Math.floor(time * 3) % 4 === 0 ? 1 : 0;
-      const rows = ['...LLLL..', '..LccccL.', '.LLcwwepL', 'LbbLwwwLp', 'LbbbbbbL.', '.LbbbbL..', '..LLLL...'];
-      const map = { L: line, c: cap, w: sleepy ? cap : '#ffffff', e: sleepy ? cap : '#2a2320', p: '#f05a6e', b: body };
-      rows.forEach((row, j) => {
-        for (let i = 0; i < row.length; i++) if (map[row[i]]) R(tx - 4 + i, 37 - rows.length + j - hop, 1, 1, map[row[i]]);
-      });
-      R(tx - 1, 37 - hop, 1, 1, '#eea5ad'); R(tx + 1, 37 - hop, 1, 1, '#eea5ad');
-    } else if (sleepy) {
-      R(tx - 5, 33, 11, 4, '#fbf7ee');
-      R(tx - 4, 33, 3, 2, '#e0a13a');
-      R(tx + 2, 34, 3, 2, '#3b3030');
-      R(tx + 4, 31, 4, 3, '#fbf7ee');
-      R(tx + 4, 30, 1, 1, '#fbf7ee');
-      R(tx + 7, 30, 1, 1, '#fbf7ee');
-      R(tx - 6, 36, 5, 1, '#3b3030');
-    } else {
-      const tail = Math.round(Math.sin(time * 3));
-      R(tx - 3, 31, 7, 6, '#fbf7ee');
-      R(tx - 3, 33, 3, 3, '#e0a13a');
-      R(tx - 3, 26, 7, 5, '#fbf7ee');
-      R(tx - 3, 25, 1, 1, '#fbf7ee');
-      R(tx + 3, 25, 1, 1, '#3b3030');
-      R(tx - 2, 28, 1, 1, '#2a2320');
-      R(tx + 2, 28, 1, 1, '#2a2320');
-      R(tx, 29, 1, 1, '#f3aaa0');
-      if ((p.stage || 0) >= 1) R(tx - 2, 31, 5, 1, '#c8412f');
-      R(tx + 4, 33 + tail, 1, 3, '#3b3030');
+      drawPet(p.species, tx, 0);
     }
 
     // z Z Z rising one after another while the pet naps (like in the kitchen);
@@ -197,9 +208,11 @@
   // -------------------------------------------------------------- info
   function renderInfo(el, d) {
     const info = el.querySelector('.okw-info');
-    const big = d.guests > 0
-      ? `<b>${d.guests}</b> guest${d.guests === 1 ? '' : 's'} waiting`
-      : `Next guest in <b>${d.nextIn}</b> review${d.nextIn === 1 ? '' : 's'}`;
+    const big = d.flash
+      ? esc(d.flash)
+      : d.guests > 0
+        ? `<b>${d.guests}</b> guest${d.guests === 1 ? '' : 's'} waiting`
+        : `Next guest in <b>${d.nextIn}</b> review${d.nextIn === 1 ? '' : 's'}`;
     const p = d.pet || {};
     // Onigiri already shows today's count, so the widget shows all-time stats
     // from Anki's review log (the timer lives in the corner chip).
@@ -239,14 +252,26 @@
       `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
       `<div class="okw-big">${big}</div>` +
       `<div class="okw-sub"><span title="${d.mon} mon (文): tips from your guests">文 ${d.mon}</span>${p.species ? `<span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span>` : ''}</div>` +
-      `<div class="okw-row">` +
+      `<div class="okw-row${d.guests > 0 ? ' okw-has-collect' : ''}">` +
       `<span class="okw-stats">${stats}</span>` +
       '' +
+      (d.guests > 0 ? `<button class="okw-btn okw-collect" data-act="collect" title="Serve every waiting guest and collect all their tips">Collect all</button>` : '') +
       `<button class="okw-btn okw-primary" data-act="open">Visit</button>` +
       `</div>`;
     info.querySelectorAll('.okw-btn').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
-      send('open');
+      if (b.dataset.act !== 'collect') { send('open'); return; }
+      // serve everyone waiting right from the home screen
+      b.disabled = true;
+      send('collectall', (res) => {
+        if (!res || !res.widget) return;
+        const w = widgets.find((x) => x.el === el);
+        if (!w) return;
+        Object.assign(w.d, res.widget);
+        w.d.flash = res.count ? `Collected ${res.count} guest${res.count === 1 ? '' : 's'} · +${res.mon} 文` : null;
+        renderInfo(el, w.d);
+        if (w.d.flash) setTimeout(() => { w.d.flash = null; renderInfo(el, w.d); }, 3500);
+      });
     }));
   }
 
