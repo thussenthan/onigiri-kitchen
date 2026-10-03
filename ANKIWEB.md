@@ -49,7 +49,7 @@ You study, guests arrive. You take a break, you get to enjoy them.
 Click the restaurant picture on Onigiri's main screen (Shift-click keeps Onigiri's normal view), click the shop-front icon next to Onigiri's buttons, click the dango timer in the corner, or use **Tools → Onigiri Kitchen** (Ctrl+Shift+K, or Cmd+Shift+K on a Mac).
 
 ### Your data
-Onigiri Kitchen never modifies Onigiri. It only reads your restaurant name, level, theme and Specials Book. Your XP and Taiyaki coins are untouched. Onigiri is recommended but not required.
+Onigiri Kitchen never changes Onigiri's files. It reads your restaurant name, level, theme and Specials Book, and (unless you turn them back on in ⚙) hides Onigiri's 25% / 50% / 75% daily-special pop-ups while Anki is open. Your XP and Taiyaki coins are untouched. Onigiri is recommended but not required.
 
 ### Bugs & ideas
 Click the 目安箱 suggestion box on the restaurant wall, or use **⚙ → Suggest a feature / Report a bug**, or open an issue on [GitHub](https://github.com/thussenthan/onigiri-kitchen). Please report problems there rather than in AnkiWeb reviews, since I can't reply to reviews.
