@@ -633,7 +633,9 @@ class KitchenState:
         self.apply_companion_perks()
 
     def all_pets(self) -> List["petmod.Pet"]:
-        return [self.pet] + [self.extra[sp] for sp in SPECIES_ORDER if sp in self.extra]
+        # your first pet, then the others in the order you adopted them
+        order = sorted(self.extra, key=lambda sp: self.data["owned"].index(PET_FOR_SPECIES[sp]) if PET_FOR_SPECIES[sp] in self.data["owned"] else 99)
+        return [self.pet] + [self.extra[sp] for sp in order]
 
     def get_pet(self, species: Optional[str]) -> "petmod.Pet":
         return self.extra.get(species or "") or self.pet

@@ -247,8 +247,7 @@
     const due = t && t.due ? t.due.total : 0;
     const leftTip = t ? (due ? `About ${mins(t.estimateSeconds)} left: ${due} cards due (${t.due.new} new, ${t.due.learn} learning, ${t.due.review} review), at your own pace` : 'Nothing due right now') : '';
     const left = t ? stat(due ? `~${mins(t.estimateSeconds)}` : 'done', due ? `~${mins(t.estimateSeconds)}` : 'done', due ? 'left' : 'all due', due ? 'left' : 'due', esc(leftTip)).replace('okw-stat"', 'okw-stat okw-stat-big"') : '';
-    const allTip = st.hours != null ? `\nAll time: ${Number(st.total || 0).toLocaleString()} reviews in ${st.hours} hours.` : '';
-    el.title = `Open Onigiri Kitchen${leftTip ? `\n${leftTip}.` : ''}${allTip}`;
+    el.removeAttribute('title'); // (no hover text on the card itself: each number explains itself)
     const stats = d.stats
       ? stat(num(st.total), short(st.total), 'reviews', 'reviews', `${Number(st.total || 0).toLocaleString()} reviews all time`) +
         stat(num(st.average), short(st.average), 'per day', '/day', 'Average reviews on the days you studied') +

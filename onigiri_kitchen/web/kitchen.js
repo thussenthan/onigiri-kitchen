@@ -145,7 +145,7 @@
   let walkerTimer = rand(3, 8);
   let fireworkTimer = 0;
   let norenSway = 0;
-  let radioOn = false;
+  let radioOn = !!conf.radio_on; // (left playing last time? it still is)
   let radioTimer = 0;
   let radioStep = 3;
   let windTimer = rand(20, 40);
@@ -1349,7 +1349,7 @@
         for (let i = 0; i < 10; i++) particles.push({ x: d.x + rand(0, 16), y: d.y + rand(0, 10), vx: rand(-8, 2), vy: rand(4, 10), life: rand(2, 4), c: pick(['#f7c6d4', '#f2a9c0']), type: 'petal' });
         OKSound.pluck(8);
         break;
-      case 'radio': radioOn = !radioOn; OKSound.blip(); break;
+      case 'radio': radioOn = !radioOn; conf.radio_on = radioOn; send('conf', JSON.stringify({ radio_on: radioOn })); OKSound.blip(); break;
       case 'tanuki':
         OKSound.koto(98, 0, 0.35); OKSound.koto(98, 0.18, 0.35);
         spawnHearts(d.x + 8, d.y + 10, 1);
@@ -1554,7 +1554,8 @@
   function petList() {
     if (!pet.species) return [];
     // (a pet you've put in storage from the shop isn't about: no tab, bowl or bed)
-    return [pet.species, ...['cat', 'puffle', 'bird'].filter((x) => x !== pet.species && S.owned.includes(PET_SHOP[x]) && !S.hidden.includes(PET_SHOP[x]))];
+    const got = (x) => S.owned.indexOf(PET_SHOP[x]); // the order you adopted them
+    return [pet.species, ...['cat', 'puffle', 'bird'].filter((x) => x !== pet.species && got(x) >= 0 && !S.hidden.includes(PET_SHOP[x])).sort((a, b) => got(a) - got(b))];
   }
   const petOf = (x) => (x === pet.species ? pet : PETS[x]);
   // is the toy out for the pet that walks about on its own (your first pet)?
@@ -2800,6 +2801,7 @@
     const panel = $('ok-pet');
     if (!panel || panel.hidden) return;
     const list = petList();
+    if (viewSp == null && list.includes(conf.last_pet)) viewSp = conf.last_pet; // (the one you looked at last time)
     if (!list.includes(viewSp)) viewSp = pet.species;
     // draw the card for the pet being viewed (everything below reads `pet`)
     const real = pet;
@@ -2935,7 +2937,13 @@
       }
       b.appendChild(cv);
       b.insertAdjacentHTML('beforeend', `<span>${esc(p0.name || x)}</span>`);
-      b.onclick = () => { viewSp = x; OKSound.blip(); voice(x); renderPetPanel(); };
+      b.onclick = () => {
+        viewSp = x;
+        if (conf.last_pet !== x) { conf.last_pet = x; send('conf', JSON.stringify({ last_pet: x })); }
+        OKSound.blip();
+        voice(x);
+        renderPetPanel();
+      };
       nav.appendChild(b);
     }
   }
@@ -3001,7 +3009,7 @@
     html += `<div class="ok-acc-note">Unlocked by caring: pets count up to ${PETS_PER_DAY} a day (${pet.petsToday || 0} today).</div>`;
     box.innerHTML = html;
     box.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => setPetColor(vs, b.dataset.color)));
-    box.querySelectorAll('[data-shop]').forEach((b) => b.addEventListener('click', () => { const ckk = colorKind(vs); shopClosed.delete(`${ckk.noun[0].toUpperCase()}${ckk.noun.slice(1)} colours`); togglePanel('ok-decor'); setTimeout(() => { const el = $('ok-colors-' + vs); if (el) el.scrollIntoView({ block: 'start' }); }, 30); }));
+    box.querySelectorAll('[data-shop]').forEach((b) => b.addEventListener('click', () => { const ckk = colorKind(vs); if (shopClosed.delete(`${ckk.noun[0].toUpperCase()}${ckk.noun.slice(1)} colours`)) { conf.shop_closed = [...shopClosed]; send('conf', JSON.stringify({ shop_closed: conf.shop_closed })); } togglePanel('ok-decor'); setTimeout(() => { const el = $('ok-colors-' + vs); if (el) el.scrollIntoView({ block: 'start' }); }, 30); }));
     box.querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', () => {
       const key = b.dataset.style;
       let value = b.dataset.value;
@@ -3216,7 +3224,8 @@
   const residents = [];
 
   function syncResidents() {
-    const want = catalog.filter((c) => isCompanion(c) && has(c.id) && !(c.kind === 'pet' && c.species === pet.species)).map((c) => c.id);
+    const want = catalog.filter((c) => isCompanion(c) && has(c.id) && !(c.kind === 'pet' && c.species === pet.species)).map((c) => c.id)
+      .sort((a, b) => S.owned.indexOf(a) - S.owned.indexOf(b)); // (beds and bowls follow the order you got them)
     for (let i = residents.length - 1; i >= 0; i--) if (!want.includes(residents[i].id)) residents.splice(i, 1);
     setTimeout(assignSlots, 0);
     want.forEach((id, i) => {
@@ -4645,7 +4654,7 @@
   $('ok-t-set').addEventListener('click', () => togglePanel('ok-settings'));
   $('ok-report').addEventListener('click', () => send('report'));
   $('ok-idea').addEventListener('click', () => send('idea'));
-  $('ok-stats').addEventListener('click', () => { OKSound.pluck(4); send('stats'); });
+  setTip($('ok-b-stats'), 'You in numbers');
   $('ok-b-stats').addEventListener('click', () => { OKSound.pluck(4); send('stats'); });
   $('ok-tour-replay').addEventListener('click', () => guardSettings(() => { $('ok-settings').hidden = true; startTour(); }));
   $('ok-b-rush').addEventListener('click', () => {
@@ -4844,7 +4853,8 @@
       h.innerHTML = `<i class="ok-caret" aria-hidden="true"></i><b class="jp">${jp}</b> ${en}<span>${sub}</span>`;
       h.addEventListener('click', () => {
         if (shopClosed.has(en)) shopClosed.delete(en); else shopClosed.add(en);
-        try { localStorage.setItem('okShopClosed', JSON.stringify([...shopClosed])); } catch (e) {}
+        conf.shop_closed = [...shopClosed];
+        send('conf', JSON.stringify({ shop_closed: conf.shop_closed }));
         applyShopFolds(grid);
       });
       grid.appendChild(h);
@@ -4932,8 +4942,7 @@
     }
     applyShopFolds(grid);
   }
-  let shopClosed = new Set();
-  try { shopClosed = new Set(JSON.parse(localStorage.getItem('okShopClosed') || '[]')); } catch (e) {}
+  let shopClosed = new Set(Array.isArray(conf.shop_closed) ? conf.shop_closed : []);
   function applyShopFolds(grid) {
     let closed = false;
     for (const el of grid.children) {
@@ -5549,11 +5558,9 @@
 
   // "Focus started" only for the day's first session; after that the timer says it
   function focusStartToast() {
-    const day = S.today.date || new Date().toDateString();
-    try {
-      if (localStorage.getItem('okFocusToast') === day) return;
-      localStorage.setItem('okFocusToast', day);
-    } catch (e) {}
+    if ((S.today || {}).focus_toast) return;
+    S.today = Object.assign({}, S.today, { focus_toast: true });
+    send('focustoast');
     toast('集中 · Focus started. The kitchen will prep while you study.');
   }
 

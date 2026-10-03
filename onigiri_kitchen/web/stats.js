@@ -48,17 +48,17 @@
   const hourName = (h) => hourLabel(h).replace('a', ' am').replace('p', ' pm');
 
   // the page being shown (the window always opens on Today)
-  const PAGES = ['today', 'pomo', 'rev', 'kitchen'];
+  const PAGES = ['today', 'rev', 'pomo', 'kitchen'];
   let page = 'today';
   try {
     const savedPage = new URLSearchParams(location.search).get('page'); // (always opens on Today)
     if (savedPage && PAGES.includes(savedPage)) page = savedPage;
   } catch (e) {}
 
-  // the chosen range (remembered between visits)
-  let range = '30';
+  // the chosen range
+  let range = '365'; // a year, unless you pick another while the window is open
   try {
-    const saved = new URLSearchParams(location.search).get('range') || localStorage.getItem('oksRange');
+    const saved = new URLSearchParams(location.search).get('range');
     if (saved && RANGES.some((r) => r[0] === saved)) range = saved;
   } catch (e) {}
   function rangeStart(firstEver) {
@@ -519,7 +519,6 @@
     if (!t) return;
     if (t.dataset.range) {
       range = t.dataset.range;
-      try { localStorage.setItem('oksRange', range); } catch (err) {}
       render();
     } else {
       page = t.dataset.page;

@@ -23,7 +23,7 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.10.1"
+VERSION = "1.10.2"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 AUTHOR_NAME = "Thussenthan Walter-Angelo"
 AUTHOR_URL = "https://github.com/thussenthan"
@@ -51,6 +51,9 @@ DEFAULT_CONF: Dict[str, Any] = {
     "celebrate_deck_finish": True,
     "pause_focus_when_idle": True,
     "idle_pause_minutes": 2,
+    "last_pet": "",  # which pet's tab the Pets card opened on last
+    "radio_on": False,  # the shelf radio, if you left it playing
+    "shop_closed": [],  # shop sections you folded away
     "onigiri_progress_popups": False,  # Onigiri's "Daily Special: 25% / 50% / 75% complete" pop-ups
 }
 
@@ -667,6 +670,10 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
     if cmd == "tutorial":
         state.set_tutorial_done(arg != "reset")
         return None
+    if cmd == "focustoast":
+        state.data["today"]["focus_toast"] = True  # today's "Focus started" note has been shown
+        state.save_soon()
+        return None
     if cmd == "author":
         openLink(AUTHOR_URL)
         return None
@@ -1126,7 +1133,7 @@ def kitchen_widget(deck_browser: Any, content: Any) -> None:
         print(f"Onigiri Kitchen: widget failed: {e}")
         return
     content.stats += (
-        f'<div class="okw{" okw-plain" if plain else ""}" role="button" tabindex="0" title="Open Onigiri Kitchen">'
+        f'<div class="okw{" okw-plain" if plain else ""}" role="button" tabindex="0" aria-label="Open Onigiri Kitchen">'
         f'<script type="application/json" class="okw-data">{data}</script>'
         '<div class="okw-in"><canvas class="okw-scene" width="64" height="40"></canvas>'
         '<div class="okw-info"></div></div></div>'

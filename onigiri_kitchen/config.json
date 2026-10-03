@@ -21,5 +21,8 @@
     "idle_pause_minutes": 2,
     "clock_style": "analog",
     "theme_mode": "anki",
+    "last_pet": "",
+    "radio_on": false,
+    "shop_closed": [],
     "onigiri_progress_popups": false
 }
