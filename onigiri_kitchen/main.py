@@ -23,7 +23,7 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.9.0"
+VERSION = "1.10.0"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 AUTHOR_NAME = "Thussenthan Walter-Angelo"
 AUTHOR_URL = "https://github.com/thussenthan"
@@ -52,7 +52,6 @@ DEFAULT_CONF: Dict[str, Any] = {
     "pause_focus_when_idle": True,
     "idle_pause_minutes": 2,
     "onigiri_progress_popups": False,  # Onigiri's "Daily Special: 25% / 50% / 75% complete" pop-ups
-    "onigiri_news": False,  # announce new Specials-Book dishes and Onigiri level-ups when you visit
 }
 
 state = KitchenState(ADDON_DIR)
@@ -265,7 +264,7 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
         stage = state.pet.stages()[grew]
         name = state.pet.d.get("name", "Tama")
         tooltip(f"🐾 {name} grew up! Now a {stage['jp']} {stage['name']}.", period=3000)
-        _eval_kitchen(f"window.OK && OK.onPet({json.dumps(state.pet.snapshot())}, true)")
+        _eval_kitchen(f"window.OK && OK.onPet({json.dumps(state.pet.snapshot())}, true, {json.dumps(state.pet_snapshots())})")
     if new_guest:
         _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
 
@@ -342,17 +341,11 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     seen = state.data.get("menu_seen")
     new_dishes = [n for n in names if n not in seen] if isinstance(seen, list) else []
     state.data["menu_seen"] = names
-    # New-dish and level-up announcements are opt-in (they're remembered either
-    # way, so turning them on later doesn't replay old news). Finishing today's
-    # special or your daily goal is always celebrated.
-    news = bool(conf().get("onigiri_news", False))
-    if not news:
-        new_dishes = []
     special_cheer = _special_cheer(specials)
     progress = restaurant_progress()
     last_level = state.data.get("last_level")
     state.data["last_level"] = int(progress.get("level", 0))
-    level_up = {"from": int(last_level), "to": int(progress["level"])} if news and last_level is not None and progress.get("level", 0) > last_level else None
+    level_up = {"from": int(last_level), "to": int(progress["level"])} if last_level is not None and progress.get("level", 0) > last_level else None
     away = state.pet.seen()
     # Anyone who already had all 12 keepsakes gets the set bonus once.
     set_bonus_now = False
@@ -365,6 +358,7 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     return {
         "reason": reason,
         "pet": state.pet.snapshot(),
+        "pets": state.pet_snapshots(),
         "petAway": away,
         "petStages": state.pet.stages(),
         "petSpecies": petmod.species_payload(),
@@ -397,6 +391,7 @@ class KitchenDialog(QDialog):
         self._closed = False
         self._force_close = False
         self._asking = False
+        self._ask_gen = 0
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowTitle("Onigiri Kitchen · おにぎり食堂")
         self.setMinimumSize(720, 520)
@@ -460,12 +455,14 @@ class KitchenDialog(QDialog):
             event.ignore()
             if not self._asking:
                 self._asking = True
+                self._ask_gen += 1
+                gen = self._ask_gen
                 try:
                     self.web.evalWithCallback("window.OK && OK.askToSave ? OK.askToSave() : false", self._after_ask)
                 except Exception:
                     self._after_ask(False)
                 # (if the page never answers, don't leave the window stuck open)
-                QTimer.singleShot(2000, lambda: self._after_ask(False) if self._asking else None)
+                QTimer.singleShot(2000, lambda: self._after_ask(False) if self._asking and self._ask_gen == gen else None)
             return
         self._cleanup()
         # Accept directly: QDialog.closeEvent would call reject() again.
@@ -568,34 +565,37 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         level = restaurant_progress()["level"]
         result = state.buy(arg, level)
         result["state"] = state.snapshot()
+        result["pets"] = state.pet_snapshots()
         return result
     if cmd == "toggle":
         state.toggle(arg)
         return state.snapshot()
     if cmd == "pet":
-        return state.pet_action(arg)
+        kind, _, species = arg.partition("@")  # "feed@puffle": which of your pets
+        return state.pet_action(kind, species or None)
     if cmd == "petgift":
-        gift = state.pet_gift()
-        return {"gift": gift, "pet": state.pet.snapshot(), "state": state.snapshot()}
+        gift = state.pet_gift(arg or None)
+        return {"gift": gift, "pet": state.pet.snapshot(), "pets": state.pet_snapshots(), "state": state.snapshot()}
     if cmd == "petname":
-        return state.pet_rename(arg)
+        try:
+            info = json.loads(arg or "{}")
+        except ValueError:
+            info = {"name": arg}
+        return state.pet_rename(str(info.get("name", "")), info.get("species"))
     if cmd == "petstyle":
         try:
             info = json.loads(arg or "{}")
         except ValueError:
             info = {}
-        return state.pet_style(str(info.get("key", "")), info.get("value"))
+        return state.pet_style(str(info.get("key", "")), info.get("value"), info.get("species"))
     if cmd == "choose":
         try:
             info = json.loads(arg or "{}")
         except ValueError:
             info = {}
         ok = state.choose_starter(str(info.get("species", "")), str(info.get("color", "")))
-        return {"ok": ok, "pet": state.pet.snapshot(), "stages": state.pet.stages(), "state": state.snapshot()}
-    if cmd == "swappet":
-        result = state.swap_pet(arg)
-        result.update(pet=state.pet.snapshot(), stages=state.pet.stages(), state=state.snapshot())
-        return result
+        state.sync_pets()
+        return {"ok": ok, "pet": state.pet.snapshot(), "pets": state.pet_snapshots(), "stages": state.pet.stages(), "state": state.snapshot()}
     if cmd == "pufflecolor":
         result = state.puffle_color(arg)
         result["state"] = state.snapshot()
@@ -662,6 +662,7 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         result = state.serve_all()
         result["state"] = state.snapshot()
         result["pet"] = state.pet.snapshot()
+        result["pets"] = state.pet_snapshots()
         return result
     if cmd == "tutorial":
         state.set_tutorial_done(arg != "reset")
@@ -860,6 +861,7 @@ def _kitchen_stats() -> Dict[str, Any]:
     d = state.data
     log = state._log()
     pet = state.pet.snapshot()
+    all_pets = list(state.pet_snapshots().values())
     progress = restaurant_progress()
     try:
         book = len(cached_specials().get("book") or [])
@@ -895,13 +897,15 @@ def _kitchen_stats() -> Dict[str, Any]:
         "levelFrom": progress.get("levelFrom", "onigiri"),
         "specials": book,
         "pet": {
-            "name": pet.get("name"),
+            # every pet you have: names joined, petting and keepsakes added up
+            "name": " & ".join(str(p.get("name")) for p in all_pets) or pet.get("name"),
+            "count": max(1, len(all_pets)),
             "species": pet.get("species"),
             "stage": f"{pet.get('stageJp', '')} {pet.get('stageName', '')}".strip(),
             "studyDays": pet.get("studyDays", 0),
-            "petted": pet.get("timesPetted", 0),
-            "gifts": len([g for g, n in (pet.get("gifts") or {}).items() if n]),
-            "giftsTotal": len(petmod.GIFTS) + len(petmod.RARE_GIFTS),
+            "petted": sum(int(p.get("timesPetted", 0)) for p in all_pets) or pet.get("timesPetted", 0),
+            "gifts": sum(len([g for g, n in (p.get("gifts") or {}).items() if n]) for p in all_pets) or 0,
+            "giftsTotal": (len(petmod.GIFTS) + len(petmod.RARE_GIFTS)) * max(1, len(all_pets)),
         },
     }
 
@@ -1088,6 +1092,9 @@ def widget_payload() -> Dict[str, Any]:
     return {
         "guests": len(state.data.get("guests", [])),
         "nextIn": max(1, per - int(best)),
+        "perGuest": per,
+        "pets": [{"species": sp, "name": snap.get("name"), "tummy": snap["tummy"], "love": snap["love"], "energy": snap["energy"]}
+                 for sp, snap in state.pet_snapshots().items()],
         "reviews": int(state.data["today"].get("reviews", 0)),
         "focusDone": int(state.data["today"].get("focus_done", 0)),
         "stats": lifetime_stats(int(state.data["today"].get("reviews", 0))),
@@ -1183,6 +1190,9 @@ def on_js_message(handled: tuple, message: str, context: Any) -> tuple:
         return (True, handle_kitchen_cmd("timer", arg, None))
     if cmd == "collectall":
         # the home-screen widget's "Collect all": serve everyone who's waiting
+        # (only from the deck list, never from a card's own page)
+        if not isinstance(context, DeckBrowser):
+            return handled
         result = state.serve_all()
         _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
         return (True, {"count": result["count"], "mon": result["mon"], "widget": widget_payload()})
@@ -1351,6 +1361,7 @@ def on_profile_open() -> None:
 
 
 def on_profile_close() -> None:
+    del _pending_notes[:]  # a waiting pop-up must not turn up in the next profile
     if _dialog is not None:
         _dialog._force_close = True
         _dialog.close()

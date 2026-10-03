@@ -47,6 +47,7 @@
       <button class="ok-foot-btn ok-rush" id="ok-b-rush" hidden><span class="jp">急</span> Serve faster</button>
       <button class="ok-foot-btn" id="ok-b-pet"><span class="jp" id="ok-pet-jp">猫</span> <span id="ok-pet-label">Pet</span></button>
       <button class="ok-foot-btn" id="ok-b-decor"><span class="jp">店</span> Shop</button>
+      <button class="ok-foot-btn" id="ok-b-stats"><span class="jp">統計</span> Stats</button>
       <button class="ok-foot-btn ok-icon-only" id="ok-b-sound" title="Mute" aria-label="Mute">
         <svg viewBox="0 0 24 24" aria-hidden="true" class="ok-snd-on"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <svg viewBox="0 0 24 24" aria-hidden="true" class="ok-snd-off"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -64,6 +65,7 @@
   </section>
 
   <section class="ok-panel ok-panel-narrow" id="ok-pet" hidden>
+    <nav class="ok-pet-switch" id="ok-pet-switch" role="tablist" hidden></nav>
     <div class="ok-panel-head ok-pet-head">
       <canvas id="ok-pet-portrait" class="ok-pet-portrait" width="44" height="36"></canvas>
       <div class="ok-pet-id">
@@ -74,7 +76,6 @@
         <div class="ok-pet-stage" id="ok-pet-stage">子猫 Kitten</div>
         <div class="ok-pet-grow"><i id="ok-pet-grow"></i></div>
         <div class="ok-pet-growtext" id="ok-pet-growtext"></div>
-        <div class="ok-pet-swap" id="ok-pet-swap" hidden></div>
       </div>
       <button class="ok-close" data-close="ok-pet" title="Close">&times;</button>
     </div>
@@ -126,8 +127,7 @@
       <label class="ok-check"><input type="checkbox" name="auto_start_next_focus"> Start the next focus session when a break ends</label>
       <label class="ok-check"><input type="checkbox" name="show_timer_chip_in_reviewer"> Show the dango timer while reviewing</label>
       <label class="ok-check"><input type="checkbox" name="widget_click_opens_kitchen"> Clicking Onigiri's restaurant picture opens the kitchen</label>
-      <label class="ok-check"><input type="checkbox" name="onigiri_progress_popups"> Show Onigiri's 25% / 50% / 75% daily-special pop-ups <em>(the unlock pop-up always shows)</em></label>
-      <label class="ok-check"><input type="checkbox" name="onigiri_news"> Announce new Specials-Book dishes and Onigiri level-ups when I visit <em>(finishing today's special or your daily goal always gets a party)</em></label>
+      <label class="ok-check"><input type="checkbox" name="onigiri_progress_popups"> Show Onigiri's 25% / 50% / 75% daily-special pop-ups</label>
       <label>Light / dark <span><select name="theme_mode">
         <option value="anki">Match Anki</option>
         <option value="auto">Day &amp; night (your clock)</option>
@@ -135,12 +135,10 @@
         <option value="dark">Always dark</option>
       </select></span></label>
       <label>Volume <span><input type="range" name="volume" min="0" max="1" step="0.05"></span></label>
-      <div class="ok-report">
-        <div class="ok-report-head"><b class="jp">統計</b> Stats: your focus, reviews and kitchen in numbers</div>
-        <div class="ok-report-btns">
-          <button type="button" class="ok-foot-btn" id="ok-stats">📊 Open stats</button>
-        </div>
-      </div>
+      <button type="button" class="ok-stats-big" id="ok-stats">
+        <span class="ok-stats-ico">📊</span>
+        <span><b><span class="jp">統計</span> Open your stats</b><small>Focus time, streaks, reviews, retention and your kitchen in charts</small></span>
+      </button>
       <div class="ok-report">
         <div class="ok-report-head"><b class="jp">目安箱</b> Ideas or problems? <em id="ok-version"></em></div>
         <div class="ok-report-btns">

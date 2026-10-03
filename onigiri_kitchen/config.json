@@ -21,6 +21,5 @@
     "idle_pause_minutes": 2,
     "clock_style": "analog",
     "theme_mode": "anki",
-    "onigiri_progress_popups": false,
-    "onigiri_news": false
+    "onigiri_progress_popups": false
 }

@@ -1534,7 +1534,7 @@
   const hasBird = () => pet.species === 'bird' || S.owned.includes('buncho');
   // The two pets that come in colours: puffle and Java sparrow.
   const colorKind = (kind) => (kind === 'bird'
-    ? { kind, list: BIRD_COLORS, owned: S.birdColors || [], current: S.birdColor || '', noun: 'Java sparrow', jp: '文鳥の色', has: hasBird(), shopId: 'buncho', first: 'grey', swatch: (c) => (c.id === 'sakura' ? 'radial-gradient(circle at 32% 34%, #f5f2ec 0 16%, transparent 18%), radial-gradient(circle at 66% 62%, #f5f2ec 0 14%, transparent 16%), #8f949f' : c.hex) }
+    ? { kind, list: BIRD_COLORS, owned: S.birdColors || [], current: S.birdColor || '', noun: 'Java sparrow', jp: '文鳥の色', has: hasBird(), shopId: 'buncho', first: 'grey', swatch: (c) => (c.id === 'sakura' ? 'linear-gradient(135deg, #f6f1ea 0 52%, #6f7480 52% 100%)' : c.hex) }
     : { kind: 'puffle', list: PUFFLE_COLORS, owned: S.puffleColors || [], current: S.puffleColor || '', noun: 'puffle', jp: 'パフルの色', has: hasPuffle(), shopId: 'puffle', first: 'blue', swatch: (c) => (c.id === 'rainbow' ? `linear-gradient(${RAINBOW.join(',')})` : c.hex) });
   function drawColorSample(kind, color, x, by, happy) {
     withPet({ species: kind, stage: 1 }, () => {
@@ -1551,7 +1551,28 @@
     const c = PUFFLE_COLORS.find((x) => x.id === (id || S.puffleColor)) || PUFFLE_COLORS[0];
     return { id: c.id, a: c.hex, d: shade(c.hex, -0.3), l: shade(c.hex, 0.35) };
   }
+  function petList() {
+    if (!pet.species) return [];
+    // (a pet you've put in storage from the shop isn't about: no tab, bowl or bed)
+    return [pet.species, ...['cat', 'puffle', 'bird'].filter((x) => x !== pet.species && S.owned.includes(PET_SHOP[x]) && !S.hidden.includes(PET_SHOP[x]))];
+  }
+  const petOf = (x) => (x === pet.species ? pet : PETS[x]);
+  // is the toy out for the pet that walks about on its own (your first pet)?
+  const tamaPlays = () => !!feather && feather.who === pet.species;
+  const bowlX = (x) => BOWL_X + Math.max(0, petList().indexOf(x)) * BOWL_GAP;
+  // the server sends your first pet as `pet` and all of them as `pets`
+  function takePets(res) {
+    if (!res) return;
+    if (res.pets) PETS = res.pets;
+    if (res.pet) pet = res.pet;
+    if (pet.species) PETS[pet.species] = pet;
+  }
   // Draw with a stand-in pet (shop icons, companions, the starter chooser).
+  // a pet you adopted, drawn with its own stage, personality and accessories
+  function standIn(x) {
+    const p0 = PETS[x];
+    return p0 ? { species: x, stage: p0.stage, trait: p0.trait, style: p0.style || {}, unlocks: p0.unlocks || {} } : { species: x, stage: 2 };
+  }
   function withPet(tmp, fn) {
     const real = pet;
     pet = Object.assign({ stage: 2, trait: 'classic', style: {}, unlocks: {} }, tmp);
@@ -1575,6 +1596,13 @@
   const SLOT = 19;
   let bedSlots = 1;
   let BOWL_X = 38;
+  // Every pet you have has its own care, keepsakes and style (PETS, by species).
+  // `pet` is the one you started with (the one who walks about); the pet card
+  // can show any of them (viewSp).
+  let PETS = INIT.pets || {};
+  let viewSp = null;
+  const PET_SHOP = { cat: 'mike', puffle: 'puffle', bird: 'buncho' };
+  const BOWL_GAP = 20;
   const slotX = (i) => BED_X + i * SLOT;
   const bedExtra = () => (bedSlots - 1) * SLOT;
   const SUN_X = 64;
@@ -1623,33 +1651,41 @@
       for (let y = 160; y < 180; y++) g.fillRect(SUN_X - 16 + Math.round((y - 160) * 0.6), y, 34, 1);
     }
     // bed: zabuton, fancy cushion or kotatsu (care milestones)
-    const bed = petStyle().bed || 'zabuton';
     const ex = bedExtra();
-    if (bed === 'kotatsu') drawKotatsu();
-    else if (bed === 'fancy') {
-      R(BED_X - 12, FLOOR_Y - 4, 25 + ex, 5, '#3b4a8a');
-      R(BED_X - 12, FLOOR_Y - 4, 25 + ex, 1, '#56679c');
-      for (let i = -10; i <= 10 + ex; i += 4) { P(BED_X + i, FLOOR_Y - 2, C.gold); P(BED_X + i + 2, FLOOR_Y - 1, '#c9a24a'); }
-      [[-13, -4], [13 + ex, -4], [-13, 0], [13 + ex, 0]].forEach(([dx, dy]) => P(BED_X + dx, FLOOR_Y + dy, C.gold));
-    } else {
-      // a row of zabuton, one per pet
-      for (let i = 0; i < bedSlots; i++) {
-        const cx = slotX(i);
-        const w = i === 0 ? 23 : SLOT - 1;
-        const x0 = i === 0 ? cx - 11 : cx - 9; // (centred under the pet who sleeps there)
-        R(x0, FLOOR_Y - 3, w, 4, '#8e3b46');
-        R(x0, FLOOR_Y - 3, w, 1, '#ad5561');
-        P(x0, FLOOR_Y - 3, '#6b2a33'); P(x0 + w - 1, FLOOR_Y - 3, '#6b2a33');
+    // a cushion for every pet, 17 wide and centred on where they sleep, with a gap between;
+    // each pet picks its own style (cushion, fancy cushion, kotatsu)
+    for (let i = 0; i < bedSlots; i++) {
+      const bed = slotBed(i);
+      const cx = slotX(i);
+      const x0 = cx - 8;
+      if (bed === 'kotatsu') {
+        drawKotatsu(cx);
+      } else if (bed === 'fancy') {
+        R(x0, FLOOR_Y - 4, 17, 5, '#3b4a8a');
+        R(x0, FLOOR_Y - 4, 17, 1, '#56679c');
+        for (let k = 2; k <= 14; k += 4) { P(x0 + k, FLOOR_Y - 2, C.gold); P(x0 + k + 2 > 15 ? x0 + k : x0 + k + 2, FLOOR_Y - 1, '#c9a24a'); }
+        [[0, -4], [16, -4], [0, 0], [16, 0]].forEach(([dx, dy]) => P(x0 + dx, FLOOR_Y + dy, C.gold));
+      } else {
+        R(x0, FLOOR_Y - 3, 17, 4, '#8e3b46');
+        R(x0, FLOOR_Y - 3, 17, 1, '#ad5561');
+        P(x0, FLOOR_Y - 3, '#6b2a33'); P(x0 + 16, FLOOR_Y - 3, '#6b2a33');
         P(cx, FLOOR_Y - 2, '#e0a13a');
       }
     }
     regions.push({ x: BED_X - 13, y: FLOOR_Y - 11, w: 27 + ex, h: 13, label: `<b>寝床</b> Bed\nTap to tuck ${residents.some((a) => a.slot != null) ? 'everyone' : esc(pet.name)} in`, click: bedtime });
-    // food bowl
-    R(BOWL_X - 4, FLOOR_Y - 2, 9, 3, '#3b6ea5');
-    R(BOWL_X - 3, FLOOR_Y - 2, 7, 1, '#dff2f7');
-    R(BOWL_X - 4, FLOOR_Y - 2, 9, 1, '#5a8cc4');
-    if (tama.state === 'eat') R(BOWL_X - 2, FLOOR_Y - 3, 5, 1, '#e8b8a0');
-    regions.push({ x: BOWL_X - 5, y: FLOOR_Y - 5, w: 11, h: 7, label: `<b>ごはん皿</b> ${esc(pet.name)}'s food dish\n${pet.fish} ${pet.fish === 1 ? sp().food : foods()} saved · tap to feed`, click: () => petAction('feed') });
+    // food bowls: one for each pet, in a row past the beds
+    petList().forEach((x) => {
+      const bx = bowlX(x);
+      const p0 = petOf(x) || pet;
+      const sp0 = SPECIES[x] || sp();
+      const eating = x === pet.species && tama.state === 'eat';
+      R(bx - 4, FLOOR_Y - 2, 9, 3, '#3b6ea5');
+      R(bx - 3, FLOOR_Y - 2, 7, 1, '#dff2f7');
+      R(bx - 4, FLOOR_Y - 2, 9, 1, '#5a8cc4');
+      if (eating) R(bx - 2, FLOOR_Y - 3, 5, 1, '#e8b8a0');
+      else if (p0.fish > 0) R(bx - 2, FLOOR_Y - 3, 5, 1, '#e8b8a0');
+      regions.push({ x: bx - 5, y: FLOOR_Y - 5, w: 11, h: 7, label: `<b>ごはん皿</b> ${esc(p0.name)}'s food dish\n${p0.fish} ${p0.fish === 1 ? sp0.food : sp0.foods || sp0.food + 's'} saved · tap to feed`, click: () => petAction('feed', x) });
+    });
   }
 
   function esc(s) {
@@ -1756,33 +1792,55 @@
     }
   }
 
-  function drawKotatsu() {
-    // quilted blanket with a little table on top
-    const ex = bedExtra();
-    for (let y = 0; y < 8; y++) {
-      const w = 22 + Math.round(y * 0.6);
-      R(BED_X - Math.floor(w / 2), FLOOR_Y - 8 + y, w + ex, 1, y % 3 === 0 ? '#e0a13a' : '#c8412f');
-    }
-    for (let x = -10; x <= 10 + ex; x += 5) R(BED_X + x, FLOOR_Y - 8, 1, 8, '#a8322a');
-    R(BED_X - 13, FLOOR_Y - 10, 27 + ex, 2, '#8a5a34');
-    R(BED_X - 13, FLOOR_Y - 10, 27 + ex, 1, '#a8743f');
-    // a mikan on top, of course
-    R(BED_X + 5, FLOOR_Y - 12, 2, 2, '#f08a2e'); P(BED_X + 6, FLOOR_Y - 13, '#4f7a3a');
+  // Which pet sleeps in bed slot i, and the bed style that pet picked.
+  function slotPet(i) {
+    if (i === 0) return pet.species;
+    const a = residents.find((r0) => r0.slot === i);
+    const x = a && Object.keys(PET_SHOP).find((k0) => PET_SHOP[k0] === a.id);
+    return x || null;
   }
-  function catKotatsu() {
-    // asleep under the kotatsu: only her head pokes out
+  const slotBed = (i) => (((petOf(slotPet(i)) || {}).style || {}).bed) || 'zabuton';
+  // the bed under x (nearest slot), for pets that sleep on top of a kotatsu
+  const bedAt = (x) => {
+    const i = Math.round((x - BED_X) / SLOT);
+    return i >= 0 && i < bedSlots && Math.abs(x - slotX(i)) < 0.6 ? slotBed(i) : 'zabuton';
+  };
+  function drawKotatsu(cx, noMikan) {
+    // quilted blanket with a little table on top (17 wide like the cushions, so beds never touch)
+    for (let y = 0; y < 8; y++) {
+      const w = 13 + Math.round(y * 0.5);
+      R(cx - Math.floor(w / 2), FLOOR_Y - 8 + y, w, 1, y % 3 === 0 ? '#e0a13a' : '#c8412f');
+    }
+    for (let x = -6; x <= 6; x += 4) R(cx + x, FLOOR_Y - 8, 1, 8, '#a8322a');
+    R(cx - 8, FLOOR_Y - 10, 17, 2, '#8a5a34');
+    R(cx - 8, FLOOR_Y - 10, 17, 1, '#a8743f');
+    // a mikan on top, of course
+    if (!noMikan) { R(cx + 3, FLOOR_Y - 12, 2, 2, '#f08a2e'); P(cx + 4, FLOOR_Y - 13, '#4f7a3a'); }
+  }
+  // A pet asleep at a kotatsu is tucked in: the table's edge is drawn over its lowest few
+  // pixels (the cat's head peeks over it; the puffle and sparrow sit just sunk in).
+  function drawKotatsuFronts() {
+    for (let i = 0; i < bedSlots; i++) {
+      if (slotBed(i) !== 'kotatsu') continue;
+      if (!slotPet(i)) continue;
+      const asleep = i === 0 ? tama.state === 'sleep' && !tama.air : residents.some((r0) => r0.slot === i && r0.pose === 'sleep' && !r0.air);
+      if (asleep) drawKotatsu(slotX(i), true);
+    }
+  }
+  function catKotatsu(cx) {
+    // asleep under the kotatsu: only her head peeks over the table (the table's edge is
+    // drawn over her afterwards, like the puffle and the sparrow: see drawKotatsuFronts)
     const col = catColors();
-    // head pokes out on the left side, away from her food bowl
-    const hx = BED_X - 14;
-    const hy = FLOOR_Y - 3;
+    const hx = cx - 1;
+    const hy = FLOOR_Y - 12;
     ellipse(hx, hy, 3, 2, CAT.fur);
     P(hx - 2, hy - 3, CAT.fur); P(hx + 2, hy - 3, CAT.fur); P(hx + 2, hy - 2, col.a);
     R(hx - 2, hy, 1, 1, C.ink); R(hx + 1, hy, 2, 1, C.ink);
-    sleepZ(hx + 5, hy - 6); // upper right of the head
+    sleepZ(hx + 6, hy - 6); // upper right of the head
   }
 
   function catSleep(cx, by) {
-    if ((petStyle().bed === 'kotatsu') && Math.abs(cx - BED_X) < 4) { catKotatsu(); return; }
+    if (bedAt(cx) === 'kotatsu') { catKotatsu(cx); return; }
     const col = catColors();
     const s = Math.max(0.85, k());
     const rx = Math.round(8 * s) + (pet.trait === 'chubby' ? 1 : 0);
@@ -1951,7 +2009,11 @@
     if (!flip && showCollar()) {
       const bx = cx + rx - 4;
       const byy = cy - ry + 1;
-      R(bx, byy, 2, 2, collarColor()); R(bx + 3, byy, 2, 2, collarColor()); P(bx + 2, byy + 1, shade(collarColor(), -0.3));
+      // (a bow the same colour as the fur would vanish: use cream on it instead)
+      const [r1, g1, b1] = hexToRgb(collarColor());
+      const [r2, g2, b2] = hexToRgb(col.a);
+      const bow = Math.hypot(r1 - r2, g1 - g2, b1 - b2) < 90 ? '#f3e6c8' : collarColor();
+      R(bx, byy, 2, 2, bow); R(bx + 3, byy, 2, 2, bow); P(bx + 2, byy + 1, shade(bow, -0.3));
     }
     if (!flip && petStyle().bandana) {
       R(cx - 4, cy + ry - 1, 9, 1, '#2e3f7a'); R(cx - 1, cy + ry, 3, 1, '#2e3f7a'); P(cx - 3, cy + ry - 1, '#ffffff');
@@ -1974,7 +2036,8 @@
   const BIRD_PALS = {
     grey: BIRD_GREY,
     white: { body: '#f8f5ee', under: '#e2dccd', belly: '#fffdf8', wing: '#e8e2d6', wingDk: '#d6cebf', tip: '#c2b8a6', cap: '#f8f5ee', capUnder: '#e2dccd', cheek: '#ffffff', tail: '#d9d1c2', ring: '#f27b89' },
-    sakura: Object.assign({}, BIRD_GREY, { speckle: true }),
+    // 桜文鳥 (pied): white with a grey saddle, a dark cap with a white blaze, dark tail
+    sakura: { body: '#f6f1ea', under: '#ded6cb', belly: '#fffaf6', wing: '#b6bac3', wingDk: '#8e939e', tip: '#4a4d57', cap: '#2a2930', capUnder: '#2a2930', cheek: '#ffffff', tail: '#34333a', ring: '#e0485a', pied: true },
     cinnamon: { body: '#c9a58a', under: '#b18d73', belly: '#e8d6c6', wing: '#a88267', wingDk: '#8a6650', tip: '#6e4f3d', cap: '#6b4a38', capUnder: '#5c3f30', cheek: '#fffaf4', tail: '#6b4a38' },
     silver: { body: '#b8bfcc', under: '#a1a8b6', belly: '#dfe2ea', wing: '#98a0af', wingDk: '#7d8595', tip: '#5d6473', cap: '#565c69', capUnder: '#4a505c', cheek: '#ffffff', tail: '#565c69' },
     cream: { body: '#ecdfc8', under: '#d9c8ab', belly: '#f7f0e3', wing: '#d8c6a7', wingDk: '#c4ae8c', tip: '#a99170', cap: '#b69c7b', capUnder: '#a28866', cheek: '#fffdf8', tail: '#b69c7b' },
@@ -1989,6 +2052,7 @@
   // 'flap'), beakOpen, headDown, flying, color (colour id).
   function drawBird(cx, by, dir, o) {
     o = o || {};
+    if (o.sleep) cx += dir * 2; // (the tail sits behind the body: this centres the sleeper on its spot)
     const head = birdBody(cx, by, dir, o, birdCols(o.color));
     if (o.sleep) sleepZ(head.x + 6, head.y - 6);
   }
@@ -2038,10 +2102,10 @@
     ellipse(hx - dir, hy + 1, hr, hr, col.capUnder);
     ellipse(hx, hy, hr, hr, col.cap);
     ellipse(hx + dir, hy + 1, Math.max(2, hr - 1), Math.max(1, hr - 2), col.cheek);
-    if (col.speckle) {
-      // 桜文鳥: white flecks scattered over the back, wing and cap
-      [[-4, -2], [-2, -3], [0, -2], [-3, 0], [-1, 1], [2, -1], [3, 1], [-5, 0], [1, 2]].forEach(([dx, dy]) => P(bx + dx * dir, bcy + dy, '#f5f2ec'));
-      P(hx - dir, hy - hr + 1, '#f5f2ec'); P(hx - 2 * dir, hy - 1, '#f5f2ec'); P(hx, hy - hr, '#f5f2ec');
+    if (col.pied) {
+      // a white blaze on the dark cap, and a grey patch low on the back
+      [[-1, -hr + 1], [0, -hr], [-2, -hr + 2], [-1, -hr + 2]].forEach(([dx, dy]) => P(hx + dx * dir, hy + dy, '#f6f1ea'));
+      R(bx - dir * 2 - (dir > 0 ? 1 : 0), bcy + bry - 2, 3, 1, col.wing);
     }
     if (pet.trait === 'night') P(hx - dir, hy - hr + 1, '#ffe27a');
     if (pet.trait === 'scrappy') { P(hx - dir, hy - hr - 1, col.cap); P(hx, hy - hr - 2, col.cap); }
@@ -2090,7 +2154,7 @@
   }
   // Pets without a kotatsu head-poke sleep on top of it instead.
   function bedTop(x) {
-    return petStyle().bed === 'kotatsu' && Math.abs(x - BED_X) < 5 ? 10 : 0;
+    return bedAt(x) === 'kotatsu' ? 7 : 0; // (sunk in a little: see drawKotatsuFronts)
   }
 
   function drawPuffleTama(x, by, st) {
@@ -2316,10 +2380,10 @@
     const fx = Math.round(feather.x);
     const fy = Math.round(feather.y);
     line(fx, fy, fx + 8, fy - 14, '#8a5a34');
-    if (pet.species === 'puffle') {
+    if (feather.who === 'puffle') {
       // bouncy ball
       ellipse(fx, fy + 1, 2, 2, '#e8546a'); R(fx - 2, fy + 1, 5, 1, '#fbf7ee'); P(fx - 1, fy, '#fbf7ee');
-    } else if (pet.species === 'bird') {
+    } else if (feather.who === 'bird') {
       // little bell
       R(fx - 1, fy, 3, 3, C.gold); P(fx, fy + 3, C.goldDk); P(fx - 1, fy, '#fff6cc');
     } else {
@@ -2394,7 +2458,7 @@
     if (tama.blink < 0) tama.blink = rand(2.5, 5);
     tama.hop = Math.max(0, tama.hop - dt * 20);
 
-    if (feather && pet.species === 'bird') {
+    if (tamaPlays() && pet.species === 'bird') {
       // the sparrow chases the bell toy through the air
       feather.t -= dt;
       if (feather.t <= 0) { endPlay(); return; }
@@ -2422,7 +2486,7 @@
     if (tama.state === 'perch' && seatTaken(tama)) { tama.perch = null; voice(); birdOuting(); return; }
     if (tama.state !== 'perch') tama.perch = null;
 
-    if (feather) {
+    if (tamaPlays()) {
       feather.t -= dt;
       if (feather.t <= 0) endPlay();
       else {
@@ -2478,9 +2542,9 @@
   function tamaReact(kind) {
     const hy = (tama.y == null ? FLOOR_Y : tama.y) - 16;
     // a trick in mid-flight: land first, then do it
-    if (tama.air && kind === 'trick' && !feather) { birdLand(tama.x, () => tamaReact('trick')); return; }
+    if (tama.air && kind === 'trick' && !tamaPlays()) { birdLand(tama.x, () => tamaReact('trick')); return; }
     // flying or chasing the toy: hearts, but no stopping
-    if (tama.air || feather) { if (kind === 'pet') { spawnHearts(tama.x, hy, 2); voice(); } return; }
+    if (tama.air || tamaPlays()) { if (kind === 'pet') { spawnHearts(tama.x, hy, 2); voice(); } return; }
     // walking somewhere: stop for it, then carry on (to the bowl, to bed…)
     if (tama.state === 'walk') {
       tama.resume = tama.target == null ? null : { x: tama.target, then: tama.then };
@@ -2503,43 +2567,112 @@
     }
   }
 
-  function petAction(kind) {
-    if (kind === 'play') {
-      // the same button turns the feather toy off again
-      if (feather) { endPlay(); $('ok-pet').hidden = true; return; }
-      startPlay();
+  // A resident pet (one you adopted) answers a click or a treat on the floor.
+  function reactPet(x, kind) {
+    const a = residents.find((r) => r.id === PET_SHOP[x]);
+    if (!a) { spawnHearts(160, FLOOR_Y - 18, 1); return; }
+    if (kind === 'feed') {
+      const bx = bowlX(x);
+      if (a.air) { reactResident(a); return; }
+      a.target = bx + 7;
+      a.pose = 'walk';
+      a.t = 0;
+      a.then = () => { a.dir = -1; a.pose = 'react'; a.t = 0; a.dur = 2.2; OKSound.pop(); spawnHearts(a.x, FLOOR_Y - 18, 1); };
       return;
     }
-    send('pet', kind, (res) => {
-      if (!res) return;
-      if (res.pet) { pet = res.pet; renderPetPanel(); }
-      if (res.ok) tamaReact(kind);
-      else if (kind !== 'pet') toast(res.msg);
-      if (res.ok && res.msg) toast(res.msg);
-    });
-    if (kind === 'pet' && tama.state === 'sleep') { tamaSet('stretch', 1); }
+    reactResident(a);
+    if (kind === 'trick' && !a.air) a.dur = 2.4;
   }
 
-  function startPlay() {
-    send('pet', 'play', (res) => {
+  function petAction(kind, species) {
+    const x = species || pet.species;
+    const main = x === pet.species;
+    if (kind === 'play') {
+      // the same button turns the toy off again
+      if (feather && feather.who === x) { endPlay(); $('ok-pet').hidden = true; return; }
+      if (feather) endPlay();
+      startPlay(x);
+      return;
+    }
+    send('pet', `${kind}@${x}`, (res) => {
       if (!res) return;
-      if (res.pet) { pet = res.pet; renderPetPanel(); }
+      takePets(res);
+      renderPetPanel();
+      // (a click on a pet always gets a visible reaction)
+      if (res.ok || kind === 'pet') { if (main) tamaReact(kind); else reactPet(x, kind); }
+      if (!res.ok && kind !== 'pet') toast(res.msg);
+      if (res.ok && res.msg) toast(res.msg);
+    });
+    if (main && kind === 'pet' && tama.state === 'sleep') { tamaSet('stretch', 1); }
+  }
+
+  function startPlay(x) {
+    const who = x || pet.species;
+    send('pet', `play@${who}`, (res) => {
+      if (!res) return;
+      takePets(res);
+      renderPetPanel();
       if (!res.ok) { toast(res.msg); return; }
       $('ok-pet').hidden = true;
-      feather = { x: tama.x + 20, y: 160, t: 20 };
-      renderPlayButton();
-      toast(`遊ぼう! Wave the ${sp().toy.toLowerCase()} with your mouse. Press Esc to stop`);
+      const a = residents.find((r0) => r0.id === PET_SHOP[who]);
+      const fx = who === pet.species ? tama.x : a ? a.x : tama.x;
+      feather = { x: fx + 20, y: 160, t: 20, who };
+      renderPetPanel();
+      toast(`遊ぼう! Wave the ${(SPECIES[who] || sp()).toy.toLowerCase()} with your mouse. Press Esc to stop`);
       OKSound.pluck(7);
     });
   }
   function endPlay() {
     if (!feather) return;
+    const who = feather.who;
     feather = null;
-    renderPlayButton();
+    renderPetPanel();
+    if (who !== pet.species) {
+      // one of your other pets was playing: it settles down where it is
+      const a = residents.find((r0) => r0.id === PET_SHOP[who]);
+      if (a) {
+        spawnHearts(a.x, (a.y == null ? FLOOR_Y : a.y) - 18, 2);
+        residentSound(a);
+        a.t = 0;
+        a.dur = rand(3, 6);
+        if (who === 'bird' && aloft(a)) {
+          a.pose = 'fly';
+          flyTo(a, [{ x: clamp(a.x, 10, 300), y: FLOOR_Y }], () => { a.pose = 'rest'; a.t = 0; a.dur = rand(3, 6); });
+        } else { a.pose = 'rest'; a.y = FLOOR_Y; }
+      }
+      return;
+    }
     spawnHearts(tama.x, (tama.y == null ? FLOOR_Y : tama.y) - 18, 2);
     if (pet.species === 'bird' && aloft(tama)) { tamaSet('fly', 99); birdOuting(); }
     else { tama.y = FLOOR_Y; tamaSet('sit', 3); }
     voice();
+  }
+
+  // One of your other pets chases the toy (the same way your first pet does).
+  function chaseToy(a, dt) {
+    feather.t -= dt;
+    if (feather.t <= 0) { endPlay(); return; }
+    const bird = a.id === 'buncho';
+    const tx = clamp(feather.x, 10, 300);
+    const ty = bird ? clamp(feather.y + 10, 26, FLOOR_Y) : FLOOR_Y;
+    a.air = null;
+    if (a.y == null) a.y = FLOOR_Y;
+    const dx = tx - a.x;
+    const dy = ty - a.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 3) {
+      const step = Math.min(d, (bird ? 40 + d * 0.8 : 34) * dt);
+      a.x += (dx / d) * step;
+      if (bird) a.y += (dy / d) * step;
+      if (Math.abs(dx) > 1) a.dir = dx > 0 ? 1 : -1;
+      a.flap = 'flap';
+      a.pose = bird && a.y < FLOOR_Y - 1 ? 'fly' : 'walk';
+    } else {
+      a.pose = 'react';
+      a.t = 0;
+      a.dur = 0.5;
+      if (Math.random() < dt * 0.8) spawnHearts(a.x, (a.y || FLOOR_Y) - 16, 1);
+    }
   }
 
   // ---------------------------------------------------------------- gifts
@@ -2578,16 +2711,25 @@
     });
   }
 
-  function checkGift() {
-    send('petgift', null, (res) => {
-      if (!res || !res.gift) return;
-      if (res.pet) pet = res.pet;
+  // Each pet brings its own keepsakes: the pets take turns.
+  let giftTurn = 0;
+  function checkGift(species) {
+    const list = petList();
+    const x = species || list[giftTurn++ % Math.max(1, list.length)];
+    send('petgift', x, (res) => {
+      if (!res) return;
+      takePets(res);
       if (res.state) S = Object.assign(S, res.state);
-      const gx = clamp(tama.x + (tama.dir > 0 ? 10 : -10), 16, 296);
+      if (!res.gift) return;
+      const who = petOf(x) || pet;
+      const main = x === pet.species;
+      const res0 = residents.find((r) => r.id === PET_SHOP[x]);
+      const px = main ? tama.x : res0 ? res0.x : tama.x;
+      const gx = clamp(px + 10, 16, 296);
       floorGifts.push({ gift: res.gift, x: gx, t: 0 });
-      tamaSet('sit', 5);
-      voice();
-      say([`${pet.name}が何か持ってきた!`, `${pet.name} brought you something!`], { x: tama.x, y: 150 });
+      if (main) { tamaSet('sit', 5); voice(); } else { reactPet(x, 'pet'); }
+      renderPetPanel();
+      say([`${who.name}が何か持ってきた!`, `${who.name} brought you something!`], { x: px, y: 150 });
     });
   }
 
@@ -2596,7 +2738,7 @@
       const bob = Math.round(Math.sin(time * 3 + fg.x) * 1);
       drawGiftSprite(fg.gift.id, fg.x - 3, FLOOR_Y - 7 + bob);
       if (Math.floor(time * 4) % 4 === 0) P(fg.x + 3, FLOOR_Y - 9 + bob, '#fff6cc');
-      regions.push({ x: fg.x - 5, y: FLOOR_Y - 11, w: 11, h: 12, label: `<b>${fg.gift.jp}</b> A gift from ${esc(pet.name)}\nTap to pick it up`, click: () => collectGift(fg) });
+      regions.push({ x: fg.x - 5, y: FLOOR_Y - 11, w: 11, h: 12, label: `<b>${fg.gift.jp}</b> A gift from ${esc((petOf(fg.gift.species) || pet).name)}\nTap to pick it up`, click: () => collectGift(fg) });
     }
   }
   function collectGift(fg) {
@@ -2604,23 +2746,24 @@
     OKSound.coin();
     spawnHearts(fg.x, 160, 1);
     const gft = fg.gift;
+    const giver = petOf(gft.species) || pet;
     if (gft.id === 'kosen') { dispMon += 5; bumpPurse(); }
     if (gft.id === 'koban') { dispMon += 25; bumpPurse(); }
-    if (gft.setBonus) { dispMon += gft.setBonus; bumpPurse(); setTimeout(() => setBonusModal(gft.setBonus), 400); }
+    if (gft.setBonus) { dispMon += gft.setBonus; bumpPurse(); setTimeout(() => setBonusModal(gft.setBonus, giver.name), 400); }
     if (gft.rare) { OKSound.fanfare(); spawnHearts(fg.x, 158, 3); }
     if (gft.fortune) {
-      modal(gft.fortune.jp, 'おみくじ · Fortune slip', `${esc(pet.name)} found a fortune for you:<br><b>${gft.fortune.text}</b>`, [['ありがとう<small>Thanks</small>', 'ok-hanko ok-hanko-wide', null]]);
+      modal(gft.fortune.jp, 'おみくじ · Fortune slip', `${esc(giver.name)} found a fortune for you:<br><b>${gft.fortune.text}</b>`, [['ありがとう<small>Thanks</small>', 'ok-hanko ok-hanko-wide', null]]);
     } else {
       toast(`${gft.jp} ${gft.name}: ${gft.desc}`);
     }
     renderPetPanel();
   }
 
-  function setBonusModal(amount) {
+  function setBonusModal(amount, who) {
     OKSound.fanfare();
     spawnHearts(40, 90, 4);
     modal('宝物', 'Keepsake collection complete!',
-      `${esc(pet.name)} has brought you all 12 keepsakes.<br><b>+${amount} mon</b> and a <b>宝物棚 treasure shelf</b> for the wall.`,
+      `${esc(who || pet.name)} has brought you all 12 keepsakes.<br><b>+${amount} mon</b> and a <b>宝物棚 treasure shelf</b> for the wall.`,
       [['やった!<small>Wonderful</small>', 'ok-hanko ok-hanko-wide', null]]);
   }
 
@@ -2631,9 +2774,10 @@
     const y = 86;
     R(x, y - 1, 60, 2, C.woodDk);
     R(x + 2, y + 1, 2, 3, C.woodDk); R(x + 56, y + 1, 2, 3, C.woodDk);
-    const shown = PET_GIFTS.filter((gf) => (pet.gifts || {})[gf.id]).slice(0, 7);
+    const owner = Object.values(PETS).find((p0) => p0.setBonus) || pet; // whoever found all twelve
+    const shown = PET_GIFTS.filter((gf) => (owner.gifts || {})[gf.id]).slice(0, 7);
     shown.forEach((gf, i) => drawGiftSprite(gf.id, x + 2 + i * 8, y - 8));
-    regions.push({ x, y: y - 9, w: 60, h: 13, label: `<b>宝物棚</b> Treasure shelf\nAll 12 of ${esc(pet.name)}'s keepsakes, found!`, click: () => { OKSound.chime(); spawnHearts(x + 30, y - 10, 1); } });
+    regions.push({ x, y: y - 9, w: 60, h: 13, label: `<b>宝物棚</b> Treasure shelf\nAll 12 of ${esc(owner.name)}'s keepsakes, found!`, click: () => { OKSound.chime(); spawnHearts(x + 30, y - 10, 1); } });
   }
 
   // ----------------------------------------------------------- pet panel
@@ -2650,11 +2794,27 @@
   }
 
   let petTab = 'care';
+  let panelMain = null; // while the card draws another pet, who your first pet is
   function renderPetPanel() {
     renderPetButton();
     const panel = $('ok-pet');
     if (!panel || panel.hidden) return;
+    const list = petList();
+    if (!list.includes(viewSp)) viewSp = pet.species;
+    // draw the card for the pet being viewed (everything below reads `pet`)
+    const real = pet;
+    pet = petOf(viewSp) || real;
+    panelMain = real.species;
+    try {
+      renderPetPanelFor(list);
+    } finally {
+      pet = real;
+      panelMain = null;
+    }
+  }
+  function renderPetPanelFor(list) {
     const P0 = sp();
+    renderPetSwitch(list);
     drawPortrait($('ok-pet-portrait'));
     $('ok-pet-name').textContent = pet.name;
     const ti = pet.traitInfo || { jp: '', name: '', desc: '' };
@@ -2701,7 +2861,6 @@
 
     // style
     renderAccessories();
-    renderPetSwap();
 
     // keepsakes
     const found = PET_GIFTS.filter((gf) => pet.gifts && pet.gifts[gf.id]).length;
@@ -2739,91 +2898,53 @@
     renderPetPanel();
   }));
 
-  // Every pet you have: your main one (with the care card) and the shop pets
-  // you've adopted, any of whom you can swap in as your main pet.
-  const PET_SHOP = { cat: 'mike', puffle: 'puffle', bird: 'buncho' };
-  function myPets() {
-    if (!pet.species) return [];
-    const list = [{ species: pet.species, name: pet.name, main: true }];
-    for (const id of ['cat', 'puffle', 'bird']) {
-      if (id === pet.species || !S.owned.includes(PET_SHOP[id])) continue;
-      list.push({ species: id, name: (S.petNames || {})[id] || (SPECIES[id] || {}).defaultName || id, main: false });
-    }
-    return list;
-  }
-  function renderPetSwap() {
-    const box = $('ok-pet-swap');
-    const pets = myPets();
-    box.hidden = pets.length < 2;
-    if (box.hidden) return;
-    box.innerHTML = '<span class="ok-pet-swap-label">Your pets · switch:</span>';
-    for (const p0 of pets) {
+  // The pet card shows one pet at a time: tabs across the top switch between yours.
+  function renderPetSwitch(list) {
+    const nav = $('ok-pet-switch');
+    nav.hidden = list.length < 2;
+    if (nav.hidden) return;
+    nav.innerHTML = '';
+    for (const x of list) {
+      const p0 = petOf(x) || {};
       const b = document.createElement('button');
-      b.className = p0.main ? 'on' : '';
+      b.type = 'button';
+      b.className = x === viewSp ? 'on' : '';
+      b.setAttribute('role', 'tab');
       const cv = document.createElement('canvas');
-      cv.width = 22;
-      cv.height = 18;
+      cv.width = 30;
+      cv.height = 26;
       const prev = gRef;
       gRef = cv.getContext('2d');
-      withPet({ species: p0.species, stage: 1 }, () => {
-        if (p0.species === 'puffle') drawPuffle(11, 17, { color: S.puffleColor });
-        else if (p0.species === 'bird') drawBird(11, 17, 1, { color: S.birdColor });
-        else catSit(11, 17, {});
+      withPet({ species: x, stage: 2 }, () => {
+        if (x === 'puffle') drawPuffle(15, 25, { color: S.puffleColor, happy: x === viewSp });
+        else if (x === 'bird') drawBird(15, 25, 1, { color: S.birdColor, happy: x === viewSp });
+        else catSit(15, 25, { happy: x === viewSp });
       });
       gRef = prev;
       b.appendChild(cv);
-      b.insertAdjacentHTML('beforeend', `${esc(p0.name)}${p0.main ? ' ✓' : ''}`);
-      if (p0.main) setTip(b, `${p0.name} is your pet right now`);
-      else {
-        setTip(b, `Make ${p0.name} your main pet. ${esc(pet.name)} moves to the shop pets and you keep both.`);
-        b.onclick = () => swapPet(p0.species);
-      }
-      box.appendChild(b);
+      b.insertAdjacentHTML('beforeend', `<span>${esc(p0.name || x)}</span>`);
+      b.onclick = () => { viewSp = x; OKSound.blip(); voice(x); renderPetPanel(); };
+      nav.appendChild(b);
     }
-  }
-  function swapPet(species) {
-    send('swappet', species, (res) => {
-      if (!res) return;
-      if (res.state) S = Object.assign(S, res.state);
-      if (!res.ok) { toast(res.msg); return; }
-      pet = res.pet;
-      if (res.stages) PET_STAGES = res.stages;
-      feather = null;
-      tama.air = null;
-      tama.state = 'sit';
-      tama.t = 0;
-      tama.y = FLOOR_Y;
-      tama.target = null;
-      tama.then = null;
-      tama.resume = null;
-      syncResidents();
-      renderPetButton();
-      renderPlayButton();
-      renderPetPanel();
-      if (!$('ok-decor').hidden) renderDecor();
-      OKSound.fanfare();
-      voice();
-      spawnHearts(tama.x, FLOOR_Y - 20, 3);
-      toast(res.msg);
-    });
   }
 
   // Footer: 猫 / パフル / 文鳥 Pet (Pets, once there's more than one)
   function renderPetButton() {
     const el = $('ok-pet-jp');
-    const pets = myPets();
-    $('ok-pet-label').textContent = pets.length > 1 ? 'Pets' : 'Pet';
+    const list = petList();
+    $('ok-pet-label').textContent = list.length > 1 ? 'Pets' : 'Pet';
     if (el) el.textContent = sp().jp;
-    setTip($('ok-b-pet'), pet.species ? (pets.length > 1 ? `Your pets: ${pets.map((x) => x.name).join(', ')}` : `${pet.name}, your ${sp().name.toLowerCase()}`) : 'Your pet');
+    setTip($('ok-b-pet'), pet.species ? (list.length > 1 ? `Your pets: ${list.map((x) => (petOf(x) || {}).name).join(', ')}` : `${pet.name}, your ${sp().name.toLowerCase()}`) : 'Your pet');
   }
 
   // 遊ぶ ⇄ やめる: the toy button is a toggle
   function renderPlayButton() {
     const b = document.querySelector('[data-pet="play"]');
     if (!b) return;
-    b.classList.toggle('on', !!feather);
-    setTip(b, feather ? 'Put the toy away' : sp().toy);
-    b.innerHTML = feather
+    const mine = !!feather && feather.who === pet.species;
+    b.classList.toggle('on', mine);
+    setTip(b, mine ? 'Put the toy away' : sp().toy);
+    b.innerHTML = mine
       ? '<b class="jp">やめる</b><small>Stop</small>'
       : '<b class="jp">遊ぶ</b><small>Play</small>';
   }
@@ -2831,6 +2952,7 @@
   // 身だしなみ: accessories unlocked by care milestones
   function renderAccessories() {
     const box = $('ok-pet-acc');
+    const vs = pet.species; // (the pet the card is showing)
     const un = pet.unlocks || {};
     const st = petStyle();
     const have = { pets: pet.petPoints || 0, fish: pet.fishFed || 0 };
@@ -2841,7 +2963,7 @@
     };
     const chip = (key, value, label, on, swatch) =>
       `<button class="ok-chip${on ? ' on' : ''}" data-style="${key}" data-value="${value}">${swatch ? `<i style="background:${swatch}"></i>` : ''}${label}</button>`;
-    const locked = (label, key) => `<span class="ok-acc-lock">🔒 ${label} <em>${prog(key)}</em></span>`;
+    const locked = (label, key) => `<span class="ok-acc-lock">${label} <em>${prog(key)}</em></span>`;
     let html = '';
     if (pet.species === 'puffle' || pet.species === 'bird') {
       const ck = colorKind(pet.species);
@@ -2866,28 +2988,29 @@
       '</div></div>';
     html += `<div class="ok-acc-note">Unlocked by caring: pets count up to ${PETS_PER_DAY} a day (${pet.petsToday || 0} today).</div>`;
     box.innerHTML = html;
-    box.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => setPetColor(pet.species, b.dataset.color)));
-    box.querySelectorAll('[data-shop]').forEach((b) => b.addEventListener('click', () => { togglePanel('ok-decor'); setTimeout(() => { const el = $('ok-colors-' + pet.species); if (el) el.scrollIntoView({ block: 'start' }); }, 30); }));
+    box.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => setPetColor(vs, b.dataset.color)));
+    box.querySelectorAll('[data-shop]').forEach((b) => b.addEventListener('click', () => { const ckk = colorKind(vs); shopClosed.delete(`${ckk.noun[0].toUpperCase()}${ckk.noun.slice(1)} colours`); togglePanel('ok-decor'); setTimeout(() => { const el = $('ok-colors-' + vs); if (el) el.scrollIntoView({ block: 'start' }); }, 30); }));
     box.querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', () => {
       const key = b.dataset.style;
       let value = b.dataset.value;
       if (key === 'bandana' || key === 'bell') value = value === '1';
-      send('petstyle', JSON.stringify({ key, value }), (p) => {
-        if (p) { pet = p; renderPetPanel(); }
+      send('petstyle', JSON.stringify({ key, value, species: vs }), (res) => {
+        if (res) { takePets(res); renderPetPanel(); }
         OKSound.pluck(6);
-        if (key === 'bed' && tama.state !== 'walk') tamaGo(BED_X, () => tamaSet('sleep', rand(15, 30)));
+        if (vs !== pet.species) reactPet(vs, 'pet');
+        else if (key === 'bed' && tama.state !== 'walk') tamaGo(BED_X, () => tamaSet('sleep', rand(15, 30)));
         else tamaSet('purr', 2.5);
       });
     }));
   }
 
-  document.querySelectorAll('[data-pet]').forEach((b) => b.addEventListener('click', () => petAction(b.dataset.pet)));
+  document.querySelectorAll('[data-pet]').forEach((b) => b.addEventListener('click', () => petAction(b.dataset.pet, viewSp)));
   $('ok-b-pet').addEventListener('click', () => { togglePanel('ok-pet'); renderPetPanel(); });
   // Double-click the name to rename: Enter or clicking away saves, Esc cancels.
   $('ok-pet-name').addEventListener('dblclick', () => {
     $('ok-pet-namewrap').classList.add('editing');
     const input = $('ok-pet-nameinput');
-    input.value = pet.name;
+    input.value = (petOf(viewSp) || pet).name;
     input.focus();
     input.select();
   });
@@ -2896,8 +3019,9 @@
     if (!wrap.classList.contains('editing')) return;
     wrap.classList.remove('editing');
     const name = $('ok-pet-nameinput').value.trim();
-    if (!keep || !name || name === pet.name) return;
-    send('petname', name, (p) => { if (p) { pet = p; renderPetPanel(); voice(); } });
+    const cur = petOf(viewSp) || pet;
+    if (!keep || !name || name === cur.name) return;
+    send('petname', JSON.stringify({ name, species: viewSp }), (res) => { if (res) { takePets(res); renderPetPanel(); voice(viewSp); } });
   }
   $('ok-pet-nameform').addEventListener('submit', (e) => { e.preventDefault(); saveName(true); });
   $('ok-pet-nameinput').addEventListener('blur', () => saveName(true));
@@ -2928,21 +3052,21 @@
   const ANIMAL_ART = {
     // The three starter pets, as shop companions (drawn with a stand-in pet).
     mike(cx, by, dir, pose, f) {
-      withPet({ species: 'cat', stage: 2, style: { collar: 'indigo' } }, () => {
+      withPet(standIn('cat'), () => {
         if (pose === 'rest' || pose === 'sleep') catSleep(cx, by);
         else if (pose === 'react') catSit(cx, by, { happy: true, fastTail: true });
         else catSide(cx, by, dir, f ? 1 : 2);
       });
     },
     puffle(cx, by, dir, pose, f) {
-      withPet({ species: 'puffle', stage: 2 }, () => {
-        if (pose === 'walk') { const b = Math.abs(Math.sin(time * 9 + cx)); drawPuffle(cx, by - Math.round(b * 4), { squash: b < 0.2, look: dir }); }
+      withPet(standIn('puffle'), () => {
+        if (pose === 'walk') { const b = Math.abs(Math.sin(time * 9)); drawPuffle(cx, by - Math.round(b * 4), { squash: b < 0.2, look: dir }); }
         else if (pose === 'react') { const b = Math.abs(Math.sin(time * 8)); drawPuffle(cx, by - Math.round(b * 7), { happy: true, squash: b < 0.15 }); }
         else drawPuffle(cx, by, { blink: Math.floor(time * 10 + cx) % 41 === 0, squash: pose === 'sleep' || Math.floor(time * 1.2 + cx) % 4 === 0, sleep: pose === 'sleep' });
       });
     },
     buncho(cx, by, dir, pose, f, a) {
-      withPet({ species: 'bird', stage: 2 }, () => {
+      withPet(standIn('bird'), () => {
         if (pose === 'fly') { flightShadow(cx, by); drawBird(cx, by, dir, { flying: true, wing: (a && a.flap) || 'flap' }); }
         else if (pose === 'walk') drawBird(cx, by, dir, { hop: f ? 2 : 0 });
         else if (pose === 'react') drawBird(cx, by, dir, { wing: 'flap', happy: true, beakOpen: Math.floor(time * 6) % 2 === 0 });
@@ -3080,7 +3204,7 @@
   const residents = [];
 
   function syncResidents() {
-    const want = catalog.filter((c) => isCompanion(c) && has(c.id)).map((c) => c.id);
+    const want = catalog.filter((c) => isCompanion(c) && has(c.id) && !(c.kind === 'pet' && c.species === pet.species)).map((c) => c.id);
     for (let i = residents.length - 1; i >= 0; i--) if (!want.includes(residents[i].id)) residents.splice(i, 1);
     setTimeout(assignSlots, 0);
     want.forEach((id, i) => {
@@ -3129,8 +3253,10 @@
   }
 
   function updateResidents(dt) {
+    if (feather && feather.who !== pet.species && !residents.some((r0) => r0.id === PET_SHOP[feather.who])) endPlay();
     for (const a of residents) {
       a.t += dt;
+      if (feather && feather.who !== pet.species && a.id === PET_SHOP[feather.who]) { chaseToy(a, dt); continue; }
       if (a.air) { updateFlight(a, dt); continue; }
       if (a.id === 'buncho' && seatTaken(a) && a.pose !== 'walk') { a.perch = null; a.dur = 0; a.pose = 'rest'; }
       if (a.pose === 'walk') {
@@ -3216,10 +3342,12 @@
         else { a.pose = 'rest'; a.t = 0; a.dur = rand(3, 8); }
         a.resume = null;
       }
-      const ay = Math.round(a.y == null ? FLOOR_Y : a.y);
       const asleep = pose === 'sleep' && !a.air;
+      // a puffle or sparrow whose bed is a kotatsu sleeps on top of it, like the cat does
+      const lift = asleep && (a.id === 'puffle' || a.id === 'buncho') ? bedTop(Math.round(a.x)) : 0;
+      const ay = Math.round(a.y == null ? FLOOR_Y : a.y) - lift;
       const paint = () => art(Math.round(a.x), ay, a.dir, a.air ? 'fly' : asleep && !SLEEP_ART.has(a.id) ? 'rest' : pose, walkFrame, a);
-      if (a.air) onTop(paint); else paint();
+      if (a.air || (a.id === 'buncho' && a.pose === 'fly')) onTop(paint); else paint();
       if (asleep) sleepZ(Math.round(a.x) + 9, ay - (a.id === 'tsuru' ? 30 : 17));
       const info = animalInfo(a.id);
       const h = a.id === 'tsuru' ? 27 : a.id === 'usagi' ? 17 : 17;
@@ -3980,6 +4108,7 @@
     drawFloorGifts();
     drawResidents();
     drawTama();
+    drawKotatsuFronts();
     drawParticles();
     drawLighting(h);
     // hover outline
@@ -4082,7 +4211,7 @@
   view.addEventListener('contextmenu', (e) => { if (feather) { e.preventDefault(); endPlay(); } });
   view.addEventListener('mouseleave', () => { hover = null; $('ok-tip').hidden = true; });
   view.addEventListener('click', (e) => {
-    if (feather) { tama.hop = 6; OKSound.pop(); return; }
+    if (feather) { if (tamaPlays()) tama.hop = 6; OKSound.pop(); return; }
     const r = hit(toLow(e));
     if (r && r.click) r.click();
   });
@@ -4093,6 +4222,9 @@
   function dismissPopup(el) {
     if (el.hidden) return;
     el.classList.add('leaving');
+    // (inline values from a drag would beat the .leaving ones: finish the fade from here)
+    el.style.setProperty('--dy', '-36px');
+    el.style.setProperty('--op', '0');
     clearTimeout(el.leaveT);
     el.leaveT = setTimeout(() => {
       el.hidden = true;
@@ -4108,8 +4240,11 @@
     el.style.removeProperty('--dy');
     el.style.removeProperty('--op');
   }
+  // opts: click (a plain click dismisses), leave (what dismissing does), drag
+  // (the element that follows the finger), anim (restart-proof: keep its
+  // entrance animation), wheelAt (how much trackpad scroll counts as a swipe)
   function makeSwipeable(el, opts) {
-    const o = Object.assign({ click: true, leave: () => dismissPopup(el), drag: el }, opts);
+    const o = Object.assign({ click: true, leave: () => dismissPopup(el), drag: el, anim: false, wheelAt: 24 }, opts);
     let y0 = null;
     let wheel = 0;
     let wheelT = 0;
@@ -4120,9 +4255,14 @@
       o.drag.style.setProperty('--dy', dy + 'px');
       o.drag.style.setProperty('--op', String(Math.max(0.2, 1 + dy / 90)));
     };
-    const up = (e) => {
+    const stop = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+    };
+    const cancel = () => { stop(); y0 = null; reset(); };
+    const up = (e) => {
+      stop();
       if (y0 == null) return;
       const dy = e.clientY - y0;
       y0 = null;
@@ -4132,9 +4272,10 @@
     el.addEventListener('pointerdown', (e) => {
       if (e.target.closest('button, a, input, select, textarea')) return;
       y0 = e.clientY;
-      el.style.animation = 'none';
+      if (!o.anim) el.style.animation = 'none';
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', cancel);
     });
     // a two-finger swipe on a trackpad arrives as wheel events
     el.addEventListener('wheel', (e) => {
@@ -4144,7 +4285,7 @@
       if (now - wheelT > 400) wheel = 0;
       wheelT = now;
       wheel += Math.abs(e.deltaY);
-      if (wheel > 24) { wheel = 0; o.leave(); }
+      if (wheel > o.wheelAt) { wheel = 0; o.leave(); }
     }, { passive: false });
   }
   let bubbleTimer = null;
@@ -4213,13 +4354,14 @@
   // takes about a second to show). Buttons keep their text in data-tip.
   function setTip(el, text) {
     if (!el) return;
+    el.removeAttribute('title');
+    if (el.dataset.tip === text) return;
     el.dataset.tip = text;
     el.setAttribute('aria-label', text);
-    el.removeAttribute('title');
   }
   {
     const tip = $('ok-btn-tip');
-    const SEL = '#ok-timer button, #ok-foot button, .ok-pet-actions button, .ok-pet-swap button, .ok-close';
+    const SEL = '#ok-timer button, #ok-foot button, .ok-pet-actions button, .ok-close';
     let tipT = null;
     let current = null;
     const hideTip = () => { clearTimeout(tipT); tip.hidden = true; current = null; };
@@ -4247,7 +4389,23 @@
     document.addEventListener('mouseleave', hideTip);
   }
 
-  makeSwipeable($('ok-bubble'));
+  {
+    // The bubble itself ignores the mouse (so it never blocks a tap on what's under it);
+    // a click on it, or a swipe up starting on it, sends it away.
+    const inBubble = (e) => {
+      const el = $('ok-bubble');
+      if (el.hidden) return false;
+      const r = el.getBoundingClientRect();
+      return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    };
+    let y0 = null;
+    view.addEventListener('pointerdown', (e) => { y0 = inBubble(e) ? e.clientY : null; });
+    view.addEventListener('pointerup', (e) => {
+      if (y0 != null && e.clientY - y0 < -24) dismissPopup($('ok-bubble'));
+      else if (inBubble(e)) dismissPopup($('ok-bubble'));
+      y0 = null;
+    });
+  }
   makeSwipeable($('ok-toast'));
 
   // ----------------------------------------------------------------- HUD
@@ -4330,7 +4488,7 @@
     send('serveall', null, (res) => {
       if (!res) return;
       if (res.state) S = Object.assign(S, res.state);
-      if (res.pet) { pet = res.pet; renderPetPanel(); }
+      if (res.pet) { takePets(res); renderPetPanel(); }
       res.count = (res.count || 0) + inside.count;
       res.mon = (res.mon || 0) + inside.mon;
       res.kinds = res.kinds || {};
@@ -4423,7 +4581,7 @@
       phase.textContent = timer.longBreak ? '祭り · Long break' : '休憩 · Break';
       clock.textContent = fmt(remaining());
     } else {
-      phase.textContent = endlessMode ? '待機 · Ready · no breaks' : '待機 · Ready';
+      phase.textContent = '待機 · Ready';
       clock.textContent = endlessMode ? '0:00' : fmt((conf.focus_minutes || 25) * 60000);
     }
     // ▶ Start / ❚❚ Pause / ▶ Resume: same width every time, outlined while paused
@@ -4476,7 +4634,8 @@
   $('ok-report').addEventListener('click', () => send('report'));
   $('ok-idea').addEventListener('click', () => send('idea'));
   $('ok-stats').addEventListener('click', () => { OKSound.pluck(4); send('stats'); });
-  $('ok-tour-replay').addEventListener('click', () => { $('ok-settings').hidden = true; startTour(); });
+  $('ok-b-stats').addEventListener('click', () => { OKSound.pluck(4); send('stats'); });
+  $('ok-tour-replay').addEventListener('click', () => guardSettings(() => { $('ok-settings').hidden = true; startTour(); }));
   $('ok-b-rush').addEventListener('click', () => {
     // first click: serve at 4×; second click: collect everyone's tips at once
     if (rush) { rush = false; serveAll(); renderRushBtn(); updateStatus(); } else startRush();
@@ -4552,6 +4711,7 @@
     el.hidden = !show;
     if (show && id === 'ok-settings') fillForm();
     if (show && id === 'ok-decor') renderDecor();
+    if (show && id === 'ok-pet') renderPetPanel();
     if (show) placePanel(el);
   }
   window.addEventListener('resize', () => document.querySelectorAll('.ok-panel:not([hidden])').forEach(placePanel));
@@ -4584,7 +4744,8 @@
     if (e.key === 'Escape' && !$('ok-starter').hidden) { e.preventDefault(); e.stopPropagation(); return; }
     if (e.key === 'Escape' && e.target === $('ok-pet-nameinput')) { saveName(false); e.preventDefault(); e.stopPropagation(); return; }
     if (e.key === 'Escape') {
-      const open = document.querySelector('.ok-panel:not([hidden]), .ok-modal:not([hidden])');
+      // a pop-up card (even the "Save your changes?" one) closes before the panel behind it
+      const open = document.querySelector('.ok-modal:not([hidden])') || document.querySelector('.ok-panel:not([hidden])');
       if (open) {
         e.preventDefault();
         e.stopPropagation();
@@ -4663,10 +4824,18 @@
     const pets = catalog.filter((c) => c.kind === 'pet' && c.species !== pet.species);
     const decor = catalog.filter((c) => !isCompanion(c) && c.kind !== 'reward' && (!c.puffle || hasPuffle() || S.owned.includes(c.id)));
     const rewards = SPECIALS.found ? catalog.filter((c) => c.kind === 'reward') : [];
+    // each section folds away with the caret by its name (remembered)
     const heading = (jp, en, sub) => {
-      const h = document.createElement('div');
+      const h = document.createElement('button');
+      h.type = 'button';
       h.className = 'ok-grid-head';
-      h.innerHTML = `<b class="jp">${jp}</b> ${en}<span>${sub}</span>`;
+      h.dataset.key = en;
+      h.innerHTML = `<i class="ok-caret" aria-hidden="true"></i><b class="jp">${jp}</b> ${en}<span>${sub}</span>`;
+      h.addEventListener('click', () => {
+        if (shopClosed.has(en)) shopClosed.delete(en); else shopClosed.add(en);
+        try { localStorage.setItem('okShopClosed', JSON.stringify([...shopClosed])); } catch (e) {}
+        applyShopFolds(grid);
+      });
       grid.appendChild(h);
     };
     const ordered = [];
@@ -4689,7 +4858,7 @@
         drawRewardIcon(icon, item.id);
         card.appendChild(icon);
         card.insertAdjacentHTML('beforeend', `<div><div class="ok-item-name"><span class="jp">${item.jp}</span><span>${item.name}</span></div><p>${item.desc}</p></div>` +
-          `<div class="ok-item-foot"><span class="ok-lock">🔒 ${Math.min(have, n)}/${n} ${k === 'total' ? `special${n === 1 ? '' : 's'}` : `${(RARITY[k] || {}).name || k} special${n === 1 ? '' : 's'}`}</span></div>`);
+          `<div class="ok-item-foot"><span class="ok-lock">${Math.min(have, n)}/${n} ${k === 'total' ? `special${n === 1 ? '' : 's'}` : `${(RARITY[k] || {}).name || k} special${n === 1 ? '' : 's'}`}</span></div>`);
         grid.appendChild(card);
         continue;
       }
@@ -4718,7 +4887,7 @@
         b.onclick = () => send('toggle', item.id, (snap) => { if (snap) S = Object.assign(S, snap); syncResidents(); renderDecor(); });
         foot.appendChild(b);
       } else if (locked) {
-        foot.innerHTML = `<span class="ok-price">${MON_SVG}${item.price}</span><span class="ok-lock">🔒 Lv ${item.level}</span>`;
+        foot.innerHTML = `<span class="ok-price">${MON_SVG}${item.price}</span><span class="ok-lock">Lv ${item.level}</span>`;
       } else {
         foot.innerHTML = `<span class="ok-price">${MON_SVG}${item.price}</span>`;
         const b = document.createElement('button');
@@ -4727,6 +4896,7 @@
         b.onclick = () => send('buy', item.id, (r) => {
           if (!r) return;
           if (r.state) S = Object.assign(S, r.state);
+          if (r.pets) PETS = r.pets;
           if (r.ok) {
             dispMon = S.mon - coins.reduce((a, c) => a + (c.done ? 0 : c.amount), 0);
             renderHeader();
@@ -4748,6 +4918,21 @@
       }
       card.appendChild(foot);
       grid.appendChild(card);
+    }
+    applyShopFolds(grid);
+  }
+  let shopClosed = new Set();
+  try { shopClosed = new Set(JSON.parse(localStorage.getItem('okShopClosed') || '[]')); } catch (e) {}
+  function applyShopFolds(grid) {
+    let closed = false;
+    for (const el of grid.children) {
+      if (el.classList.contains('ok-grid-head')) {
+        closed = shopClosed.has(el.dataset.key);
+        el.classList.toggle('closed', closed);
+        el.setAttribute('aria-expanded', String(!closed));
+      } else {
+        el.style.display = closed ? 'none' : '';
+      }
     }
   }
 
@@ -5136,6 +5321,7 @@
       $('ok-starter-go').innerHTML = goHtml;
     }
   }
+  let choosing = false; // (a double-click must adopt only once)
   setInterval(renderChooser, 100);
   $('ok-starter-go').addEventListener('click', () => {
     if (!chooser) return;
@@ -5147,9 +5333,12 @@
       setPetColor(species, color);
       return;
     }
+    if (choosing) return;
+    choosing = true;
     send('choose', JSON.stringify({ species, color }), (res) => {
-      if (!res || !res.pet) return;
-      pet = res.pet;
+      choosing = false;
+      if (!res || !res.ok || !res.pet) return;
+      takePets(res);
       if (res.stages) PET_STAGES = res.stages;
       if (res.state) S = Object.assign(S, res.state);
       $('ok-starter').hidden = true;
@@ -5194,9 +5383,13 @@
     const card = $('ok-modal').querySelector('.ok-card');
     makeSwipeable(card, {
       click: false,
+      anim: true,
+      wheelAt: 110, // (a trackpad's coasting shouldn't close a card by accident)
       leave() {
         card.classList.add('leaving');
-        setTimeout(() => { $('ok-modal').hidden = true; card.classList.remove('leaving'); card.style.removeProperty('--dy'); card.style.removeProperty('--op'); }, 200);
+        card.style.setProperty('--dy', '-40px');
+        clearTimeout(card.leaveT);
+        card.leaveT = setTimeout(() => { $('ok-modal').hidden = true; reviveWindow(card); }, 200);
       },
     });
   }
@@ -5386,9 +5579,9 @@
     onBreakDone() {
       breakOver();
     },
-    onPet(p, grew) {
+    onPet(p, grew, all) {
       if (!p) return;
-      pet = p;
+      takePets({ pet: p, pets: all });
       renderPetPanel();
       if (grew) {
         OKSound.fanfare();
@@ -5420,11 +5613,11 @@
   // dev preview only: draw sprites onto a test canvas
   if (window.OK_DEBUG_HOOKS) {
     window.OKD = {
-      tama, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish, openOshinagaki, specialTag, dharmaText, checkGift, setBonusModal, feedbackModal, serveAll,
+      tama, getPet: () => pet, birdOuting, residents, bedtime, seats, MENU_DISHES, drawDish, drawDishMini, makeDish, openOshinagaki, specialTag, dharmaText, checkGift, setBonusModal, feedbackModal, serveAll,
       hitAt(x, y) { render(); const r = hit({ x, y }); return r && r.label; },
       pickGift() { if (floorGifts[0]) collectGift(floorGifts[0]); },
       step(n) { for (let i = 0; i < n; i++) update(1 / 30); },
-      draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, withPet, ANIMAL_ART }); } finally { gRef = prev; } },
+      draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, catSleep, withPet, ANIMAL_ART }); } finally { gRef = prev; } },
     };
   }
   if (window.OK_DEBUG_FF) for (let i = 0; i < window.OK_DEBUG_FF * 30; i++) update(1 / 30);

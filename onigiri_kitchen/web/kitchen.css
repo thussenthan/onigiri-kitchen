@@ -1247,7 +1247,7 @@ body .ok-icon-btn.ok-t-endless.on { color: var(--shu); background: color-mix(in 
 /* Pop-ups follow your finger up (--dy) and fade (--op); a swipe, a flick of
    the trackpad or a click sends them away. */
 .ok-toast { transform: translateX(-50%) translateY(var(--dy, 0px)); opacity: var(--op, 1); cursor: pointer; touch-action: none; }
-.ok-bubble { transform: translate(-50%, -100%) translateY(var(--dy, 0px)); opacity: var(--op, 1); pointer-events: auto; cursor: pointer; touch-action: none; }
+.ok-bubble { transform: translate(-50%, -100%) translateY(var(--dy, 0px)); opacity: var(--op, 1); pointer-events: none; }
 .ok-toast.leaving, .ok-bubble.leaving { transition: transform 0.18s ease-in, opacity 0.18s ease-in; --dy: -36px; --op: 0; animation: none; }
 .ok-card { touch-action: pan-x; }
 .ok-card.leaving { transition: transform 0.2s ease-in, opacity 0.2s ease-in; transform: translateY(-40px); opacity: 0; }
@@ -1267,17 +1267,6 @@ body .ok-icon-btn.ok-t-endless.on { color: var(--shu); background: color-mix(in 
 .ok-credit a:hover { text-decoration: underline; }
 .ok-form .ok-check em { display: block; color: var(--ink-3); }
 
-/* switch between your pets */
-.ok-pet-swap { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
-.ok-pet-swap[hidden] { display: none; }
-.ok-pet-swap button {
-  display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px 2px 3px; border-radius: 999px;
-  border: 1.5px solid var(--line); background: var(--card); color: var(--ink-2); font: 600 11.5px var(--sans); cursor: pointer;
-}
-.ok-pet-swap button canvas { width: 22px; height: 18px; image-rendering: pixelated; }
-.ok-pet-swap button:hover { border-color: var(--shu); }
-.ok-pet-swap button.on { border-color: var(--shu); background: color-mix(in srgb, var(--shu) 16%, var(--card)); cursor: default; }
-.ok-pet-swap-label { font-size: 11px; color: var(--ink-3); align-self: center; margin-right: 2px; }
 
 /* the break card's emphasis */
 .ok-cheer { display: block; margin-top: 8px; font-size: 1.12em; font-weight: 800; color: var(--shu); }
@@ -1286,6 +1275,38 @@ body .ok-icon-btn.ok-t-endless.on { color: var(--shu); background: color-mix(in 
 .ok-starter-hint { text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-2); margin: -6px 0 14px; min-height: 16px; }
 .ok-starter-hint[hidden] { display: none; }
 .ok-swatch.locked { opacity: 0.55; position: relative; }
-.ok-swatch.locked::after { content: '🔒'; position: absolute; right: -5px; bottom: -6px; font-size: 9px; }
+.ok-swatch.locked { border-style: dashed; }
 .ok-swatch.locked.on { opacity: 1; }
-.ok-pet-swap-label { flex: 1 0 100%; margin: 0 0 1px; }
+
+/* shop sections fold with a caret on the left */
+button.ok-grid-head { all: unset; box-sizing: border-box; grid-column: 1 / -1; display: flex; align-items: baseline; gap: 6px; margin: 6px 2px 0; font-size: 13.5px; font-weight: 800; cursor: pointer; color: var(--ink); border-radius: 8px; padding: 2px 4px; }
+button.ok-grid-head:hover { background: var(--paper-2); }
+button.ok-grid-head:focus-visible { outline: 2px solid var(--shu); }
+.ok-caret { width: 0; height: 0; align-self: center; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid var(--ink-3); transition: transform 0.15s; margin-right: 2px; }
+button.ok-grid-head.closed .ok-caret { transform: rotate(-90deg); }
+
+/* the pet card's tabs: one big tab per pet */
+.ok-pet-switch { display: flex; gap: 6px; padding: 10px 12px 0; }
+.ok-pet-switch[hidden] { display: none; }
+.ok-pet-switch button {
+  all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 4px 5px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); cursor: pointer;
+  font: 700 12px var(--sans); color: var(--ink-2);
+}
+.ok-pet-switch button canvas { width: 45px; height: 39px; image-rendering: pixelated; }
+.ok-pet-switch button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ok-pet-switch button:hover { border-color: var(--shu); }
+.ok-pet-switch button.on { border-color: var(--shu); background: color-mix(in srgb, var(--shu) 14%, var(--card)); color: var(--ink); }
+.ok-pet-switch button:focus-visible { outline: 2px solid var(--shu); outline-offset: 1px; }
+
+/* Open stats: big, first thing in the settings */
+.ok-stats-big {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 14px; width: 100%; cursor: pointer;
+  padding: 14px 16px; border-radius: 16px; background: var(--shu); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--shu) 35%, transparent);
+}
+.ok-stats-big:hover { filter: brightness(1.07); }
+.ok-stats-big:focus-visible { outline: 3px solid color-mix(in srgb, var(--shu) 40%, #fff); outline-offset: 2px; }
+.ok-stats-big .ok-stats-ico { font-size: 28px; line-height: 1; }
+.ok-stats-big b { display: block; font-size: 16px; font-weight: 800; }
+.ok-stats-big b .jp { font-family: var(--mincho); margin-right: 4px; }
+.ok-stats-big small { display: block; font-size: 12px; opacity: 0.9; margin-top: 2px; font-weight: 500; }

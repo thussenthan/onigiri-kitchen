@@ -65,6 +65,7 @@ PETS: List[Dict[str, Any]] = [
      "perk": "Your pet's tummy never drops below 40."},
 ]
 PET_FOR_SPECIES = {p["species"]: p["id"] for p in PETS}
+SPECIES_ORDER = ("cat", "puffle", "bird")
 
 # Puffle colours. The first one is free (picked with the puffle); more cost
 # PUFFLE_COLOR_PRICE each and can be swapped any time once owned.
@@ -76,11 +77,11 @@ PUFFLE_COLORS: List[Dict[str, Any]] = [
     {"id": "black", "name": "Black", "jp": "黒", "hex": "#34343c", "starter": True},
     {"id": "green", "name": "Green", "jp": "緑", "hex": "#4fb04a", "starter": True},
     {"id": "purple", "name": "Purple", "jp": "紫", "hex": "#9a5bc8", "starter": True},
-    {"id": "yellow", "name": "Yellow", "jp": "黄", "hex": "#f2cf3a", "starter": True},
+    {"id": "yellow", "name": "Yellow", "jp": "黄", "hex": "#f6de3c", "starter": True},
     {"id": "white", "name": "White", "jp": "白", "hex": "#eef2f6", "starter": True},
     {"id": "orange", "name": "Orange", "jp": "橙", "hex": "#f08a2e", "starter": True},
     {"id": "brown", "name": "Brown", "jp": "茶", "hex": "#8a5a34", "starter": True},
-    {"id": "gold", "name": "Gold", "jp": "金", "hex": "#e8c25a", "starter": False},
+    {"id": "gold", "name": "Gold", "jp": "金", "hex": "#dbaa2a", "starter": False},
     {"id": "rainbow", "name": "Rainbow", "jp": "虹", "hex": "#e0508a", "starter": False},
 ]
 PUFFLE_COLORS_BY_ID = {c["id"]: c for c in PUFFLE_COLORS}
@@ -90,7 +91,7 @@ PUFFLE_COLORS_BY_ID = {c["id"]: c for c in PUFFLE_COLORS}
 BIRD_COLORS: List[Dict[str, Any]] = [
     {"id": "grey", "name": "Grey", "jp": "並", "hex": "#8f949f", "starter": True},
     {"id": "white", "name": "White", "jp": "白", "hex": "#f4f1ea", "starter": True},
-    {"id": "sakura", "name": "Sakura", "jp": "桜", "hex": "#7d828d", "starter": True},
+    {"id": "sakura", "name": "Sakura", "jp": "桜", "hex": "#c9c3bd", "starter": True},
     {"id": "cinnamon", "name": "Cinnamon", "jp": "シナモン", "hex": "#c9a58a", "starter": True},
     {"id": "silver", "name": "Silver", "jp": "シルバー", "hex": "#b8bfcc", "starter": False},
     {"id": "cream", "name": "Cream", "jp": "クリーム", "hex": "#eadcc4", "starter": False},
@@ -216,6 +217,7 @@ class KitchenState:
         self.data: Dict[str, Any] = _defaults()
         self.path: Optional[str] = None
         self.pet = petmod.Pet(self.data["pet"])
+        self.extra: Dict[str, "petmod.Pet"] = {}  # the other pets you've adopted, by species
         self._save_timer: Optional[QTimer] = None
         # Extra tip for what a guest orders (rarer Onigiri specials pay more);
         # set by main.py, used when guests are served in bulk or take out.
@@ -251,6 +253,15 @@ class KitchenState:
             print(f"Onigiri Kitchen: could not read save file, starting fresh: {e}")
         self.data = data
         self.pet = petmod.Pet(self.data["pet"])
+        # (colour lists from older or hand-edited saves: keep only colours that exist)
+        for _kind, (by_id, owned_key, current_key, _pid, _default, _noun) in COLOR_KINDS.items():
+            owned = [c for c in (self.data.get(owned_key) or []) if c in by_id]
+            self.data[owned_key] = owned
+            if self.data.get(current_key) not in owned:
+                self.data[current_key] = owned[0] if owned else ""
+        if not isinstance(self.data.get("pets_extra"), dict):
+            self.data["pets_extra"] = {}
+        self.sync_pets()
         self.apply_companion_perks()
         self.roll_day()
 
@@ -313,7 +324,8 @@ class KitchenState:
         today = self.data["today"]
         new_guest = False
         if leech_success:
-            self.pet.d["leeches"] = int(self.pet.d.get("leeches", 0)) + 1
+            for p in self.all_pets():
+                p.d["leeches"] = int(p.d.get("leeches", 0)) + 1
             if today["leech_guests"] < MAX_LEECH_GUESTS_PER_DAY:
                 today["leech_guests"] += 1
                 self.add_guest({"deck": deck, "kind": "leech", "reviews": 1})
@@ -323,7 +335,7 @@ class KitchenState:
                 new_guest = True
         else:
             # Couldn't read the review log: count this one answer directly.
-            self.pet_grew = self.pet.on_review(today["date"], False)
+            self._pets_review(today["date"])
             today["reviews"] += 1
             by_deck = today.get("by_deck")
             if isinstance(by_deck, dict):
@@ -411,7 +423,8 @@ class KitchenState:
         day = self._log_day()
         day["guests"] = int(day.get("guests", 0)) + 1
         self.data["served_total"] += 1
-        self.pet.on_guest_served()
+        for p in self.all_pets():
+            p.on_guest_served()  # every pet gets its own treat with every guest
         if self.shown("mike"):
             self.pet.on_guest_served()  # 三毛猫 perk: an extra treat
         if deck:
@@ -437,6 +450,7 @@ class KitchenState:
             return {"ok": False, "msg": "Not enough mon yet. Keep serving guests!"}
         self.spend(item["price"])
         self.data["owned"].append(item_id)
+        self.sync_pets()
         self.apply_companion_perks()
         self.save()
         return {"ok": True, "msg": f"{item['jp']} {item['name']} added!"}
@@ -481,9 +495,7 @@ class KitchenState:
             pending[deck] = pending.get(deck, 0) + diff
             if diff > 0:
                 for _ in range(diff):
-                    grew = self.pet.on_review(today["date"], False)
-                    if grew is not None:
-                        self.pet_grew = grew
+                    self._pets_review(today["date"])
                 while pending[deck] >= n:
                     pending[deck] -= n
                     self.add_guest({"deck": deck, "kind": "regular", "reviews": n})
@@ -533,8 +545,8 @@ class KitchenState:
             amount += 1
         if self.shown("shiba"):
             amount += 1
-        if self.pet.happy():
-            amount += 1  # happy-cat bonus: Tama beckons guests in
+        if any(p.happy() for p in self.all_pets()):
+            amount += 1  # happy-pet bonus: a happy pet beckons guests in
         if self.menu_bonus:
             try:
                 amount += int(self.menu_bonus(guest))
@@ -551,7 +563,8 @@ class KitchenState:
             floors["energy"] = 40
         if self.shown("buncho"):
             floors["tummy"] = 40
-        self.pet.floors = floors
+        for p in self.all_pets():
+            p.floors = floors
 
     def serve_all(self) -> Dict[str, Any]:
         """Serve every waiting guest at once (after a big study session)."""
@@ -584,7 +597,8 @@ class KitchenState:
         (once a day, when the second eye is painted), or 0."""
         self.roll_day()
         self.data["today"]["focus_done"] += 1
-        self.pet.on_focus_done()
+        for p in self.all_pets():
+            p.on_focus_done()
         if self.shown("usagi"):
             self.earn(5, "rabbit")
         self.add_guest({"deck": None, "kind": "golden", "reviews": 0})
@@ -596,21 +610,73 @@ class KitchenState:
         return bonus
 
     # ---------------------------------------------------------------- pet
-    def pet_action(self, kind: str) -> Dict[str, Any]:
-        result = self.pet.action(kind)
+    # ---- all your pets: the one you started with, plus any you adopt from the shop
+    def sync_pets(self) -> None:
+        main_sp = self.pet.d.get("species")
+        self.extra = {}
+        if not main_sp:
+            return
+        store = self.data.setdefault("pets_extra", {})
+        names = self.data.get("pet_names") or {}
+        for sp in SPECIES_ORDER:
+            if sp == main_sp or PET_FOR_SPECIES[sp] not in self.data["owned"]:
+                continue
+            d = store.get(sp)
+            if not isinstance(d, dict):
+                d = petmod.defaults()
+                d["species"] = sp
+                d["name"] = names.get(sp) or petmod.species_info(sp)["defaultName"]
+                for k in ("study_days", "last_study_day", "total_reviews"):  # growth carries over
+                    d[k] = self.pet.d.get(k, d.get(k))
+                store[sp] = d
+            self.extra[sp] = petmod.Pet(d)
+        self.apply_companion_perks()
+
+    def all_pets(self) -> List["petmod.Pet"]:
+        return [self.pet] + [self.extra[sp] for sp in SPECIES_ORDER if sp in self.extra]
+
+    def get_pet(self, species: Optional[str]) -> "petmod.Pet":
+        return self.extra.get(species or "") or self.pet
+
+    def pet_snapshots(self) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        for p in self.all_pets():
+            snap = p.snapshot()
+            snap["isMain"] = p is self.pet
+            if snap.get("species"):
+                out[snap["species"]] = snap
+        return out
+
+    def _pets_review(self, today: str) -> None:
+        for p in self.all_pets():
+            grew = p.on_review(today, False)
+            if grew is not None and p is self.pet:
+                self.pet_grew = grew
+
+    def pet_action(self, kind: str, species: Optional[str] = None) -> Dict[str, Any]:
+        if species and species not in [q.species for q in self.all_pets()]:
+            # a stale page asking about a pet you no longer have in that slot
+            return {"ok": False, "msg": "You don't have that pet.", "species": species,
+                    "pet": self.pet.snapshot(), "pets": self.pet_snapshots()}
+        p = self.get_pet(species)
+        result = p.action(kind)
         self.save_soon()
+        result["species"] = p.species
         result["pet"] = self.pet.snapshot()
+        result["pets"] = self.pet_snapshots()
         return result
 
-    def pet_gift(self) -> Optional[Dict[str, Any]]:
-        gift = self.pet.maybe_gift()
+    def pet_gift(self, species: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        p = self.get_pet(species)
+        gift = p.maybe_gift()
         if gift:
+            gift["species"] = p.species
             if gift["id"] == "kosen":
                 self.earn(5, "gifts")
             if gift["id"] == "koban":
                 self.earn(25, "gifts")
             if gift.get("setBonus"):
-                # all 12 keepsakes: one-time mon + the treasure shelf
+                # all 12 keepsakes: one-time mon + the treasure shelf (every pet earns its own)
                 self.earn(int(gift["setBonus"]), "keepsakes")
                 if "takaramono" not in self.data["owned"]:
                     self.data["owned"].append("takaramono")
@@ -671,46 +737,18 @@ class KitchenState:
         self.save()
         return {"ok": True, "msg": f"{c['jp']} {c['name']} unlocked!"}
 
-    def swap_pet(self, species: str) -> Dict[str, Any]:
-        """Make another pet you own your main one (the one with the care card).
-        The old one moves to the shop-pet spot, so you still have both. Care,
-        growth, keepsakes and the bed carry over; each pet keeps its own name."""
-        cur = self.pet.d.get("species")
-        new_id = PET_FOR_SPECIES.get(species)
-        if not cur or not new_id or species == cur:
-            return {"ok": False, "msg": "That's already your pet."}
-        owned = self.data["owned"]
-        if new_id not in owned:
-            return {"ok": False, "msg": "Adopt that pet from the shop first."}
-        names = self.data.setdefault("pet_names", {})
-        names[cur] = self.pet.d.get("name") or petmod.species_info(cur)["defaultName"]
-        owned.remove(new_id)
-        if new_id in self.data["hidden"]:
-            self.data["hidden"].remove(new_id)
-        if PET_FOR_SPECIES[cur] not in owned:
-            owned.append(PET_FOR_SPECIES[cur])
-        self.pet.d["species"] = species
-        self.pet.d["name"] = names.get(species) or petmod.species_info(species)["defaultName"]
-        for kind in COLOR_KINDS:
-            # a pet that came from the shop starts with its free first colour
-            if self.has_kind(kind) and not self.data.get(COLOR_KINDS[kind][1]):
-                self.grant_first_color(kind, COLOR_KINDS[kind][4])
-        self.apply_companion_perks()
-        self.save()
-        return {"ok": True, "msg": f"{self.pet.d['name']} is your pet now."}
-
     def puffle_color(self, color: str) -> Dict[str, Any]:
         return self.pet_color("puffle", color)
 
-    def pet_style(self, key: str, value: Any) -> Dict[str, Any]:
-        self.pet.set_style(key, value)
+    def pet_style(self, key: str, value: Any, species: Optional[str] = None) -> Dict[str, Any]:
+        self.get_pet(species).set_style(key, value)
         self.save_soon()
-        return self.pet.snapshot()
+        return {"pet": self.pet.snapshot(), "pets": self.pet_snapshots()}
 
-    def pet_rename(self, name: str) -> Dict[str, Any]:
-        self.pet.rename(name)
+    def pet_rename(self, name: str, species: Optional[str] = None) -> Dict[str, Any]:
+        self.get_pet(species).rename(name)
         self.save_soon()
-        return self.pet.snapshot()
+        return {"pet": self.pet.snapshot(), "pets": self.pet_snapshots()}
 
     def snapshot(self) -> Dict[str, Any]:
         d = self.data

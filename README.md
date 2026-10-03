@@ -35,13 +35,13 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **Pomodoro timer.** One dango per focus session. When a break starts, the restaurant opens. When the
   break ends, you get a gentle nudge back to your cards. Long breaks are festival nights with fireworks.
   A small dango timer sits in the corner of Anki's main screens. Focus only counts while you're actually reviewing:
-  after 2 minutes without activity it pauses (and gives that time back), then resumes on your next card.
+  after 2 minutes without activity (change it in ⚙) it pauses (and gives that time back), then resumes on your next card.
   The ↺ button next to the timer resets the cycle. Rather study without breaks? Tap **∞ endless focus**: the clock
   counts up, no break pop-ups interrupt you, and every focus-length you study still counts as a finished session.
 - **Choose your starter pet.** The first time you open the kitchen, pick a partner: Tama the cat, a puffle
   (in the colour of your choice) or a 文鳥 Java sparrow (grey, white, sakura or cinnamon, with silver and cream in
   the shop), who flies about the restaurant between perches on the
-  window sill, the menu rail, the door frame, the counter, the rice cooker and any empty place at the tables. The other two can be adopted later from the shop, and once you have more than one, the **Pets** card lets you switch which one is your main pet.
+  window sill, the menu rail, the door frame, the counter, the rice cooker and any empty place at the tables. The other two can be adopted later from the shop, and once you have more than one, the **Pets** card has a tab for each: every pet has its own care, style and keepsakes.
 
   ![Choosing a starter pet](docs/starter.png)
 - **Your shop pet.** A virtual pet with needs (tummy, love, energy) that your studying fills.
@@ -67,7 +67,7 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   go out at dawn.
 - **紙吹雪 confetti and sakura petals** when you finish a deck: confetti bursts in from the sides and petals drift
   down from the top of the "Congratulations" screen, with a little fanfare.
-- **統計 Stats.** ⚙ → Open stats opens a window full of numbers and charts, for the last 7 days, 30 days, year or
+- **統計 Stats.** The **Stats** button at the bottom of the kitchen (or ⚙ → Open stats) opens a window full of numbers and charts, for the last 7 days, 30 days, year or
   all time. **Today:** cards, time, pace, retention, and how long your due cards will take at your own
   pace. **Pomodoro:** focus time, streaks,
   completion rate, cards per session, best days, breaks and festival nights, time of day and weekday patterns, the
@@ -75,8 +75,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   collection's new, young and mature cards. **Kitchen:** guests by type and deck, mon earned and spent, your pet
   and collection. Pomodoro and kitchen numbers are recorded from 1.8.0 on.
 - **Home-screen widget.** A small live pixel scene with guests waiting, mon, your pet's mood and all-time stats
-  (total reviews, daily average, days studied, longest streak and total time studied), plus a Visit button. Big
-  widgets (two by two) add how long today's due cards will take at your own pace. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
+  (total reviews, daily average, days studied, longest streak and total time studied), plus **Collect all** (serve everyone waiting without opening the kitchen) and a Visit button. Big
+  widgets (two by two) show all your pets, progress to the next guest, and how long today's due cards will take at your own pace. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
   your decks on Anki's main screen (you can turn it off in the add-on config).
 - **A guided tour** the first time you open it, which you can replay from ⚙.
 - **目安箱 suggestion box** on the wall (and in ⚙) for feature ideas and bug reports.

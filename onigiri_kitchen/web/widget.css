@@ -161,3 +161,29 @@
 @container (max-width: 520px) {
   .okw-row.okw-has-collect .okw-primary { display: none; }
 }
+
+.okw-btns { display: flex; align-items: center; gap: 6px; flex: none; }
+.okw-topmon, .okw-meter { display: none; }
+
+/* ---- Big widgets (two rows, two columns): the scene up top, then a tidy grid ---- */
+@container (min-height: 170px) and (min-width: 300px) {
+  .okw-info { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "top top" "big btns" "meter meter" "stats stats"; align-items: center; gap: 4px 10px; }
+  .okw-row { display: contents; }
+  .okw-top { grid-area: top; display: flex; align-items: center; }
+  .okw-topmon { display: inline; margin-left: auto; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--fg); }
+  .okw-big { grid-area: big; font-size: 15px; }
+  .okw-big b { font-size: 19px; }
+  .okw-btns { grid-area: btns; }
+  .okw-sub { display: none; }
+  .okw-meter { display: block; grid-area: meter; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--fg) 12%, transparent); overflow: hidden; }
+  .okw-meter i { display: block; height: 100%; border-radius: 3px; background: var(--accent-color, #c8412f); transition: width 0.4s; }
+  .okw-stats { grid-area: stats; flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; overflow: visible; margin-top: 3px; }
+  .okw-stat { background: color-mix(in srgb, var(--fg) 7%, transparent); border-radius: 9px; padding: 4px 8px 5px; min-width: 0; }
+  .okw-stat b { font-size: 14px; }
+  .okw-stat small { font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+  .okw-stat-big:last-child b { color: var(--accent-color, #c8412f); }
+  .okw-row.okw-has-collect .okw-primary { display: inline-block; }
+}
+@container (min-height: 170px) and (min-width: 440px) {
+  .okw-stats { grid-template-columns: repeat(6, 1fr); }
+}

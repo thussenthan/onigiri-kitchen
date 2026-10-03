@@ -460,7 +460,7 @@
       hero('Mon spent', `${num(spent)} 文`, `in ${rangeName()} · ${num(k.mon)} 文 now`) +
       hero('Restaurant', `Lv ${num(k.level)}`, k.levelFrom === 'study' ? 'from your study days' : 'from Onigiri') +
       '</div><div class="oks-grid">' +
-      tile('Your pet', esc(pet.name || '–'), `${esc(pet.stage || '')} · ${num(pet.studyDays)} study days`) +
+      tile(pet.count > 1 ? 'Your pets' : 'Your pet', esc(pet.name || '–'), `${esc(pet.stage || '')} · ${num(pet.studyDays)} study days`) +
       tile('Times petted', num(pet.petted)) +
       tile('Keepsakes found', `${num(pet.gifts)} / ${num(pet.giftsTotal)}`) +
       tile('Fish fed', num(k.fishFed)) +

@@ -133,7 +133,7 @@
       } else if (species === 'bird') {
         // a tiny Java sparrow in its colour: outline, cap, white cheek, pink beak
         const pal = {
-          grey: ['#8f949f', '#1e1d23', '#232128'], white: ['#f6f3ec', '#f6f3ec', '#8e877c'], sakura: ['#8f949f', '#1e1d23', '#232128'],
+          grey: ['#8f949f', '#1e1d23', '#232128'], white: ['#f6f3ec', '#f6f3ec', '#8e877c'], sakura: ['#f6f1ea', '#2a2930', '#2a2930'],
           cinnamon: ['#c9a58a', '#6b4a38', '#4a3326'], silver: ['#b8bfcc', '#565c69', '#3a3f49'], cream: ['#ecdfc8', '#b69c7b', '#7a6650'],
         }[d.birdColor] || ['#8f949f', '#1e1d23', '#232128'];
         const [body, cap, line] = pal;
@@ -244,27 +244,33 @@
       ? stat(num(st.total), short(st.total), 'reviews', 'reviews', `${Number(st.total || 0).toLocaleString()} reviews all time`) +
         stat(num(st.average), short(st.average), 'per day', '/day', 'Average reviews on the days you studied') +
         stat(num(st.days), short(st.days), st.days === 1 ? 'day' : 'days', st.days === 1 ? 'day' : 'days', 'Days studied (with at least one review)') +
-        stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'best streak', 'Your longest-ever streak: the most days in a row you have reviewed') +
+        stat(`${st.bestStreak || 0}d`, `${st.bestStreak || 0}d`, 'best streak', 'streak', 'Your longest-ever streak: the most days in a row you have reviewed') +
         (st.hours != null ? stat(span(st.hours), span(st.hours), 'studied', 'studied', `${st.hours} hours of reviewing, all time (as timed by Anki)`) : '') +
         left
       : '';
+    const per = d.perGuest || 10;
+    const into = d.guests > 0 ? per : Math.max(0, Math.min(per, per - d.nextIn));
+    const petsLine = (d.pets && d.pets.length ? d.pets : p.species ? [p] : []).map((x) => `${esc(x.name || 'Tama')} · ${mood(x)}`).join('  ·  ');
     info.innerHTML =
-      `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen</div>` +
+      `<div class="okw-top"><span class="okw-jp">食堂</span>Onigiri Kitchen<span class="okw-topmon" title="${d.mon} mon (文): tips from your guests">文 ${d.mon}</span></div>` +
       `<div class="okw-big">${big}</div>` +
-      `<div class="okw-sub"><span title="${d.mon} mon (文): tips from your guests">文 ${d.mon}</span>${p.species ? `<span>🐾 ${esc(p.name || 'Tama')} · ${mood(p)}</span>` : ''}</div>` +
+      `<div class="okw-meter" title="${into} of ${per} reviews towards the next guest"><i style="width:${(into / per) * 100}%"></i></div>` +
+      `<div class="okw-sub"><span title="${d.mon} mon (文): tips from your guests">文 ${d.mon}</span>${petsLine ? `<span>🐾 ${petsLine}</span>` : ''}</div>` +
       `<div class="okw-row${d.guests > 0 ? ' okw-has-collect' : ''}">` +
       `<span class="okw-stats">${stats}</span>` +
-      '' +
+      '<span class="okw-btns">' +
       (d.guests > 0 ? `<button class="okw-btn okw-collect" data-act="collect" title="Serve every waiting guest and collect all their tips">Collect all</button>` : '') +
       `<button class="okw-btn okw-primary" data-act="open">Visit</button>` +
+      '</span>' +
       `</div>`;
+    el.dataset.pets = petsLine;
     info.querySelectorAll('.okw-btn').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (b.dataset.act !== 'collect') { send('open'); return; }
       // serve everyone waiting right from the home screen
       b.disabled = true;
       send('collectall', (res) => {
-        if (!res || !res.widget) return;
+        if (!res || !res.widget) { b.disabled = false; return; }
         const w = widgets.find((x) => x.el === el);
         if (!w) return;
         Object.assign(w.d, res.widget);
@@ -295,7 +301,7 @@
     fitCanvas(canvas);
     drawScene(ctx, d, performance.now() / 1000);
     el.addEventListener('click', () => send('open'));
-    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); send('open'); } });
+    el.addEventListener('keydown', (e) => { if (e.target === el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); send('open'); } });
   }
 
   function scan() {
