@@ -14,7 +14,8 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 4px 6px 6px 4px;
+  /* (the dango's stick pokes 3px out on the left, so the left needs 3px more to look as far from the edge as the cat does on the right) */
+  padding: 4px 8px 6px 13px;
   border-radius: 999px;
   background: var(--okc-paper);
   color: var(--okc-ink);
@@ -42,8 +43,16 @@
   gap: 6px;
   color: inherit;
 }
-.okc-main { padding: 3px 8px 3px 6px; border-radius: 999px; }
-.okc-main:hover { background: rgba(200, 65, 47, 0.08); }
+/* The button that opens the kitchen stretches to the pill's own left, top and bottom edges
+   (negative margins cancel the pill's padding), so its hover tint is clipped by the pill's
+   curve on the left and rounds off to match on the right: the same oval as the outside. */
+.okc button.okc-main {
+  align-self: stretch;
+  margin: -4px 0 -6px -13px;
+  padding: 4px 8px 6px 13px;
+  border-radius: 999px;
+}
+.okc button.okc-main:hover { background: rgba(200, 65, 47, 0.08); }
 .okc-dango { display: inline-flex; align-items: center; gap: 0; position: relative; }
 .okc-dango::before {
   content: "";
@@ -72,6 +81,7 @@
 .okc[data-phase="focus"] .okc-label { color: var(--okc-shu); }
 .okc[data-phase="break"] .okc-label { color: var(--okc-matcha); }
 .okc-time { font-variant-numeric: tabular-nums; min-width: 2.2em; }
+.okc-time:empty { display: none; } /* idle with no sessions yet: no blank gap before the cat */
 .okc.paused .okc-time { opacity: 0.55; }
 .okc-actions {
   display: inline-flex;
