@@ -32,6 +32,7 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **Study in one big batch, catch up later.** There's no limit on waiting guests. After a big session, tap
   急 Serve faster to serve everyone at 4×, and tap it again to collect every tip at once. Guests last until Anki's day rolls over, and anyone
   still waiting then takes takeout and still leaves a tip.
+- **A forest outside the window, and a bonsai that grows.** Japanese trees (pine, maple, cedar, sakura, bamboo, ginkgo) are planted along the road as your all-time review count climbs, and follow the seasons. The bonsai grows for most of a year from the day you buy it.
 - **Pomodoro timer.** One dango per focus session. When a break starts, the restaurant opens. When the
   break ends, you get a gentle nudge back to your cards. Long breaks are festival nights with fireworks.
   A small dango timer sits in the corner of Anki's main screens. Focus only counts while you're actually reviewing:

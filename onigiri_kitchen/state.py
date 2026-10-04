@@ -28,7 +28,7 @@ MAX_LEECH_GUESTS_PER_DAY = 3
 # Decor you can buy with mon. `level` is the Onigiri restaurant level needed.
 CATALOG: List[Dict[str, Any]] = [
     {"id": "bonsai", "name": "Bonsai", "jp": "盆栽", "level": 0, "price": 15,
-     "desc": "A patient little pine. Grows a new tuft every week you study."},
+     "desc": "A patient little pine. Grows taller and fuller for most of a year, with a new tuft every few weeks."},
     {"id": "furin", "name": "Wind chime", "jp": "風鈴", "level": 2, "price": 25,
      "desc": "Glass fūrin by the window. Tap it, or let the breeze ring it."},
     {"id": "kakejiku", "name": "Hanging scroll", "jp": "掛け軸", "level": 4, "price": 35,
@@ -450,6 +450,7 @@ class KitchenState:
             return {"ok": False, "msg": "Not enough mon yet. Keep serving guests!"}
         self.spend(item["price"])
         self.data["owned"].append(item_id)
+        self.data.setdefault("owned_on", {})[item_id] = anki_today()  # (the bonsai grows from this day)
         self.sync_pets()
         self.apply_companion_perks()
         self.save()
@@ -763,6 +764,7 @@ class KitchenState:
             "onigiriMade": d.get("onigiri_made", 0),
             "today": dict(d["today"]),
             "firstSeen": d.get("first_seen"),
+            "ownedOn": dict(d.get("owned_on") or {}),
             "tutorialDone": bool(d.get("tutorial_done", False)),
             "puffleColor": d.get("puffle_color") or "",
             "puffleColors": list(d.get("puffle_colors") or []),

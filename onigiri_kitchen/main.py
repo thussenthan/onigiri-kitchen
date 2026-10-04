@@ -23,7 +23,7 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.10.3"
+VERSION = "1.10.4"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 AUTHOR_NAME = "Thussenthan Walter-Angelo"
 AUTHOR_URL = "https://github.com/thussenthan"
@@ -335,9 +335,11 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     # Onigiri: the Specials Book (the menu and its rewards) and level-ups
     _specials_cache["value"] = None
     specials = cached_specials()
+    new_rewards = []  # rewards you've unlocked since your last visit (the chef tells you)
     for rid in earned_rewards(specials.get("book") or []):
         if rid not in state.data["owned"]:
             state.data["owned"].append(rid)
+            new_rewards.append(rid)
     # dishes that joined the menu since your last visit (the chef announces
     # them); the first time, just remember what's already there
     names = [d["name"] for d in specials.get("book") or []]
@@ -378,8 +380,10 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
         "levelUp": level_up,
         "newDishes": new_dishes,
         "specialCheer": special_cheer,
+        "newRewards": new_rewards,
         "goalParty": goal_party,
         "state": state.snapshot(),
+        "reviewsTotal": int((lifetime_stats(int(today.get("reviews", 0))) or {}).get("total", 0) or 0),  # the forest outside the window grows with it
         "takeout": state.pop_takeout(),
         "catalog": CATALOG,
         "conf": conf(),

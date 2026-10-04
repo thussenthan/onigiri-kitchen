@@ -172,21 +172,24 @@
   .okw-row { display: contents; }
   .okw-top { grid-area: top; display: flex; align-items: center; }
   .okw-topmon { display: inline; margin-left: auto; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--fg); }
-  .okw-big { grid-area: big; font-size: 15px; }
-  .okw-big b { font-size: 19px; }
+  .okw-big { grid-area: big; font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .okw-big b { font-size: 17px; }
   .okw-btns { grid-area: btns; }
   .okw-sub { display: none; }
   .okw-meter { display: block; grid-area: meter; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--fg) 12%, transparent); overflow: hidden; }
   .okw-meter i { display: block; height: 100%; border-radius: 3px; background: var(--accent-color, #c8412f); transition: width 0.4s; }
   .okw-stats { grid-area: stats; flex: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; overflow: visible; margin-top: 3px; }
   .okw-stat { background: color-mix(in srgb, var(--fg) 7%, transparent); border-radius: 9px; padding: 5px 6px 6px; min-width: 0; align-items: center; text-align: center; }
-  .okw-stat b { font-size: 13.5px; }
-  .okw-stat small { font-size: 9.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .okw-stat b { font-size: clamp(9.5px, 2.7cqw, 12px); max-width: 100%; overflow: hidden; text-overflow: ellipsis; } /* (shrinks for long values like ~1h 15m) */
+  .okw-stat small { font-size: 8.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .okw-stat-big:last-child b { color: var(--accent-color, #c8412f); }
   .okw-row.okw-has-collect .okw-primary { display: inline-block; }
 }
 @container (min-height: 170px) and (min-width: 420px) {
-  .okw-stat { padding: 6px 8px 7px; }
-  .okw-stat b { font-size: 15px; }
-  .okw-stat small { font-size: 10.5px; }
+  .okw-stat b { font-size: clamp(11px, 2.9cqw, 13.5px); }
+  .okw-stat small { font-size: 9.5px; }
 }
+
+/* long values (like ~1h15m) get a smaller number so they never run out of their box */
+.okw-stat b.okw-long { font-size: 10.5px !important; letter-spacing: -0.01em; }
+@container (max-width: 380px) { .okw-stat b.okw-long { font-size: 9px !important; } }

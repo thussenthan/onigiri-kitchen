@@ -811,7 +811,8 @@ body { background-image: none !important; font-family: var(--sans); }
 .ok-report { flex-direction: column; align-items: stretch; }
 .ok-report-head { font-size: 12.5px; }
 .ok-report-head .jp { color: var(--shu); margin-right: 4px; }
-.ok-report-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ok-report-btns { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 8px; }
+.ok-report-btns .ok-foot-btn { flex: 1 1 0; min-width: 0; justify-content: center; white-space: nowrap; padding-left: 8px; padding-right: 8px; }
 
 /* -------------------------------------------------------------- tutorial */
 .ok-tour { position: fixed; inset: 0; z-index: 40; }
@@ -1286,14 +1287,14 @@ button.ok-grid-head:focus-visible { outline: 2px solid var(--shu); }
 button.ok-grid-head.closed .ok-caret { transform: rotate(-90deg); }
 
 /* the pet card's tabs, along the bottom: a slim strip, sprite and name side by side */
-.ok-pet-switch { display: flex; justify-content: center; gap: 6px; padding: 6px 12px 7px; border-top: 1px solid var(--line); background: var(--paper-2); }
+.ok-pet-switch { display: flex; justify-content: center; gap: 6px; padding: 3px 12px 4px; border-top: 1px solid var(--line); background: var(--paper-2); }
 .ok-pet-switch[hidden] { display: none; }
 .ok-pet-switch button {
   all: unset; box-sizing: border-box; flex: 0 1 108px; min-width: 0; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 5px;
-  height: 28px; padding: 0 8px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer;
+  height: 22px; padding: 0 8px; border-radius: 7px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer;
   font: 700 11.5px var(--sans); color: var(--ink-2);
 }
-.ok-pet-switch button canvas { display: block; flex: none; width: 24px; height: 20px; image-rendering: pixelated; }
+.ok-pet-switch button canvas { display: block; flex: none; width: 24px; height: 20px; margin: -2px 0; image-rendering: pixelated; }
 .ok-pet-switch button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ok-pet-switch button:hover { border-color: var(--shu); }
 .ok-pet-switch button.on { border-color: var(--shu); background: color-mix(in srgb, var(--shu) 14%, var(--card)); color: var(--ink); }

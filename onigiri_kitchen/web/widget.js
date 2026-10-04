@@ -239,11 +239,11 @@
       return `${one(h / 8766)}y`;
     };
     const two = (l, sh) => `<span class="okw-l">${l}</span><span class="okw-s">${sh}</span>`;
-    const stat = (v, vs, label, ls, tip) => `<span class="okw-stat" title="${tip}"><b>${two(v, vs)}</b><small>${two(label, ls)}</small></span>`;
+    const stat = (v, vs, label, ls, tip) => `<span class="okw-stat" title="${tip}"><b${String(vs).length > 5 ? ' class="okw-long"' : ''}>${two(v, vs)}</b><small>${two(label, ls)}</small></span>`;
     // how long what's still due will take at your pace (the one thing about
     // today that Onigiri doesn't already show)
     const t = d.studyToday;
-    const mins = (secs) => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`; };
+    const mins = (secs) => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? `${m % 60}m` : ''}` : `${m}m`; }; // (1h15m: compact, it has to fit a small box)
     const due = t && t.due ? t.due.total : 0;
     const leftTip = t ? (due ? `About ${mins(t.estimateSeconds)} left: ${due} cards due (${t.due.new} new, ${t.due.learn} learning, ${t.due.review} review), at your own pace` : 'Nothing due right now') : '';
     const left = t ? stat(due ? `~${mins(t.estimateSeconds)}` : 'done', due ? `~${mins(t.estimateSeconds)}` : 'done', due ? 'left' : 'all due', due ? 'left' : 'due', esc(leftTip)).replace('okw-stat"', 'okw-stat okw-stat-big"') : '';

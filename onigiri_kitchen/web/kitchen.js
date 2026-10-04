@@ -620,6 +620,71 @@
   let clouds = [{ x: 10, y: 8, s: 1 }, { x: 55, y: 16, s: 0 }, { x: 90, y: 5, s: 1 }];
   let stars = Array.from({ length: 16 }, (_, i) => ({ x: (i * 37) % 76, y: (i * 23) % 30, p: i }));
 
+  // ---------------------------------------------------------- the forest
+  // Japanese trees along the road outside the window: pine, maple, cedar, sakura, bamboo and
+  // ginkgo. The more cards you've ever reviewed, the more of them are planted (one more at
+  // each step), and they follow the seasons.
+  const FOREST = [[58, 'pine', 14], [8, 'maple', 12], [38, 'cedar', 16], [24, 'sakura', 12], [70, 'bamboo', 15], [48, 'ginkgo', 13],
+    [16, 'pine', 10], [32, 'maple', 11], [2, 'cedar', 13], [64, 'sakura', 11], [54, 'maple', 10], [76, 'ginkgo', 11]];
+  const FOREST_STEPS = [200, 500, 1000, 2000, 4000, 7000, 12000, 20000, 32000, 50000, 80000, 100000];
+  const forestSize = () => FOREST_STEPS.filter((v) => (INIT.reviewsTotal || 0) >= v).length;
+  function drawTree(type, x, by, hgt, night) {
+    const c = (col) => (night ? shade(col, -0.55) : col);
+    const bark = c('#5a3a22');
+    const snow = SEASON === 'winter' ? c('#f4f8fc') : null;
+    // the colours of the broad-leaved trees change with the season (and go bare in winter)
+    const leaf = {
+      maple: { spring: ['#7fb35a', '#9ccc6e'], summer: ['#3f7a3a', '#5a9a46'], autumn: ['#c8412f', '#e8742f'] },
+      sakura: { spring: ['#f2a9c0', '#f9d0de'], summer: ['#4f7a3a', '#6a9a4a'], autumn: ['#b5562f', '#d98a3a'] },
+      ginkgo: { spring: ['#8cbf5e', '#a8d472'], summer: ['#5a9a3a', '#7fb35a'], autumn: ['#e8c25a', '#f4dc86'] },
+    };
+    if (leaf[type]) {
+      R(x, by - Math.round(hgt * 0.55), 1, Math.round(hgt * 0.55), bark);
+      const cy = by - Math.round(hgt * 0.7);
+      const pal = leaf[type][SEASON];
+      if (!pal) {
+        // winter: bare branches with a dusting of snow
+        line(x, by - Math.round(hgt * 0.5), x - 4, cy - 2, bark); line(x, by - Math.round(hgt * 0.5), x + 4, cy - 2, bark);
+        line(x, by - Math.round(hgt * 0.55), x, cy - 4, bark);
+        P(x - 4, cy - 3, c('#f4f8fc')); P(x + 4, cy - 3, c('#f4f8fc')); P(x, cy - 5, c('#f4f8fc'));
+        return;
+      }
+      const rx = type === 'ginkgo' ? 3 : 5;
+      ellipse(x, cy, rx, Math.round(hgt * 0.32), c(pal[0]));
+      ellipse(x - 1, cy - 1, Math.max(2, rx - 2), Math.max(2, Math.round(hgt * 0.2)), c(pal[1]));
+      if (type === 'sakura') { P(x + 3, cy + 1, c('#fbe6ee')); P(x - 4, cy, c('#fbe6ee')); }
+      if (type === 'maple') { P(x + 2, cy + 2, c('#e8742f')); P(x - 3, cy + 1, c(pal[1])); }
+    } else if (type === 'pine') {
+      // 松: a leaning trunk and a few cloud-shaped pads of needles
+      line(x, by, x + 1, by - hgt + 4, bark);
+      const pad = c('#2f5f3a');
+      const padHi = c('#4a8a4a');
+      [[x + 1, by - hgt + 2, 4], [x - 2, by - hgt + 6, 4], [x + 3, by - hgt + 8, 3]].forEach(([px, py, r]) => { ellipse(px, py, r, 1, pad); ellipse(px, py - 1, r - 1, 1, padHi); if (snow) R(px - r + 1, py - 2, r * 2 - 2, 1, snow); });
+    } else if (type === 'cedar') {
+      // 杉: a tall narrow cone, row by row
+      R(x, by - 2, 1, 2, bark);
+      for (let r = 0; r < hgt - 2; r++) {
+        const hw = Math.max(0, Math.round((1 - r / (hgt - 2)) * 4)); // wide at the foot, a point at the top
+        R(x - hw, by - 2 - r, hw * 2 + 1, 1, r % 3 === 0 ? c('#2a5a38') : c('#336a40'));
+      }
+      if (snow) { R(x - 1, by - hgt + 1, 3, 1, snow); R(x - 2, by - hgt + 4, 5, 1, snow); }
+    } else if (type === 'bamboo') {
+      // 竹: three stalks with joints and a tuft of leaves on top
+      [[-2, 0.8], [0, 1], [2, 0.7]].forEach(([dx, f], i) => {
+        const hh = Math.round(hgt * f);
+        R(x + dx, by - hh, 1, hh, c('#7fae5a'));
+        for (let j = 3; j < hh; j += 4) P(x + dx, by - j, c('#4f7a3a'));
+        ellipse(x + dx + (i - 1), by - hh, 2, 1, c('#5a9a46'));
+        if (snow) P(x + dx, by - hh - 1, snow);
+      });
+    }
+  }
+  function drawForest(ix, by, night) {
+    const n = forestSize();
+    // the back ones first (the smaller ones are further away)
+    FOREST.slice(0, n).sort((a, b) => a[2] - b[2]).forEach(([fx, type, hgt]) => drawTree(type, ix + fx + 3, by, hgt, night));
+  }
+
   function drawWindow(h) {
     const { x, y, w } = WIN;
     const ih = WIN.h;
@@ -676,6 +741,7 @@
     // tree line & street
     const tcol = night ? '#1e2a2a' : SEASON === 'autumn' ? '#b5562f' : SEASON === 'spring' ? '#e7a7bd' : SEASON === 'winter' ? '#e8eef5' : '#4f7a3a';
     for (let i = 0; i < 12; i++) ellipse(ix + i * 7 + 2, iy + inh - 9, 4, 3, i % 2 ? tcol : shade(tcol, -0.12));
+    drawForest(ix, iy + inh - 7, night);
     R(ix, iy + inh - 6, iw, 6, night ? '#3a3440' : '#b8a88e');
     R(ix, iy + inh - 6, iw, 1, night ? '#4a4450' : '#cbbca2');
     // walkers outside
@@ -721,7 +787,7 @@
     // sill
     R(x - 2, y + ih, w + 4, 3, C.woodMd);
     R(x - 2, y + ih, w + 4, 1, C.woodHi);
-    regions.push({ x, y, w, h: ih, label: `<b>窓</b> Window\n${SEASON_LABEL}${raining ? ' · rain' : ''}`, click: () => callSparrow() });
+    regions.push({ x, y, w, h: ih, label: `<b>窓</b> Window\n${SEASON_LABEL}${raining ? ' · rain' : ''}\n${forestSize()} of ${FOREST.length} trees outside: more cards plant more`, click: () => callSparrow() });
   }
 
   // -------------------------------------------------------------- lanterns
@@ -971,7 +1037,7 @@
 
   // ----------------------------------------------------------------- decor
   const DECOR = {
-    bonsai: { x: 8, y: 102, w: 24, h: 24, draw: drawBonsai },
+    bonsai: { x: 8, y: 92, w: 24, h: 34, draw: drawBonsai }, // (10px of headroom above the old 24px box, for it to grow into)
     furin: { x: 84, y: 18, w: 7, h: 18, draw: drawFurin },
     kakejiku: { x: 178, y: 18, w: 14, h: 46, draw: drawKakejiku },
     maneki: { x: 42, y: 91, w: 11, h: 13, draw: drawManeki },
@@ -1000,19 +1066,36 @@
     P(x + 3, y + 3, '#ffffff'); P(x + 4, y + 2, '#ffffff');
   }
 
-  function drawBonsai(x, y) {
+  // A bonsai grows for most of a year from the day you bought it: taller, with a new
+  // tuft of needles every few weeks, a thicker trunk and a few blossoms at the end.
+  function bonsaiAge() {
+    const since = (S.ownedOn || {}).bonsai || S.firstSeen;
+    if (!since || !(S.today || {}).date) return 0;
+    return Math.max(0, (new Date(S.today.date) - new Date(since)) / 864e5);
+  }
+  // [from day, x, y, rx, ry, colour, how much of the growth lifts it]
+  const BONSAI_TUFTS = [
+    [7, 5, 12, 3, 1, '#4f7a3a', 0.3], [14, 20, 11, 3, 1, '#4f7a3a', 0.3], [21, 13, 1, 2, 1, '#8cbf5e', 1],
+    [42, 6, 6, 3, 1, '#6a9a4a', 0.6], [63, 20, 4, 3, 1, '#6a9a4a', 0.8], [90, 13, -1, 4, 2, '#4f7a3a', 1],
+    [120, 3, 10, 2, 1, '#4f7a3a', 0.3], [150, 22, 8, 2, 1, '#4f7a3a', 0.5], [180, 9, 2, 3, 1, '#7fb35a', 0.9],
+    [220, 18, 0, 3, 1, '#7fb35a', 1], [270, 13, -3, 3, 1, '#8cbf5e', 1],
+  ];
+  function drawBonsaiAt(x, y0, age) {
+    const y = y0 + 10; // (the box leaves 10px of headroom for a grown tree)
+    const up = Math.round(Math.min(1, age / 365) * 8); // (stops just under the treasure shelf)
     R(x, y + 20, 24, 2, C.woodDk); R(x + 2, y + 22, 2, 2, C.woodDk); R(x + 20, y + 22, 2, 2, C.woodDk);
     R(x + 6, y + 15, 12, 5, '#3b4a6b'); R(x + 6, y + 15, 12, 1, '#56678c');
-    line(x + 12, y + 15, x + 10, y + 10, '#5a3a22'); line(x + 10, y + 10, x + 14, y + 6, '#5a3a22');
-    line(x + 11, y + 11, x + 16, y + 9, '#5a3a22');
-    const weeks = Math.min(3, Math.floor((S.today.date && S.firstSeen ? (new Date(S.today.date) - new Date(S.firstSeen)) / 6048e5 : 0)));
-    ellipse(x + 8, y + 9, 4, 2, '#4f7a3a'); ellipse(x + 9, y + 8, 3, 1, '#6a9a4a');
-    ellipse(x + 16, y + 7, 5, 2, '#4f7a3a'); ellipse(x + 16, y + 6, 3, 1, '#7fb35a');
-    ellipse(x + 13, y + 4, 4, 2, '#4f7a3a'); ellipse(x + 13, y + 3, 2, 1, '#8cbf5e');
-    if (weeks >= 1) { ellipse(x + 5, y + 12, 3, 1, '#4f7a3a'); }
-    if (weeks >= 2) { ellipse(x + 20, y + 11, 3, 1, '#4f7a3a'); }
-    if (weeks >= 3) { ellipse(x + 13, y + 1, 2, 1, '#8cbf5e'); }
+    const lift = (f) => Math.round(up * f);
+    line(x + 12, y + 15, x + 10, y + 10 - lift(0.5), '#5a3a22'); line(x + 10, y + 10 - lift(0.5), x + 14, y + 6 - up, '#5a3a22');
+    line(x + 11, y + 11 - lift(0.4), x + 16, y + 9 - lift(0.7), '#5a3a22');
+    if (age >= 240) { line(x + 13, y + 15, x + 11, y + 10 - lift(0.5), '#5a3a22'); line(x + 11, y + 10 - lift(0.5), x + 15, y + 6 - up, '#5a3a22'); }
+    ellipse(x + 8, y + 9 - lift(0.5), 4, 2, '#4f7a3a'); ellipse(x + 9, y + 8 - lift(0.5), 3, 1, '#6a9a4a');
+    ellipse(x + 16, y + 7 - lift(0.7), 5, 2, '#4f7a3a'); ellipse(x + 16, y + 6 - lift(0.7), 3, 1, '#7fb35a');
+    ellipse(x + 13, y + 4 - up, 4, 2, '#4f7a3a'); ellipse(x + 13, y + 3 - up, 2, 1, '#8cbf5e');
+    for (const [from, tx, ty, rx, ry, col, f] of BONSAI_TUFTS) if (age >= from) ellipse(x + tx, y + ty - lift(f), rx, ry, col);
+    if (age >= 365) [[8, 5], [17, 3], [13, -2]].forEach(([bx, by]) => P(x + bx, y + by - lift(0.8), '#f2a9c0')); // blossoms
   }
+  function drawBonsai(x, y) { drawBonsaiAt(x, y, bonsaiAge()); }
   function drawFurin(x, y) {
     const sw = Math.round(Math.sin(time * 2.2) * (shake.furin > 0 ? 2 : 0.6));
     R(x + 3, y, 1, 4, '#2b1c12');
@@ -1562,9 +1645,23 @@
   const tamaPlays = () => !!feather && feather.who === pet.species;
   const bowlX = (x) => BOWL_X + Math.max(0, petList().indexOf(x)) * BOWL_GAP;
   // the server sends your first pet as `pet` and all of them as `pets`
+  const UNLOCK_NAMES = { collar: ['首輪', 'Collar colours'], bandana: ['手ぬぐい', 'Bandana'], bell: ['金の鈴', 'Golden bell'], fancy_bed: ['豪華座布団', 'Fancy cushion'], kotatsu: ['こたつ', 'Kotatsu'] };
+  function announceUnlocks(before, after) {
+    for (const sp0 of Object.keys(after)) {
+      const was = (before[sp0] || {}).unlocks;
+      if (!was) continue;
+      for (const key of Object.keys(UNLOCK_NAMES)) {
+        if (!was[key] && (after[sp0].unlocks || {})[key]) {
+          const [jp, en] = UNLOCK_NAMES[key];
+          OKSound.fanfare();
+          bigToast(jp, `${esc(after[sp0].name)} unlocked: ${en}`, 'Find it on the Style tab of the Pets card.');
+        }
+      }
+    }
+  }
   function takePets(res) {
     if (!res) return;
-    if (res.pets) PETS = res.pets;
+    if (res.pets) { announceUnlocks(PETS, res.pets); PETS = res.pets; }
     if (res.pet) pet = res.pet;
     if (pet.species) PETS[pet.species] = pet;
   }
@@ -2356,25 +2453,48 @@
         pawUp,
       });
     }
-    if (st !== 'sleep' && st !== 'walk' && (st === 'beg' || tama.wantsFish)) drawThought(x + 6, by - 26);
+    if (st !== 'sleep' && st !== 'walk' && (st === 'beg' || tama.wantsFish)) drawThought(x + 6, by - 30);
     if (feather) drawFeather();
     regions.push({ x: x - 12, y: by - 20, w: 24, h: 21, label: tamaLabel(), click: () => petAction('pet') });
   }
 
-  function drawThought(x, y) {
-    R(x, y, 11, 7, C.ink); R(x + 1, y + 1, 9, 5, '#fffaf0');
-    P(x + 1, y + 7, C.ink); P(x, y + 8, C.ink);
+  // The thought bubble over a hungry pet shows the food it's hoping for: a fish for the cat,
+  // a puffle O for the puffle, a spray of millet for the sparrow. Point at it to read it, or
+  // tap it to feed.
+  function drawThought(x, y, pointy) {
+    if (pointy == null) pointy = true; // (the millet's rounded head ends in a point at the bottom)
+    const paper = '#fffaf0';
+    R(x + 1, y, 13, 11, C.ink); R(x, y + 1, 15, 9, C.ink);
+    R(x + 2, y + 1, 11, 9, paper); R(x + 1, y + 2, 13, 7, paper);
+    P(x + 2, y + 11, C.ink); P(x + 1, y + 12, C.ink); // the little trail of the bubble
+    const cx = x + 7;
+    const cy = y + 5;
     if (pet.species === 'puffle') {
-      // a puffle O
-      R(x + 4, y + 2, 3, 1, '#c98a4a'); R(x + 4, y + 4, 3, 1, '#c98a4a'); P(x + 3, y + 3, '#c98a4a'); P(x + 7, y + 3, '#c98a4a');
+      // a puffle O: a ring of orange with a bright edge
+      ellipse(cx, cy, 3, 3, '#c98a4a'); ellipse(cx, cy, 1, 1, paper); P(cx - 2, cy - 2, '#f0c080'); P(cx - 1, cy - 3, '#f0c080');
     } else if (pet.species === 'bird') {
-      // millet spray
-      P(x + 3, y + 5, '#8a9a4a'); P(x + 4, y + 4, '#8a9a4a');
-      [[5, 3], [6, 2], [7, 3], [6, 4], [5, 2], [7, 1]].forEach(([dx, dy]) => P(x + dx, y + dy, '#e8c25a'));
+      // a head of millet: a green stalk arching over, and a plump drooping spike of golden seeds
+      line(x + 4, y + 9, x + 5, y + 4, '#6f9a4a'); line(x + 5, y + 4, x + 8, y + 2, '#6f9a4a');
+      P(x + 3, y + 7, '#6f9a4a'); P(x + 2, y + 6, '#6f9a4a'); // a leaf at the foot
+      if (pointy) {
+        // a rounded head whose bottom comes to a point in the middle: widths 3, 5, 5, 5, 5, 3, 1 (rows 2 to 8)
+        [[9, 11], [8, 12], [8, 12], [8, 12], [8, 12], [9, 11], [10, 10]].forEach(([c0, c1], i) => R(x + c0, y + 2 + i, c1 - c0 + 1, 1, '#e8c25a'));
+      } else {
+        ellipse(x + 10, y + 5, 2, 3, '#e8c25a');
+      }
+      [[9, 4], [11, 5], [10, 7], [9, 6]].forEach(([dx, dy]) => P(x + dx, y + dy, '#d6ae48')); // a few seeds in shade (only a shade deeper than the rest)
+      [[10, 3], [11, 4], [10, 5], [11, 6]].forEach(([dx, dy]) => P(x + dx, y + dy, '#f6e08a')); // and a few catching the light
+      P(x + 12, y + 3, '#e8c25a'); // a bristly tip
+      // nothing may touch the black border: paint the bubble's outermost ring of paper back over it
+      R(x + 2, y + 1, 11, 1, paper); R(x + 2, y + 9, 11, 1, paper); R(x + 1, y + 2, 1, 7, paper); R(x + 13, y + 2, 1, 7, paper);
+      [[2, 2], [12, 2], [2, 8], [12, 8]].forEach(([dx, dy]) => P(x + dx, y + dy, paper));
     } else {
-      // tiny fish
-      R(x + 3, y + 3, 4, 1, '#6a9ac4'); R(x + 4, y + 2, 2, 3, '#6a9ac4'); P(x + 7, y + 2, '#6a9ac4'); P(x + 7, y + 4, '#6a9ac4'); P(x + 3, y + 3, C.ink);
+      // a little fish with an eye and a forked tail
+      ellipse(cx - 1, cy, 3, 2, '#6a9ac4'); P(cx - 3, cy, C.ink); R(cx - 2, cy + 1, 4, 1, '#a8c8e4');
+      R(cx + 3, cy - 1, 1, 3, '#6a9ac4'); P(cx + 4, cy - 2, '#6a9ac4'); P(cx + 4, cy + 2, '#6a9ac4');
     }
+    const who = pet.species ? sp() : null;
+    regions.push({ x, y, w: 15, h: 13, label: `<b>${esc(pet.name)} is hungry</b>\nHoping for ${who && /^[aeiou]/.test(who.food) ? 'an' : 'a'} ${who ? who.food : 'treat'}. Tap to feed${pet.fish > 0 ? ` (${pet.fish} saved)` : ''}.`, click: () => petAction('feed', pet.species) });
   }
 
   function drawFeather() {
@@ -4811,7 +4931,6 @@
   }
   $('ok-form').addEventListener('submit', (e) => { e.preventDefault(); saveSettings(); });
   $('ok-author').addEventListener('click', (e) => { e.preventDefault(); send('author'); });
-  $('ok-author-gh').addEventListener('click', (e) => { e.preventDefault(); send('author'); });
   // closing the whole window with unsaved settings asks first (see KitchenDialog.closeEvent)
   function askToSave() {
     if (!settingsDirty()) return false;
@@ -4932,7 +5051,7 @@
               if (item.id === 'buncho' && !(S.birdColors || []).length) setTimeout(() => openChooser('color', 'bird'), 700);
             }
           }
-          toast(r.msg);
+          if (!(r.ok && isCompanion(item))) toast(r.msg); // (a new friend moving in already says so)
           renderDecor();
         });
         foot.appendChild(b);
@@ -5545,6 +5664,18 @@
       chef.dish = d;
     }
   }
+  // A reward from your Specials Book (the menu board, the golden frame, the gold headband,
+  // the legendary knife) has just joined the restaurant.
+  function rewardCheer(id) {
+    const item = catalog.find((c) => c.id === id);
+    if (!item) return;
+    OKSound.fanfare();
+    chef.lineT = 10;
+    say(['新しい飾り!', `Unlocked: ${item.name}!`]);
+    bigToast(item.jp, `Unlocked: ${esc(item.name)}`, esc(item.desc || 'A reward for your Specials Book.'));
+    spawnHearts(121, 74, 2);
+    for (let i = 0; i < 2; i++) setTimeout(roomFirework, 300 + i * 420);
+  }
   // Onigiri's restaurant levelled up since you were last here: the chef cheers.
   function levelUpCheer(lu) {
     const seatsThen = clamp(2 + Math.floor(lu.from / 5), 2, 5);
@@ -5552,6 +5683,8 @@
     OKSound.fanfare();
     chef.lineT = 12;
     say(['おめでとう!', `Your restaurant reached level ${lu.to}!${newSeat ? ' A new seat opened up.' : ''}`]);
+    const fresh = catalog.filter((c) => c.kind !== 'reward' && c.level > lu.from && c.level <= lu.to);
+    if (fresh.length) setTimeout(() => toast(`店 New in the shop: ${fresh.map((c) => c.name).join(', ')}`), 2800);
     for (let i = 0; i < 4; i++) setTimeout(roomFirework, 300 + i * 420);
     spawnHearts(121, 74, 3);
   }
@@ -5635,7 +5768,7 @@
       hitAt(x, y) { render(); const r = hit({ x, y }); return r && r.label; },
       pickGift() { if (floorGifts[0]) collectGift(floorGifts[0]); },
       step(n) { for (let i = 0; i < n; i++) update(1 / 30); },
-      draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, catSleep, withPet, ANIMAL_ART }); } finally { gRef = prev; } },
+      draw(ctx, fn) { const prev = gRef; gRef = ctx; try { fn({ drawBird, drawPuffle, catSit, catSleep, withPet, ANIMAL_ART, drawBonsaiAt, drawThought }); } finally { gRef = prev; } },
     };
   }
   if (window.OK_DEBUG_FF) for (let i = 0; i < window.OK_DEBUG_FF * 30; i++) update(1 / 30);
@@ -5650,6 +5783,7 @@
     if (INIT.levelUp) news.push(() => levelUpCheer(INIT.levelUp));
     if ((INIT.newDishes || []).length) news.push(() => newDishCheer(INIT.newDishes));
     if (INIT.specialCheer) news.push(specialCheer);
+    (INIT.newRewards || []).forEach((id) => news.push(() => rewardCheer(id)));
     if (INIT.goalParty) news.push(() => goalParty(INIT.goalParty));
     news.forEach((fn, i) => setTimeout(fn, 250 + i * 3400));
     if (INIT.setBonusNow) { setBonusModal(500); return; }
