@@ -729,15 +729,15 @@
     }
     // Fuji
     const mcol = night ? '#2c2f55' : mix('#6a6fa8', top, 0.35);
-    for (let r = 0; r < 20; r++) {
-      const hw = Math.round(4 + r * 1.6);
-      R(ix + 34 - hw, iy + inh - 26 + r, hw * 2, 1, mcol);
+    for (let r = 0; r < 38; r++) {
+      const hw = Math.round(3 + r * 1.05);
+      R(ix + 34 - hw, iy + inh - 44 + r, hw * 2, 1, mcol);
     }
-    for (let r = 0; r < 5; r++) {
-      const hw = Math.round(4 + r * 1.6);
-      R(ix + 34 - hw, iy + inh - 26 + r, hw * 2, 1, night ? '#c9cbe6' : '#fbfbff');
+    for (let r = 0; r < 9; r++) {
+      const hw = Math.round(3 + r * 1.05);
+      R(ix + 34 - hw, iy + inh - 44 + r, hw * 2, 1, night ? '#c9cbe6' : '#fbfbff');
     }
-    P(ix + 31, iy + inh - 21, mcol); P(ix + 36, iy + inh - 21, mcol);
+    P(ix + 30, iy + inh - 35, mcol); P(ix + 36, iy + inh - 35, mcol); P(ix + 33, iy + inh - 36, mcol);
     // tree line & street
     const tcol = night ? '#1e2a2a' : SEASON === 'autumn' ? '#b5562f' : SEASON === 'spring' ? '#e7a7bd' : SEASON === 'winter' ? '#e8eef5' : '#4f7a3a';
     for (let i = 0; i < 12; i++) ellipse(ix + i * 7 + 2, iy + inh - 9, 4, 3, i % 2 ? tcol : shade(tcol, -0.12));
@@ -4925,7 +4925,6 @@
       renderTimer();
       updateStatus();
       $('ok-settings').hidden = true;
-      toast('Saved · 保存しました');
       if (after) after();
     });
   }
