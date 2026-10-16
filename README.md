@@ -76,8 +76,8 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
   collection's new, young and mature cards. **Kitchen:** guests by type and deck, mon earned and spent, your pet
   and collection. Pomodoro and kitchen numbers are recorded from 1.8.0 on.
 - **Home-screen widget.** A small live pixel scene with guests waiting, mon, your pet's mood and review stats
-  (the share of the last 30 days you studied, your daily average, 30-day retention and how long today's due cards will take), plus **Collect all** (serve everyone waiting without opening the kitchen) and a Visit button. Big
-  widgets (two by two) show all your pets, progress to the next guest, and how long today's due cards will take at your own pace. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
+  (the share of the last 30 days you studied, your daily average, 30-day retention and the time left today), plus **Collect all** (serve everyone waiting without opening the kitchen) and a Visit button. Big
+  widgets (two by two) show all your pets and progress to the next guest. With Onigiri, add it from Onigiri's layout editor. Without Onigiri, it shows under
   your decks on Anki's main screen (you can turn it off in the add-on config).
 - **A guided tour** the first time you open it, which you can replay from ⚙.
 - **目安箱 suggestion box** on the wall (and in ⚙) for feature ideas and bug reports.
