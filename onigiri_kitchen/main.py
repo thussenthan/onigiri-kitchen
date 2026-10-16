@@ -23,7 +23,7 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.10.5"
+VERSION = "1.10.6"
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 AUTHOR_NAME = "Thussenthan Walter-Angelo"
 AUTHOR_URL = "https://github.com/thussenthan"
@@ -694,6 +694,7 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
 
 # --------------------------------------------------- Onigiri home-screen widget
 _stats_cache: Dict[str, Any] = {"key": None, "value": None}
+_overdue_cache: Dict[str, Any] = {"key": None, "value": None}
 
 
 def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
@@ -730,10 +731,18 @@ def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
         run = run + 1 if prev is not None and d == prev + 1 else 1
         best = max(best, run)
         prev = d
+    try:
+        rev30 = mw.col.db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", (cutoff - 30 * 86400) * 1000) or (0, 0)
+        retention30 = round(100 * (1 - (rev30[1] or 0) / rev30[0])) if rev30[0] else None
+    except Exception:
+        retention30 = None
     value = {
+        "retention30": retention30,
         "total": total,
         "days": days,
         "average": round(total / days) if days else 0,
+        # share of the last 30 Anki days (today is index 99999) with a review
+        "monthPct": round(100 * sum(1 for d, _ in rows if d >= 99970) / 30),
         "bestStreak": best,
         "hours": round(total_ms / 3600000, 1),
     }
@@ -789,6 +798,88 @@ def _pomo_stats(today: datetime.date) -> Dict[str, Any]:
         "idlePauses": int(log.get("idle", 0)),
         "resets": int(log.get("resets", 0)),
     }
+
+
+def _new_per_day() -> int:
+    """New cards a day your decks let you see: the new-card limits of the
+    top-level decks that still have new cards waiting (today's limits, as the
+    log doesn't keep past ones). 0 when it can't be worked out."""
+    try:
+        total = 0
+        for entry in mw.col.decks.all_names_and_ids(skip_empty_default=True):
+            if "::" in entry.name:
+                continue
+            ids = list(mw.col.decks.deck_and_child_ids(entry.id))
+            marks = ",".join(str(int(i)) for i in ids)
+            waiting = mw.col.db.scalar(f"select count() from cards where queue = 0 and (did in ({marks}) or odid in ({marks}))")
+            if not waiting:
+                continue
+            conf = mw.col.decks.config_dict_for_deck_id(entry.id)
+            total += int((conf.get("new") or {}).get("perDay", 0))
+        return total
+    except Exception:
+        return 0
+
+
+def _overdue_days(cutoff: int, today_n: int) -> Dict[str, List[int]]:
+    """Day indexes (99999 is today) that you left something undone.
+    "reviews": a review card was due but not answered by the day's end.
+    "all": that, or a card in its learning steps came round again and wasn't
+    answered, or fewer new cards were started than your decks' daily limit.
+    Anki keeps no daily due counts, so it is rebuilt from the log: an answer's
+    interval says when the card came due, and the days between then and the
+    next answer were missed. Cards still overdue now count from their due day
+    up to yesterday. The new-card part uses today's limits and assumes there
+    were new cards left, so it's approximate. Cached until the day or the log changes."""
+    key = (cutoff, today_n)
+    if _overdue_cache["key"] == key:
+        return _overdue_cache["value"]
+    reviews: set = set()
+    learning: set = set()
+    new_by_day: Dict[int, int] = {}
+    try:
+        db = mw.col.db
+        rows = db.all(
+            "select cid, id, cast((id / 1000 - ?) / 86400.0 + 100000 as integer), type, ivl from revlog "
+            "where type in (0, 1, 2, 4, 5) order by cid, id", cutoff)
+        day = lambda ts: int((ts - cutoff) // 86400) + 100000
+        cid_prev = None
+        due = None  # the day a review is due
+        step = None  # the day a learning step comes round
+        for cid, rid, d, t, ivl in rows:
+            if cid != cid_prev:
+                cid_prev, due, step = cid, None, None
+                if t == 0:
+                    new_by_day[d] = new_by_day.get(d, 0) + 1
+            if t == 1 and due is not None and due < d:
+                reviews.update(range(due, d))
+            if t in (0, 1, 2) and step is not None and step < d:
+                learning.update(range(step, d))
+            # a positive interval is days until the next review; a negative one is
+            # seconds until the next learning step; a reset leaves neither
+            due = d + ivl if t in (0, 1, 2) and ivl > 0 else None
+            step = day(rid / 1000 - ivl) if t in (0, 1, 2) and ivl < 0 else None
+        sched_today = int(mw.col.sched.today)
+        oldest = db.scalar("select min(due) from cards where queue = 2 and due < ?", sched_today)
+        if oldest is not None:
+            reviews.update(range(99999 - (sched_today - int(oldest)), 99999))
+        stuck = db.scalar("select min(due) from cards where queue = 1 and due < ?", cutoff - 86400)
+        if stuck is not None:
+            learning.update(range(day(int(stuck)), 99999))
+    except Exception as e:
+        print(f"Onigiri Kitchen: couldn't work out overdue days: {e}")
+        return {"reviews": [], "all": []}
+    short: set = set()
+    limit = _new_per_day()
+    if limit and new_by_day:
+        short = {d for d in range(min(new_by_day), 99999) if new_by_day.get(d, 0) < limit}
+    value = {"reviews": sorted(reviews), "all": sorted(reviews | learning | short)}
+    _overdue_cache.update(key=key, value=value)
+    return value
+
+
+def _iso_days(today: datetime.date, idx: List[int]) -> List[str]:
+    return [(today - datetime.timedelta(days=99999 - d)).isoformat() for d in idx]
 
 
 def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
@@ -849,9 +940,14 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
         print(f"Onigiri Kitchen: couldn't read review history for stats: {e}")
         return None
     # day index 99999 is today (Anki's day, with its own rollover hour)
+    overdue = _overdue_days(cutoff, sum(int(c) for _, c, _ in rows))
     daily = [[(today - datetime.timedelta(days=99999 - int(d))).isoformat(), int(c), int(ms)] for d, c, ms in rows]
     return {
         "daily": daily,  # [date, reviews, answer ms], every day you reviewed
+        # days something was left undone (so every other day since your first review was cleared):
+        # "missed" is review cards only, "missedAll" adds learning and new cards
+        "missed": _iso_days(today, overdue["reviews"]),
+        "missedAll": _iso_days(today, overdue["all"]),
         "ranges": ranges,
         "collection": {
             "cards": int(cards[0] or 0),

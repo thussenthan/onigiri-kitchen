@@ -61,6 +61,8 @@
     pomo: { since: back(90), sessions, breaks, idlePauses: 27, resets: 4 },
     reviews: {
       daily,
+      missedAll: [1, 2, 3, 4, 6, 9, 10, 11, 12, 15, 17, 21, 24, 25].concat(Array.from({ length: 70 }, (_, k) => 30 + k * 6 + (k % 4))).map(back),
+      missed: [3, 4, 9, 10, 11, 17, 24, 25].concat(Array.from({ length: 40 }, (_, k) => 30 + k * 10 + (k % 3))).map(back),
       ranges: { 7: rangeOf(7), 30: rangeOf(30), 365: rangeOf(365), all: rangeOf(0) },
       collection: { cards: 9840, new: 3120, mature: 4210, young: 2140, learning: 180, suspended: 190, avgInterval: 38.5, avgEase: 247, notes: 7210, decks: 14 },
     },

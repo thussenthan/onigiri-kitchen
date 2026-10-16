@@ -102,6 +102,37 @@
     return { current, best };
   }
 
+  // Days you cleared everything that was due: each day from your first review
+  // up to yesterday that wasn't left undone (today counts once nothing is due).
+  // `all` adds learning and new cards to the reviews. Returns the current and
+  // best runs, and the share of the days in the range (the whole history for All time).
+  function cleared(r, first, all, days) {
+    if (!first) return null;
+    const missed = new Set((all ? r.missedAll : r.missed) || []);
+    const t = (OKS.studyToday || {}).due;
+    const left = t ? (all ? t.total : t.review + t.learn) : null;
+    const todayDone = left === 0 && !missed.has(TODAY);
+    const span = Math.min(days || Infinity, between(first, TODAY) + 1);
+    let best = 0;
+    let run = 0;
+    let n = 0;
+    let d = first;
+    for (let i = between(first, TODAY); i >= 0; i--, d = addDays(d, 1)) {
+      const isToday = d === TODAY;
+      if (isToday ? todayDone : !missed.has(d)) { run++; best = Math.max(best, run); if (between(d, TODAY) < span) n++; } else if (!isToday) run = 0;
+    }
+    return { current: run, best, pct: Math.round((n / span) * 100) };
+  }
+  const CLEAR_TIP = ['Days in a row you finished every review that was due (a day counts once nothing is left overdue). Rebuilt from your review log',
+    'Days in a row you finished every review, every learning step and your daily new cards. Rebuilt from your review log; new cards are checked against today\'s daily limits, so it\'s approximate'];
+  const clearTiles = (r, first, days, label, streaksOnly) => [false, true].map((all) => {
+    const c = cleared(r, first, all, days);
+    if (!c) return '';
+    const what = all ? 'all cards' : 'reviews';
+    return tile(`Cleared streak · ${what}`, `${num(c.current)} day${c.current === 1 ? '' : 's'}`, `best ever ${num(c.best)}`, CLEAR_TIP[all ? 1 : 0]) +
+      (streaksOnly ? '' : tile(`Cleared days · ${what}`, `${c.pct}%`, label, `Share of ${label} you finished everything due (${what})`));
+  }).join('');
+
   // -------------------------------------------------------------- pieces
   function tile(label, value, note, tip, cls) {
     return `<div class="oks-tile ${cls || ''}"${tip ? ` data-tip="${esc(tip)}"` : ''}><small>${label}</small><b>${value}</b>${note ? `<em>${note}</em>` : ''}</div>`;
@@ -231,6 +262,20 @@
   }
 
   // --------------------------------------------------------------- 今日 today
+  // The "recent" tiles on the Today tab: streaks and the last 30 days, so every
+  // tab has the cleared and studied numbers.
+  function todayRows(r) {
+    const daily = r.daily || [];
+    const first = daily.length ? daily[0][0] : null;
+    const st = streaks(daily.filter(([, c]) => c).map(([d]) => d));
+    const studied = daily.filter(([d]) => between(d, TODAY) < 30).length;
+    const a = (r.ranges || {})['30'] || {};
+    return tile('Review streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one review') +
+      tile('Days studied', `${Math.round((studied / Math.min(30, first ? between(first, TODAY) + 1 : 30)) * 100)}%`, 'of the last 30 days') +
+      tile('Retention', a.reviewAnswers ? pct(round1((1 - a.fails / a.reviewAnswers) * 100)) : '–', 'last 30 days') +
+      clearTiles(r, first, 30, 'of the last 30 days');
+  }
+
   // (the same every range: it's about today)
   function renderToday() {
     const t = D.studyToday;
@@ -250,6 +295,7 @@
       tile('Retention today', pct(t.retention), 'review cards remembered') +
       tile('Focus today', dur(focusMin), `${num(sessions.length)} session${sessions.length === 1 ? '' : 's'}`) +
       tile('Guests today', num(kday[1]), `${num(kday[2])} 文 earned`) +
+      todayRows(D.reviews || {}) +
       tile('Finish around', due.total ? new Date(Date.now() + t.estimateSeconds * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '–', due.total ? 'if you start now' : '') +
       '</div><div class="oks-charts">' +
       card('Due today', `${num(due.total)} cards · about ${dur(t.estimateSeconds / 60)}`, stack([
@@ -390,6 +436,13 @@
     const st = streaks(daily.filter(([, c]) => c).map(([d]) => d));
     const busiest = inRange.reduce((a, e) => (!a || e[1] > a[1] ? e : a), null);
     const c = r.collection || {};
+    // the focus and kitchen numbers from the other tabs, for the same range
+    const fs = ((D.pomo || {}).sessions || []).filter((x) => x[0] >= start);
+    const fMin = fs.reduce((a, x) => a + x[3] / 60, 0);
+    const fDays = new Set(fs.map((x) => x[0])).size;
+    const timed = fs.filter((x) => x[5] !== 'e');
+    const finished = timed.filter((x) => x[5] === 'f' || x[5] === 'g').length;
+    const kd = ((D.kitchen || {}).days || []).filter((x) => x[0] >= start);
 
     let html = '<div class="oks-hero">' +
       hero('Reviews', num(total), `in ${rangeName()}`) +
@@ -401,7 +454,13 @@
       tile('Busiest day', busiest ? num(busiest[1]) : '–', busiest ? fmtDay(busiest[0], 'year') : '') +
       tile('Time reviewing', dur((rg.ms || 0) / 60000), 'as timed by Anki') +
       tile('Per card', total ? `${round1((rg.ms || 0) / 1000 / total)}s` : '–', 'average answer time') +
+      clearTiles(r, first, range === 'all' ? null : parseInt(range, 10), `of ${rangeName()}`) +
       tile('Cards learned', num(rg.newCards), 'first seen as new') +
+      tile('Focus time', dur(fMin), `${num(fs.length)} session${fs.length === 1 ? '' : 's'} · ${rangeName()}`) +
+      tile('Focus days', num(fDays), `${Math.round((fDays / spanDays) * 100)}% of days`) +
+      tile('Focus completion', timed.length ? pct(Math.round((finished / timed.length) * 100)) : '–', 'timed sessions finished') +
+      tile('Guests served', num(kd.reduce((a, x) => a + x[1], 0)), rangeName()) +
+      tile('Mon earned', `${num(kd.reduce((a, x) => a + x[2], 0))} 文`, rangeName()) +
       tile('Again rate', presses ? pct(round1((btn[0] / presses) * 100)) : '–', `${num(btn[0])} presses`) +
       (range === 'all' || (first && first >= start) ? '' : // (when the range already covers everything, these would just repeat it)
         tile('All-time reviews', num(allTotal), first ? `since ${fmtDay(first, 'year')}` : '') +

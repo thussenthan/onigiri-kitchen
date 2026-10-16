@@ -76,15 +76,34 @@ def find_onigiri_package() -> Optional[str]:
     return None
 
 
-def _xp_for_next(level: int) -> int:
-    # Same curve Onigiri uses (gamification/restaurant_level.py).
-    return 50 * (2 * level + 1)
+def _xp_for_next(level: int, mult: int = 1) -> int:
+    # Same curve Onigiri uses (gamification/nook_level.py; 2.0 scales it by difficulty).
+    return 50 * (2 * level + 1) * mult
 
 
-def _collapse_xp(total_xp: int):
+def _difficulty_mult(value: Any) -> int:
+    v = str(value or "").strip().lower()
+    if v in {"legend", "chef", "executive chef"}:
+        return 4
+    if v in {"experient", "cook", "sous chef"}:
+        return 2
+    return 1
+
+
+def _read_difficulty_mult(pkg: str, profile: str) -> int:
+    try:
+        with open(os.path.join(mw.addonManager.addonsFolder(), pkg, "user_files", f"settings_{profile}.json"), encoding="utf-8") as f:
+            st = json.load(f)
+        rc = st.get("restaurant_level") or (st.get("achievements") or {}).get("restaurant_level") or {}
+        return _difficulty_mult(rc.get("difficulty"))
+    except Exception:
+        return 1
+
+
+def _collapse_xp(total_xp: int, mult: int = 1):
     level, needed = 0, 0
     while True:
-        step = _xp_for_next(level)
+        step = _xp_for_next(level, mult)
         if total_xp < needed + step:
             return level, total_xp - needed, step
         needed += step
@@ -94,10 +113,12 @@ def _collapse_xp(total_xp: int):
 def _theme_color(pkg: str, theme_id: str) -> str:
     if theme_id == "default":
         return DEFAULT_THEME_COLOR
-    mod = sys.modules.get(f"{pkg}.gamification.restaurant_level")
-    if mod is not None:
-        for table in ("RESTAURANTS", "EVOLUTIONS"):
-            item = getattr(mod, table, {}).get(theme_id)
+    for modname in ("nook_level", "restaurant_level"):
+        mod = sys.modules.get(f"{pkg}.gamification.{modname}")
+        if mod is None:
+            continue
+        for table in ("RESTAURANTS", "EVOLUTIONS", "SHOPS", "DEVS"):
+            item = (getattr(mod, table, None) or {}).get(theme_id)
             if item and item.get("theme"):
                 return item["theme"]
     return _FALLBACK_THEMES.get(theme_id, DEFAULT_THEME_COLOR)
@@ -133,7 +154,7 @@ def read_progress() -> Dict[str, Any]:
         return result
 
     total_xp = int(data.get("total_xp", 0) or 0)
-    level, into, nxt = _collapse_xp(max(0, total_xp))
+    level, into, nxt = _collapse_xp(max(0, total_xp), _read_difficulty_mult(pkg, profile))
     name = str(data.get("name") or "").strip()
     if not name or name == "Restaurant Level":
         name = "Onigiri Kitchen"
@@ -334,7 +355,7 @@ _SPECIALS_CACHE: Dict[str, Any] = {"key": None, "dishes": None}
 def _restaurant_dishes(pkg: str, theme_id: str) -> list:
     """The dish list Onigiri uses for a restaurant (same lookup as Onigiri:
     evolutions use the default list, unknown ids fall back to it too)."""
-    path = os.path.join(mw.addonManager.addonsFolder(), pkg, "web", "gamification", "restaurant_level", "special_dishes.js")
+    path = os.path.join(mw.addonManager.addonsFolder(), pkg, "web", "gamification", "restaurant_level", "special_dishes.js")  # gone in 2.0
     try:
         mtime = os.path.getmtime(path)
     except OSError:
@@ -411,19 +432,25 @@ def read_specials() -> Dict[str, Any]:
         with open(os.path.join(mw.addonManager.addonsFolder(), pkg, "user_files", f"settings_{profile}.json"), encoding="utf-8") as f:
             settings = json.load(f)
         ds_conf = settings.get("daily_special") or (settings.get("achievements") or {}).get("daily_special") or {}
-        enabled = bool(ds_conf.get("enabled", True))  # Onigiri's own default is on
+        enabled = bool(ds_conf.get("enabled", False))  # off by default in Onigiri 2.0
     except Exception:
-        enabled = True
-    dishes = _restaurant_dishes(pkg, str(rl.get("current_theme_id") or "default"))
-    if enabled and dishes:
-        import datetime as _dt
+        enabled = False
+    ds = rl.get("daily_special") or {}
+    target = int(ds.get("target") or 0)
+    progress = int(ds.get("current_progress") or 0)
+    dish = None
+    if ds.get("mode") == "recipe_rush" and str(ds.get("name") or "").strip():
+        # Onigiri 2.0: the Rush ticket (name, description, difficulty) is stored in the state
+        dish = ds
+    else:
+        dishes = _restaurant_dishes(pkg, str(rl.get("current_theme_id") or "default"))
+        if dishes:
+            import datetime as _dt
 
-        now = _dt.datetime.now()
-        day_of_year = (now - _dt.datetime(now.year, 1, 1)).days + 1
-        dish = dishes[day_of_year % len(dishes)]
-        ds = rl.get("daily_special") or {}
-        target = int(ds.get("target") or 0)
-        progress = int(ds.get("current_progress") or 0)
+            now = _dt.datetime.now()
+            day_of_year = (now - _dt.datetime(now.year, 1, 1)).days + 1
+            dish = dishes[day_of_year % len(dishes)]
+    if enabled and dish:
         result["today"] = {
             "name": str(dish.get("name"))[:60],
             "desc": str(dish.get("description") or "")[:160],
@@ -449,11 +476,15 @@ def hide_progress_popups(allow: "Callable[[], bool]") -> bool:
     pkg = find_onigiri_package()
     if not pkg:
         return False
-    try:
-        mod = importlib.import_module(f"{pkg}.gamification.restaurant_level")
-        cls = mod.RestaurantLevelManager
-        original = cls._dispatch_notifications
-    except Exception:
+    cls = None
+    for modname, clsname in (("nook_level", "NookLevelManager"), ("restaurant_level", "RestaurantLevelManager")):
+        try:
+            cls = getattr(importlib.import_module(f"{pkg}.gamification.{modname}"), clsname)
+            original = cls._dispatch_notifications
+            break
+        except Exception:
+            cls = None
+    if cls is None:
         return False
     if getattr(original, "_ok_wrapped", False):
         return True
