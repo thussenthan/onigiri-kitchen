@@ -882,6 +882,9 @@ def _iso_days(today: datetime.date, idx: List[int]) -> List[str]:
     return [(today - datetime.timedelta(days=99999 - d)).isoformat() for d in idx]
 
 
+_records_cache: Dict[str, Any] = {}
+
+
 def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
     """What the Records page is worked out from: for each day, answers by kind
     (learning, review, relearning, filtered), review Agains, new cards and the
@@ -890,6 +893,10 @@ def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
     days: Dict[int, List[Any]] = {}
     sessions: List[List[Any]] = []
     try:
+        # the log only ever grows, so its size and newest answer say whether the last result still holds
+        stamp = (tuple(mw.col.db.first("select count(), coalesce(max(id), 0) from revlog where type in (0, 1, 2, 3)") or ()), cutoff, today.isoformat())
+        if _records_cache.get("stamp") == stamp:
+            return _records_cache["value"]
         rows = mw.col.db.all("select id, cid, type, ease, time from revlog where type in (0, 1, 2, 3) order by id")
     except Exception as e:
         print(f"Onigiri Kitchen: couldn't read review log for records: {e}")
@@ -897,12 +904,13 @@ def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
     run = 0
     prev = None
     start = 0
+    first_id = 0
     count = 0
     day_of = lambda ms: int((ms / 1000 - cutoff) / 86400.0 + 100000)
 
     def close_session() -> None:
         if count >= 5 and prev is not None:
-            d = (today - datetime.timedelta(days=99999 - day_of(start))).isoformat()
+            d = (today - datetime.timedelta(days=99999 - day_of(first_id))).isoformat()
             sessions.append([d, round((prev - start) / 60000, 1), count])
 
     for rid, cid, t, ease, ms in rows:
@@ -917,12 +925,14 @@ def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
         row[6] = max(row[6], run)
         if prev is None or rid - prev > 300000:
             close_session()
-            start, count = rid - (ms or 0), 0
+            start, first_id, count = rid - (ms or 0), rid, 0
         prev = rid
         count += 1
     close_session()
     out = [[(today - datetime.timedelta(days=99999 - d)).isoformat(), r[0], r[1], r[2], r[3], r[4], len(r[5]), r[6]] for d, r in sorted(days.items())]
-    return {"days": out, "sessions": sessions}
+    value = {"days": out, "sessions": sessions}
+    _records_cache.update(stamp=stamp, value=value)
+    return value
 
 
 def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:

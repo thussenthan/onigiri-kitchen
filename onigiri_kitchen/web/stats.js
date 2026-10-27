@@ -139,6 +139,8 @@
     return `<div class="oks-tile ${cls || ''}"${tip ? ` data-tip="${esc(tip)}"` : ''}><small>${label}</small><b>${value}</b>${note ? `<em>${note}</em>` : ''}</div>`;
   }
   const hero = (label, value, note, tip) => tile(label, value, note, tip, 'oks-hero-tile');
+  // ▲ / ▼ against the stretch of the same length just before this range
+  const delta = (text, up, tip) => `<span class="oks-delta${up ? ' up' : ''}" data-tip="${esc(tip)}">${up ? '▲' : '▼'} ${text}</span>`;
   // a titled, foldable set of small stats on a hairline grid (the fold is remembered)
   function fold(title, key, body) {
     let open = true;
@@ -284,6 +286,23 @@
       clearTiles(r, first, 30, 'of the last 30 days');
   }
 
+  // Records you hold as of today (only once there's a couple of weeks of history to beat),
+  // as a note for the top of the Today page
+  function recordsToday() {
+    const r = D.reviews;
+    const rec = r && r.records;
+    const first = r && (r.daily || []).length ? r.daily[0][0] : null;
+    if (!rec || !rec.days.length || !first || between(first, TODAY) < 14) return '';
+    const names = [];
+    recordGroups(r, rec, first).forEach(([, list]) => list.forEach(([label, , fmt, calc]) => {
+      const x = label === 'Longest break' ? null : calc('');
+      if (x && x.date === TODAY && !x.unit) names.push(`${label} (${fmt(x.v)})`);
+    }));
+    if (!names.length) return '';
+    const shown = names.slice(0, 3).join(', ');
+    return `<div class="oks-note oks-note-new">★ New record today: ${shown}${names.length > 3 ? ` and ${names.length - 3} more` : ''}. See Records.</div>`;
+  }
+
   // (the same every range: it's about today)
   function renderToday() {
     const t = D.studyToday;
@@ -293,7 +312,7 @@
     if (!t) { section($('oks-today'), '今日', 'Today', '', '<div class="oks-note">Couldn\'t read today\'s reviews.</div>'); return; }
     const due = t.due || {};
     const pc = t.paces || {};
-    let html = '<div class="oks-hero">' +
+    let html = recordsToday() + '<div class="oks-hero">' +
       hero('Cards today', num(t.cards), `${num(t.newCards)} new`) +
       hero('Time today', dur(t.seconds / 60), 'as timed by Anki') +
       hero('Pace', t.pace ? `${t.pace}s` : '–', 'per card today') +
@@ -451,10 +470,21 @@
     const finished = timed.filter((x) => x[5] === 'f' || x[5] === 'g').length;
     const kd = ((D.kitchen || {}).days || []).filter((x) => x[0] >= start);
 
+    // the same-length stretch just before the range (only when your history reaches back that far)
+    let vs = null;
+    if (range !== 'all' && first && first <= addDays(start, -spanDays)) {
+      const pFrom = addDays(start, -spanDays);
+      const pTo = addDays(start, -1);
+      const prevTotal = daily.filter(([d]) => d >= pFrom && d <= pTo).reduce((a, [, c]) => a + c, 0);
+      const pr = (r.records || { days: [] }).days.filter((x) => x[0] >= pFrom && x[0] <= pTo).reduce((a, x) => [a[0] + x[2], a[1] + x[5]], [0, 0]);
+      vs = { total: prevTotal, retention: pr[0] ? round1((1 - pr[1] / pr[0]) * 100) : null, name: `the ${spanDays} days before` };
+    }
+    const reviewsVs = vs && vs.total && total !== vs.total ? ` · ${delta(`${Math.abs(Math.round(((total - vs.total) / vs.total) * 100))}%`, total > vs.total, `${num(vs.total)} reviews in ${vs.name}`)}` : '';
+    const retentionVs = vs && vs.retention != null && retention != null && Math.abs(retention - vs.retention) >= 0.1 ? ` · ${delta(`${round1(Math.abs(retention - vs.retention))} pts`, retention > vs.retention, `${vs.retention}% in ${vs.name}`)}` : '';
     let html = '<div class="oks-hero">' +
-      hero('Reviews', num(total), `in ${rangeName()}`) +
+      hero('Reviews', num(total), `in ${rangeName()}${reviewsVs}`) +
       hero('Per day', num(Math.round(total / spanDays)), `${num(inRange.length ? Math.round(total / inRange.length) : 0)} per study day`) +
-      hero('Retention', pct(retention), 'review cards remembered', 'Share of answers on review cards that weren\'t Again') +
+      hero('Retention', pct(retention), `review cards remembered${retentionVs}`, 'Share of answers on review cards that weren\'t Again') +
       hero('Review streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one review') +
       '</div>' +
       group('Habits', tile('Days studied', num(inRange.length), `${Math.round((inRange.length / spanDays) * 100)}% of days`) +
@@ -592,23 +622,14 @@
     return Object.entries(m).map(([k, v]) => ({ v, date: unit === 'month' ? `${k}-01` : k, unit }));
   }
 
-  function renderRecords() {
-    const r = D.reviews;
-    const rec = (r && r.records) || { days: [], sessions: [] };
-    if (!r || !rec.days.length) { section($('oks-rec'), '記録', 'Records', '', '<div class="oks-note">No review history to find records in yet.</div>'); return; }
+  // every record: [group title, [[label, tip, format, work out the record for the days since `since`], ...]]
+  function recordGroups(r, rec, first) {
     const daily = r.daily || [];
-    const first = daily.length ? daily[0][0] : null;
     const pomo = (D.pomo || {}).sessions || [];
     const kit = (D.kitchen || {}).days || [];
-    const start = rangeStart(first);
-    const allTime = range === 'all' || (first && first >= start);
     const total = (x) => x[1] + x[2] + x[3] + x[4];
-    const msOf = {};
-    daily.forEach(([d, c, ms]) => { msOf[d] = ms || 0; });
     const ofDay = (x, v) => ({ v, date: x[0] });
-
-    // [label, tip, format, work out the record for the days since `since`, low = smaller is better]
-    const GROUPS = [
+    return [
       ['Most in a day', [
         ['Cards answered', 'Answers of every kind in one day', num, (S) => pick(rec.days.filter((x) => x[0] >= S).map((x) => ofDay(x, total(x))))],
         ['New cards learned', 'Cards first seen as new in one day', num, (S) => pick(rec.days.filter((x) => x[0] >= S).map((x) => ofDay(x, x[6])))],
@@ -660,6 +681,18 @@
         ['Mon earned in a day', 'Mon (文) from guests and pets in one day', (v) => `${num(v)} 文`, (S) => pick(kit.filter((x) => x[0] >= S).map((x) => ({ v: x[2], date: x[0] })))],
       ]],
     ];
+  }
+
+  function renderRecords() {
+    const r = D.reviews;
+    const rec = (r && r.records) || { days: [], sessions: [] };
+    if (!r || !rec.days.length) { section($('oks-rec'), '記録', 'Records', '', '<div class="oks-note">No review history to find records in yet.</div>'); return; }
+    const daily = r.daily || [];
+    const first = daily.length ? daily[0][0] : null;
+    const start = rangeStart(first);
+    const allTime = range === 'all' || (first && first >= start);
+    const GROUPS = recordGroups(r, rec, first);
+
 
     const fresh = addDays(TODAY, -6);
     const dateNote = (x) => (x.date ? `${x.unit === 'month' ? fmtDay(x.date, 'month') : x.unit === 'week' ? `week of ${fmtDay(x.date, 'year')}` : fmtDay(x.date, 'year')}${x.note ? ` · ${x.note}` : ''}` : (x.note || ''));

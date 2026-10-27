@@ -263,3 +263,12 @@ body .oks-range button.on, body .oks-range button.on:hover { background: var(--s
   margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--shu); color: var(--accent-fg);
   font: 800 9.5px var(--sans); font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 2px;
 }
+
+/* change against the stretch just before */
+.oks-delta { color: var(--ink-3); font-weight: 700; white-space: nowrap; }
+.oks-delta.up { color: var(--today); }
+
+/* respect the system "reduce motion" setting: near-instant transitions and animations (they still finish, so anything waiting on them still runs) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

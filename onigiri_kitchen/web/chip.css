@@ -159,3 +159,8 @@
 }
 .okc:not([data-phase="focus"]) .okc-z { display: none; }
 @keyframes okc-z { 0% { opacity: 0; transform: translate(0, 3px); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate(3px, -4px); } }
+
+/* respect the system "reduce motion" setting: near-instant transitions and animations (they still finish, so anything waiting on them still runs) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

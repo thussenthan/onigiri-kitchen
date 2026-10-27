@@ -1307,3 +1307,8 @@ button.ok-grid-head.closed .ok-caret { transform: rotate(-90deg); }
 ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink) 22%, transparent); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; min-height: 36px; }
 ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--shu) 70%, transparent); background-clip: content-box; }
+
+/* respect the system "reduce motion" setting: near-instant transitions and animations (they still finish, so anything waiting on them still runs) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
