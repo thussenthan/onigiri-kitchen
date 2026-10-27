@@ -9,6 +9,10 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 
 ![Daytime in the restaurant](docs/day.png)
 
+**In 30 seconds:** every 10 reviews a guest walks in and, when you take a break, tips you in 文 (mon). Spend mon
+on decor and pets; a pomodoro timer is built in; Stats shows your numbers. Nothing ever punishes you: no streak to
+break, nothing that gets sick or dies.
+
 ## Features
 
 - **A living pixel restaurant.** Click Onigiri's restaurant widget and your restaurant opens: lanterns,
@@ -17,7 +21,7 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 - **Guests come from studying.** Every 10 reviews in a deck brings a guest from that deck, and each deck
   gets its own look. Getting a leech card right sends a grumpy sour-plum guest who cheers up once fed.
   Finishing a focus session sends a golden guest. Guests are counted from Anki's review log for the day, so
-  reviews on your phone count too, once synced.
+  reviews on your phone count too, once synced (reviews that arrive after their day ended bring takeout guests).
 - **Your Onigiri Specials are on the menu.** Guests order dishes from your Onigiri Specials Book (every Daily
   Special you've finished), so the menu grows as your Book does, and golden guests order today's Daily Special.
   Rarer specials tip more (+1 mon for Uncommon up to +6 for Legendary), and once you've finished today's
@@ -144,7 +148,11 @@ own expand view), click the shop-front icon next to Onigiri's buttons, click the
 - Onigiri Kitchen **never modifies Onigiri**. It only reads your restaurant name, level, theme colours and
   font. Your XP and Taiyaki coins are untouched.
 - Kitchen progress (mon, decor, guests, Tama) is saved per profile in the add-on's `user_files` folder,
-  which Anki keeps across updates.
+  which Anki keeps across updates. The file is named by a short id kept in the profile's own settings, so
+  renaming a profile keeps its kitchen.
+- **The kitchen lives on one computer.** It isn't synced through AnkiWeb (your reviews are, and they bring guests
+  on every device you open the kitchen on, but mon, decor and pets stay where you earned them). To move it, use
+  **⚙ → Back up / Restore**. Uninstalling the add-on deletes its folder, backups included, so back up first.
 - The save is backed up once a day (the last five are kept in `user_files/backups`), a save that can't be read is
   never overwritten, and **⚙ → Back up / Restore** copies your kitchen to a file, for example to move it to another computer.
 - Nothing is sent anywhere. The bug-report button only opens a pre-filled GitHub issue in your browser.
@@ -158,14 +166,22 @@ onigiri_kitchen/      the add-on (what gets installed)
   pet.py              the pet: species, needs, growth, gifts
   pomodoro.py         wall-clock pomodoro timer
   onigiri_link.py     read-only access to Onigiri's data & theme
-  review_stats.py     what Stats and the widget read from Anki's review log (records, missed days)
+  review_stats.py     what Stats and the widget read from Anki's review log (records, missed days); Records are read incrementally
   savefile.py         reading, backing up and protecting the save file
   diag.py             the small rolling debug log
   web/                kitchen.js (pixel engine), chip.js (timer + widget hook), sound.js, css
 dev/                  browser previews with mock data
 build.sh              builds dist/*.ankiaddon and the AnkiWeb zip
-tests/                Python tests (pytest) and a Stats page smoke test (node); run by GitHub Actions on every push
+tests/                Python tests (pytest, no Anki needed), the Stats and kitchen page smoke tests (node, the kitchen one
+                      in headless Chrome via playwright) and anki_compat.py (checks the parts of Anki this reaches into)
+tests_main/           main.py's hooks and commands, run against dev/anki_stub.py
+dev/release_check.py  the version is the same everywhere (main.py, manifest, changelog); build.sh runs it
+CHANGELOG.md          what changed in each release
 ```
+
+CI (GitHub Actions) runs all of that on every push, and the Anki check against the oldest (23.10) and newest Anki.
+Locally: `pip install pytest && python -m pytest tests && python -m pytest tests_main`, then
+`npx eslint onigiri_kitchen/web tests/*.js` and `node tests/stats_smoke.js`.
 
 Preview the kitchen in a browser (Anki loads scripts in `<head>`, and the preview reproduces that):
 

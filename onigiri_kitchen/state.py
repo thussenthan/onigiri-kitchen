@@ -12,7 +12,9 @@ import json
 import os
 import random
 import re
+import shutil
 import time
+import uuid
 from typing import Any, Dict, List, Optional
 
 from aqt import mw
@@ -170,19 +172,30 @@ CATALOG_BY_ID = {item["id"]: item for item in CATALOG}
 def anki_today() -> str:
     try:
         cutoff = mw.col.sched.day_cutoff
-        return datetime.date.fromtimestamp(cutoff - 86400).isoformat()
+        # (half a day before the rollover is always inside the day, even on a clock-change day)
+        return datetime.date.fromtimestamp(cutoff - 43200).isoformat()
     except Exception:
         return datetime.date.today().isoformat()
 
 
+# Bumped when the save's shape changes. 2: today's reviews and the guests-in-
+# progress are counted by deck id (not name), and unpaid guests are kept.
+SAVE_VERSION = 2
+
+
+petmod.today_fn = anki_today
+
+
 def _defaults() -> Dict[str, Any]:
     return {
-        "version": 1,
+        "version": SAVE_VERSION,
         "mon": 0,
         "owned": [],
         "hidden": [],
-        "pending": {},  # deck name -> reviews not yet turned into a guest
+        "pending": {},  # deck id -> reviews not yet turned into a guest
         "guests": [],  # queue of guests waiting outside
+        "serving": [],  # guests seated in the kitchen who haven't paid yet (put back if the window closes)
+        "credited": {},  # date -> reviews already turned into guests, so reviews synced in later still count
         "takeout": {"count": 0, "mon": 0},  # overflow while the queue was full
         "served_total": 0,
         "served_by_deck": {},
@@ -212,6 +225,41 @@ def _defaults() -> Dict[str, Any]:
     }
 
 
+def _coerce(stored: Dict[str, Any], defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep what a save says only where it has the right kind of value, so a
+    hand-edited or damaged file can't break the kitchen later (a mon of "5",
+    a guests list that is a number). Unknown keys are kept as they are."""
+    out: Dict[str, Any] = {}
+    for key, value in stored.items():
+        if key not in defaults:
+            out[key] = value
+            continue
+        default = defaults[key]
+        if isinstance(default, bool):
+            out[key] = bool(value) if isinstance(value, (bool, int)) else default
+        elif isinstance(default, (int, float)):
+            try:
+                if isinstance(value, bool) or value is None:
+                    raise ValueError
+                out[key] = type(default)(value)
+            except (TypeError, ValueError, OverflowError):
+                out[key] = default
+        elif isinstance(default, dict):
+            if isinstance(value, dict):
+                merged = copy.deepcopy(default)
+                merged.update(value)
+                out[key] = merged
+            else:
+                out[key] = copy.deepcopy(default)
+        elif isinstance(default, list):
+            out[key] = value if isinstance(value, list) else []
+        elif isinstance(default, str):
+            out[key] = value if isinstance(value, str) else default
+        else:
+            out[key] = value
+    return out
+
+
 class KitchenState:
     def __init__(self, addon_dir: str) -> None:
         self.addon_dir = addon_dir
@@ -227,14 +275,9 @@ class KitchenState:
 
     # ------------------------------------------------------------------ io
     def load(self) -> None:
-        try:
-            profile = mw.pm.name or "default"
-        except Exception:
-            profile = "default"
-        safe = re.sub(r"[^\w\-]+", "_", profile)
         folder = os.path.join(self.addon_dir, "user_files")
         os.makedirs(folder, exist_ok=True)
-        self.path = os.path.join(folder, f"kitchen_{safe}.json")
+        self.path = os.path.join(folder, f"kitchen_{self.profile_key(folder)}.json")
 
         data = _defaults()
         self.protect = False
@@ -261,11 +304,13 @@ class KitchenState:
             if isinstance(stored.get("pet"), dict) and "species" not in stored["pet"]:
                 # Saves from before the starter choice already have Tama.
                 stored["pet"]["species"] = "cat"
-            for key, value in stored.items():
-                if key in data and isinstance(data[key], dict) and isinstance(value, dict):
-                    data[key].update(value)
-                else:
-                    data[key] = value
+            if int(stored.get("version") or 1) < 2 and isinstance(stored.get("today"), dict):
+                # Version 1 counted a day's reviews by deck name: start counting by deck id
+                # from here, without counting what was already seen again.
+                stored["today"].pop("by_deck", None)
+                stored["pending"] = {}
+            data.update(_coerce(stored, data))
+            data["version"] = SAVE_VERSION
         self.data = data
         self.pet = petmod.Pet(self.data["pet"])
         # (colour lists from older or hand-edited saves: keep only colours that exist)
@@ -279,6 +324,29 @@ class KitchenState:
         self.sync_pets()
         self.apply_companion_perks()
         self.roll_day()
+
+    @staticmethod
+    def profile_key(folder: str) -> str:
+        """What this profile's save file is called. A short id kept in the profile's
+        own collection settings, so renaming the profile (or two profiles whose names
+        only differ in punctuation) never swaps or loses a kitchen; falls back to the
+        profile's name, and an older name-based save is moved to the id."""
+        try:
+            name = mw.pm.name or "default"
+        except Exception:
+            name = "default"
+        legacy = re.sub(r"[^\w\-]+", "_", name)
+        try:
+            key = mw.col.get_config("onigiri_kitchen_id", None)
+            if not (isinstance(key, str) and re.fullmatch(r"[0-9a-f]{12}", key)):
+                key = uuid.uuid4().hex[:12]
+                mw.col.set_config("onigiri_kitchen_id", key)
+                old = os.path.join(folder, f"kitchen_{legacy}.json")
+                if os.path.exists(old):
+                    shutil.copy2(old, os.path.join(folder, f"kitchen_{key}.json"))  # (the old file stays as a backup)
+            return key
+        except Exception:
+            return legacy
 
     def save(self) -> None:
         if not self.path or self.protect:
@@ -305,8 +373,18 @@ class KitchenState:
         today = anki_today()
         if self.data["today"].get("date") == today:
             return
-        # Yesterday's guests go home with takeout, tips still count.
-        leftover = self.data.get("guests") or []
+        # Yesterday's guests go home with takeout, tips still count (so do any
+        # who were seated but hadn't paid yet).
+        # A meal lasts well under a minute: anyone seated for longer is from a window
+        # that closed. (Someone still eating as the day turns over pays for themselves.)
+        seated = self.data.get("serving") or []
+        stale = [g for g in seated if time.time() - float(g.get("claimed", 0)) > 300]
+        leftover = stale + (self.data.get("guests") or [])
+        prev = self.data["today"].get("date")
+        if prev:
+            self.data.setdefault("credited", {})[prev] = int(self.data["today"].get("reviews", 0))
+            for old in sorted(self.data["credited"])[:-14]:
+                del self.data["credited"][old]
         if leftover and self.data["today"].get("date"):
             tips = sum(self.tip_for(g) for g in leftover)
             if self.shown("tanuki_friend"):
@@ -315,6 +393,7 @@ class KitchenState:
             self.data["takeout"]["count"] += len(leftover)
             self.data["takeout"]["mon"] += tips
         self.data["guests"] = []
+        self.data["serving"] = [g for g in seated if g not in stale]
         self.data["pending"] = {}
         self.data["today"] = {"date": today, "reviews": 0, "focus_done": 0, "leech_guests": 0, "by_deck": {}}
         self.save_soon()
@@ -331,7 +410,8 @@ class KitchenState:
         return True
 
     def add_review(self, deck: str, leech_success: bool, reviews_per_guest: int,
-                   db_counts: Optional[Dict[str, int]] = None) -> bool:
+                   db_counts: Optional[Dict[str, int]] = None, deck_id: Any = None,
+                   names: Optional[Dict[str, str]] = None) -> bool:
         """A card was just answered. Anki's review log (`db_counts`, today's
         reviews per deck) is the source of truth for counting; this only adds
         what the log can't tell us (leech guests). Returns True if a guest arrived."""
@@ -347,20 +427,21 @@ class KitchenState:
                 self.add_guest({"deck": deck, "kind": "leech", "reviews": 1})
                 new_guest = True
         if db_counts is not None:
-            if self.sync_today(db_counts, reviews_per_guest) > 0:
+            if self.sync_today(db_counts, reviews_per_guest, names) > 0:
                 new_guest = True
         else:
             # Couldn't read the review log: count this one answer directly.
             self._pets_review(today["date"])
             today["reviews"] += 1
+            key = str(deck_id if deck_id is not None else deck)
             by_deck = today.get("by_deck")
             if isinstance(by_deck, dict):
-                by_deck[deck] = by_deck.get(deck, 0) + 1
+                by_deck[key] = by_deck.get(key, 0) + 1
             pending = self.data["pending"]
-            pending[deck] = pending.get(deck, 0) + 1
+            pending[key] = pending.get(key, 0) + 1
             n = max(1, int(reviews_per_guest))
-            if pending[deck] >= n:
-                pending[deck] -= n
+            if pending[key] >= n:
+                pending[key] -= n
                 self.add_guest({"deck": deck, "kind": "regular", "reviews": n})
                 new_guest = True
         self.save_soon()
@@ -370,8 +451,21 @@ class KitchenState:
         if not self.data["guests"]:
             return None
         guest = self.data["guests"].pop(0)
+        guest["claimed"] = int(time.time())
+        # until they've paid they're only seated: a closed window puts them back
+        self.data.setdefault("serving", []).append(guest)
         self.save_soon()
         return guest
+
+    def release_serving(self) -> int:
+        """Guests who were seated but never paid (the window closed, or Anki
+        quit mid-meal) go back to the front of the queue, so their tip isn't lost."""
+        seated = self.data.get("serving") or []
+        if seated:
+            self.data["guests"] = seated + self.data["guests"]
+            self.data["serving"] = []
+            self.save_soon()
+        return len(seated)
 
     def pop_takeout(self) -> Dict[str, int]:
         takeout = copy.deepcopy(self.data["takeout"])
@@ -434,6 +528,11 @@ class KitchenState:
         amount = max(0, min(int(amount), 100))
         self.earn(amount, "tips")
         kind = kind if kind in ("regular", "golden", "leech") else "regular"
+        seated = self.data.get("serving") or []
+        for i, g in enumerate(seated):
+            if (g.get("deck") or None) == (deck or None) and g.get("kind", "regular") == kind:
+                del seated[i]  # (this guest has paid)
+                break
         by_kind = self._log()["guests_by_kind"]
         by_kind[kind] = int(by_kind.get(kind, 0)) + 1
         day = self._log_day()
@@ -481,10 +580,14 @@ class KitchenState:
         self.apply_companion_perks()
         self.save_soon()
 
-    def sync_today(self, db_counts: Dict[str, int], reviews_per_guest: int) -> int:
+    def sync_today(self, db_counts: Dict[str, int], reviews_per_guest: int,
+                   names: Optional[Dict[str, str]] = None) -> int:
         """Match today's reviews and guests to Anki's review log, which is the
         source of truth: it includes reviews from other devices (once synced)
-        and drops reviews you undid. Returns the change in waiting guests."""
+        and drops reviews you undid. `db_counts` is today's reviews per deck id
+        (so renaming or moving a deck doesn't look like new reviews), `names`
+        the deck names for the guests. Returns the change in waiting guests."""
+        names = names or {}
         self.roll_day()
         today = self.data["today"]
         if not isinstance(today.get("by_deck"), dict):
@@ -515,13 +618,14 @@ class KitchenState:
                     self._pets_review(today["date"])
                 while pending[deck] >= n:
                     pending[deck] -= n
-                    self.add_guest({"deck": deck, "kind": "regular", "reviews": n})
+                    self.add_guest({"deck": names.get(deck) or "Deck", "kind": "regular", "reviews": n})
             else:
                 # Reviews were undone: if that un-earns a guest who hasn't been
                 # seated yet, they leave the queue. Nothing else is taken away.
                 while pending[deck] < 0:
+                    name = names.get(deck) or "Deck"
                     idx = next((i for i in range(len(self.data["guests"]) - 1, -1, -1)
-                                if self.data["guests"][i].get("deck") == deck
+                                if self.data["guests"][i].get("deck") == name
                                 and self.data["guests"][i].get("kind") == "regular"), None)
                     if idx is None:
                         pending[deck] = 0
@@ -538,17 +642,52 @@ class KitchenState:
             self.save_soon()
         return len(self.data["guests"]) - before
 
+    def backfill(self, past: Dict[str, int], reviews_per_guest: int) -> Dict[str, int]:
+        """Reviews that reached Anki's log for a recent past day after that day
+        closed here (done on a phone, synced the next morning). Each day's extra
+        reviews become guests who already left: takeout tips, as if they'd been
+        waiting at the end of the day. `past` is date -> reviews in the log.
+        Only days the kitchen watched are paid, never the history from before
+        it was installed. Returns {"count", "mon"} of what was added."""
+        credited = self.data.setdefault("credited", {})
+        n = max(1, int(reviews_per_guest))
+        count = mon = 0
+        for day, total in sorted(past.items()):
+            if day not in credited:
+                continue
+            extra = int(total) - int(credited[day])
+            if extra <= 0:
+                continue
+            credited[day] = int(total)
+            for _ in range(extra // n):
+                tip = self.tip_for({"kind": "regular"})
+                if self.shown("tanuki_friend"):
+                    tip *= 2
+                self.earn(tip, "takeout")
+                count += 1
+                mon += tip
+        if count:
+            self.data["takeout"]["count"] += count
+            self.data["takeout"]["mon"] += mon
+            self.save_soon()
+        return {"count": count, "mon": mon}
+
     # --------------------------------------------------------- catch-up
     def shown(self, item_id: str) -> bool:
         return item_id in self.data["owned"] and item_id not in self.data["hidden"]
 
-    def tip_for(self, guest: Dict[str, Any]) -> int:
-        """Same tip rules as the animated service in kitchen.js (tipFor).
+    def tip_for(self, guest: Dict[str, Any], base: Optional[int] = None, dish_bonus: Optional[int] = None) -> int:
+        """What a guest tips, perks included. The kitchen page rolls the base tip
+        (and picks the dish, so its bonus) for the animated service; this is the
+        one place the perks are worked out, and what is actually paid.
 
         Tips vary a little (averages: regular ~3, sour plum 6.5, golden 12.5),
         with a rare generous regular who leaves 8."""
         kind = guest.get("kind")
-        if kind == "golden":
+        if base is not None:
+            lo, hi = {"golden": (10, 15), "leech": (5, 8)}.get(kind, (2, 8))
+            amount = max(lo, min(hi, int(base)))
+        elif kind == "golden":
             amount = random.randint(10, 15)
         elif kind == "leech":
             amount = random.randint(5, 8)
@@ -564,7 +703,9 @@ class KitchenState:
             amount += 1
         if any(p.happy() for p in self.all_pets()):
             amount += 1  # happy-pet bonus: a happy pet beckons guests in
-        if self.menu_bonus:
+        if dish_bonus is not None:
+            amount += max(0, min(int(dish_bonus), 12))
+        elif self.menu_bonus:
             try:
                 amount += int(self.menu_bonus(guest))
             except Exception:

@@ -48,7 +48,7 @@ window.pycmd = function(msg, cb){
   const [, cmd, ...rest] = msg.split(':'); const arg = rest.join(':');
   let r = null;
   if (cmd==='claim') r = guests.shift() || null;
-  else if (cmd==='pay') { mock.mon += JSON.parse(arg).amount; r = {mon: mock.mon, owned: mock.owned, hidden: mock.hidden, guestsWaiting: guests.length, today:{reviews:142, focus_done:2}}; }
+  else if (cmd==='pay') { const pay = JSON.parse(arg); const tip = pay.amount != null ? pay.amount : pay.base + (pay.dishBonus || 0); mock.mon += tip; r = {tip, mon: mock.mon, owned: mock.owned, hidden: mock.hidden, guestsWaiting: guests.length, today:{reviews:142, focus_done:2}}; }
   else if (cmd==='timer') { if (arg==='endless') window.__endless=!window.__endless; if (arg==='start') { phase='focus'; window.__endlessStart=Date.now(); } if (arg==='skip') phase = window.__endless && phase==='focus' ? 'idle' : phase==='focus'?'break':'idle'; if (arg==='reset') phase='idle'; const pm=pomo(); if (window.__endless && phase==='focus') Object.assign(pm, {endless:true, endsAt:null, paused:false, elapsed: Date.now()-(window.__endlessStart||Date.now())+ 26*60000, total:25*60000}); r = {pomo: pm, sound:true, endlessMode: !!window.__endless}; }
   else if (cmd==='conf') r = Object.assign(window.OK_INIT.conf, JSON.parse(arg));
   else if (cmd==='pet') { const [k0, sp0] = arg.split('@'); const tp = petsMap[sp0] || petState; if (k0==='feed') tp.fish--; tp.love=Math.min(100,tp.love+5); r={ok:true,msg:'',pet:petState,pets:petsMap}; }

@@ -172,6 +172,32 @@ def read_progress() -> Dict[str, Any]:
     return result
 
 
+def health() -> str:
+    """What of Onigiri's data the kitchen can read right now, for bug reports:
+    this add-on reads Onigiri's files (it has no public interface to ask), so when
+    Onigiri changes how it stores things this says which part stopped working."""
+    pkg = find_onigiri_package()
+    if not pkg:
+        return "not installed"
+    parts = []
+    try:
+        progress = read_progress()
+        parts.append("level ok" if progress.get("level") or progress.get("themeId") != "default" or progress.get("name") != "Onigiri Kitchen" else "level unread")
+    except Exception:
+        parts.append("level error")
+    try:
+        specials = read_specials()
+        parts.append(f"specials ok ({len(specials.get('book') or [])} in the book)" if specials.get("found") else "specials unread")
+    except Exception:
+        parts.append("specials error")
+    try:
+        theme = read_theme()
+        parts.append("theme ok" if theme and (theme["light"] or theme["dark"]) else "theme unread")
+    except Exception:
+        parts.append("theme error")
+    return ", ".join(parts)
+
+
 # ------------------------------------------------------------------ theme
 # The Onigiri colour tokens the kitchen reuses, so it matches whichever
 # Onigiri theme is active (read from Onigiri's settings file, never written).

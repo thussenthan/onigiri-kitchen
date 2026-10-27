@@ -4,6 +4,7 @@
 #   dist/onigiri_kitchen-ankiweb.zip - upload to AnkiWeb (no manifest.json)
 set -e
 cd "$(dirname "$0")"
+python3 dev/release_check.py
 mkdir -p dist
 rm -f dist/onigiri_kitchen.ankiaddon dist/onigiri_kitchen-ankiweb.zip
 find onigiri_kitchen -name "__pycache__" -type d -exec rm -rf {} +

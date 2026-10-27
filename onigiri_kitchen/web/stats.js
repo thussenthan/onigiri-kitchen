@@ -539,7 +539,7 @@
         { slot: 3, label: 'Young', value: c.young || 0, note: 'Interval under 21 days' },
         { slot: 4, label: 'Mature', value: c.mature || 0, note: 'Interval of 21 days or more' },
         { slot: 5, label: 'Suspended', value: c.suspended || 0, note: 'Suspended cards' },
-      ]) + `<div class="oks-mini">${tile('Average interval', c.avgInterval == null ? '–' : `${num(c.avgInterval)} days`, 'review cards')}${tile('Average ease', c.avgEase == null ? '–' : `${c.avgEase}%`, 'review cards')}${tile('Mature share', c.cards ? pct(round1((c.mature / c.cards) * 100)) : '–', 'of all cards')}</div>`, 'wide') +
+      ]) + `<div class="oks-mini">${tile('Average interval', c.avgInterval == null ? '–' : `${num(c.avgInterval)} days`, 'review cards')}${D.fsrs ? '' : tile('Average ease', c.avgEase == null ? '–' : `${c.avgEase}%`, 'review cards')}${tile('Mature share', c.cards ? pct(round1((c.mature / c.cards) * 100)) : '–', 'of all cards')}</div>`, 'wide') +
       '</div>';
     section($('oks-rev'), '復習', 'Reviews', 'From your whole Anki review history', html);
   }

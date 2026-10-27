@@ -10,13 +10,19 @@ sys.path.insert(0, str(ROOT))
 
 class FakeTimer:
     def __init__(self, *a, **k):
-        pass
+        self.active = False
 
     def setSingleShot(self, v):
         pass
 
-    def start(self, ms):
+    def setInterval(self, ms):
         pass
+
+    def start(self, ms=0):
+        self.active = True
+
+    def stop(self):
+        self.active = False
 
     @property
     def timeout(self):
@@ -27,6 +33,7 @@ class FakeMw:
     """What the tests set up: `col` (a collection with `db` and `sched`) and the profile manager."""
     col = None
     pm = types.SimpleNamespace(name="test")
+    addonManager = types.SimpleNamespace(addonsFolder=lambda: "/nonexistent", allAddons=lambda: [])
 
 
 aqt = types.ModuleType("aqt")

@@ -25,10 +25,14 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.10.10"
+VERSION = "1.11.0"
 
 # what's new, shown once (as a note when the kitchen opens) after updating to that version
 WHATS_NEW = {
+    "1.11.0": ["Guests who are mid-meal when you close the kitchen no longer lose their tip.",
+               "Renaming a deck can't bring a second round of guests any more.",
+               "Reviews you do on your phone and sync the next morning still bring takeout guests.",
+               "Stats open without freezing Anki, even for a very large history."],
     "1.10.10": ["New: the envelope button next to the sound button makes a postcard of your restaurant to save or copy."],
     "1.10.9": ["Your kitchen is now backed up every day, and never overwritten if it can't be read.",
                "⚙ has Back up and Restore buttons, for moving your kitchen to another computer.",
@@ -78,6 +82,20 @@ def conf() -> Dict[str, Any]:
     return merged
 
 
+# sensible bounds for numbers typed into the settings (low, high)
+CONF_RANGES: Dict[str, Tuple[float, float]] = {
+    "focus_minutes": (1, 240),
+    "short_break_minutes": (1, 120),
+    "long_break_minutes": (1, 240),
+    "rounds_before_long_break": (1, 12),
+    "focus_card_goal": (0, 10000),
+    "daily_card_goal": (0, 100000),
+    "reviews_per_guest": (1, 1000),
+    "volume": (0.0, 1.0),
+    "idle_pause_minutes": (0.5, 60),
+}
+
+
 def write_conf(updates: Dict[str, Any]) -> None:
     current = conf()
     for key, value in updates.items():
@@ -97,8 +115,16 @@ def write_conf(updates: Dict[str, Any]) -> None:
                 continue
         except (TypeError, ValueError):
             continue
+        if key in CONF_RANGES and not isinstance(value, bool):
+            low, high = CONF_RANGES[key]
+            value = type(default)(max(low, min(high, value)))
         current[key] = value
     mw.addonManager.writeConfig(__name__, current)
+
+
+def _script_json(value: Any) -> str:
+    """JSON that is safe inside an inline <script> (no </script>, no <!--)."""
+    return json.dumps(value, ensure_ascii=False).replace("<", "\\u003c")
 
 
 # ------------------------------------------------------------ notifications
@@ -256,8 +282,9 @@ def _eval_kitchen(js: str) -> None:
 
 # ------------------------------------------------------------------- reviews
 def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
+    deck_id = card.odid or card.did
     try:
-        deck = mw.col.decks.name(card.odid or card.did)
+        deck = mw.col.decks.name(deck_id)
     except Exception:
         deck = "Deck"
     leech_success = False
@@ -266,7 +293,9 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
             leech_success = card.note().has_tag("leech")
         except Exception:
             leech_success = False
-    new_guest = state.add_review(deck, leech_success, conf().get("reviews_per_guest", 10), todays_reviews_by_deck())
+    counts = todays_reviews_by_deck()
+    new_guest = state.add_review(deck, leech_success, conf().get("reviews_per_guest", 10),
+                                 counts[0] if counts else None, deck_id, counts[1] if counts else None)
     pomo.on_review()
     check_daily_goal()
     if _pending_notes:
@@ -286,7 +315,7 @@ def on_answer(reviewer: Reviewer, card: Any, ease: int) -> None:
 def _sync_with_log() -> None:
     counts = todays_reviews_by_deck()
     if counts is not None:
-        state.sync_today(counts, conf().get("reviews_per_guest", 10))
+        state.sync_today(counts[0], conf().get("reviews_per_guest", 10), counts[1])
 
 
 def on_undo(*_args: Any) -> None:
@@ -295,9 +324,10 @@ def on_undo(*_args: Any) -> None:
     _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
 
 
-def todays_reviews_by_deck() -> Optional[Dict[str, int]]:
-    """Today's reviews per deck from Anki's review log (respects the day
-    rollover). None if the log couldn't be read (callers then skip syncing)."""
+def todays_reviews_by_deck() -> Optional[Tuple[Dict[str, int], Dict[str, str]]]:
+    """Today's reviews per deck id, and the deck names, from Anki's review log
+    (respects the day rollover). None if the log couldn't be read (callers then
+    skip syncing). Decks are counted by id so a rename doesn't look like new reviews."""
     try:
         start = (mw.col.sched.day_cutoff - 86400) * 1000
         rows = mw.col.db.all(
@@ -310,13 +340,50 @@ def todays_reviews_by_deck() -> Optional[Dict[str, int]]:
         diag.error("couldn't read today's reviews", e)
         return None
     out: Dict[str, int] = {}
+    names: Dict[str, str] = {}
     for did, count in rows:
+        key = str(did)
+        out[key] = out.get(key, 0) + int(count)
         try:
-            name = mw.col.decks.name(did)
+            names[key] = mw.col.decks.name(did)
         except Exception:
-            name = "Deck"
-        out[name] = out.get(name, 0) + int(count)
-    return out
+            names[key] = "Deck"
+    return out, names
+
+
+def recent_days_reviews() -> Dict[str, int]:
+    """Reviews in Anki's log for each of the last few days before today (date ->
+    count), for reviews that arrived after those days closed (a phone, synced later)."""
+    try:
+        cutoff = int(mw.col.sched.day_cutoff)
+        rows = mw.col.db.all(
+            "select cast((id / 1000 - ?) / 86400.0 + 100000 as integer) as d, count() "
+            "from revlog where id > ? and type in (0, 1, 2, 3) group by d",
+            cutoff, (cutoff - 4 * 86400) * 1000,
+        )
+        today = datetime.date.fromisoformat(anki_today())
+        return {(today - datetime.timedelta(days=99999 - int(d))).isoformat(): int(c) for d, c in rows if int(d) < 99999}
+    except Exception as e:
+        diag.error("couldn't read recent days", e)
+        return {}
+
+
+def backfill_recent() -> Dict[str, int]:
+    return state.backfill(recent_days_reviews(), conf().get("reviews_per_guest", 10))
+
+
+def on_sync_finished(*_args: Any) -> None:
+    """After a sync, reviews done elsewhere are in the log: count them."""
+    try:
+        if state.path is None:
+            return
+        got = backfill_recent()
+        _sync_with_log()
+        _eval_kitchen(f"window.OK && OK.onGuests({len(state.data['guests'])})")
+        if got["count"]:
+            tooltip(f"Reviews from your other device brought {got['count']} takeout guests ({got['mon']} 文).", period=4000)
+    except Exception as e:
+        diag.error("after sync", e)
 
 
 def check_daily_goal() -> None:
@@ -336,6 +403,8 @@ def check_daily_goal() -> None:
 
 def init_payload(reason: str = "") -> Dict[str, Any]:
     state.roll_day()
+    state.release_serving()  # (anyone left seated by a window that closed)
+    backfill_recent()
     _sync_with_log()
     check_daily_goal()
     today = state.data["today"]
@@ -438,7 +507,7 @@ class KitchenDialog(QDialog):
         base = f"/_addons/{PACKAGE}/web"
         head = onigiri_link.theme_css() + (
             "<script>window.OK_INIT = "
-            + json.dumps(init_payload(reason), ensure_ascii=False).replace("</", "<\\/")
+            + _script_json(init_payload(reason))
             + ";</script>"
         )
         with open(os.path.join(ADDON_DIR, "web", "kitchen.html"), encoding="utf-8") as f:
@@ -503,6 +572,7 @@ class KitchenDialog(QDialog):
         self._closed = True
         saveGeom(self, "onigiriKitchen")
         state.pet.seen()
+        state.release_serving()  # (guests mid-meal keep their place, and their tip, for next time)
         state.save()
         if _dialog is self:
             _dialog = None
@@ -532,7 +602,7 @@ def _version_info() -> str:
     return (
         f"- Onigiri Kitchen: {VERSION}\n"
         f"- Anki: {anki_version}\n"
-        f"- Onigiri: {onigiri_version}\n"
+        f"- Onigiri: {onigiri_version} ({onigiri_link.health()})\n"
         f"- OS: {platform.system()} {platform.release()}\n"
     )
 
@@ -664,7 +734,13 @@ def open_kitchen(reason: str = "") -> None:
         _dialog.raise_()
         _dialog.activateWindow()
         return
-    _dialog = KitchenDialog(reason)
+    try:
+        _dialog = KitchenDialog(reason)
+    except Exception as e:
+        _dialog = None
+        diag.error("couldn't open the kitchen", e)
+        tooltip("Onigiri Kitchen couldn't open. Details are in its debug_log.txt.", period=5000)
+        return
     _dialog.show()
 
 
@@ -676,8 +752,19 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
             info = json.loads(arg or "{}")
         except ValueError:
             info = {}
-        state.pay(int(info.get("amount", 0)), info.get("deck"), info.get("kind"))
-        return state.snapshot()
+        kind = info.get("kind") if info.get("kind") in ("regular", "golden", "leech") else "regular"
+        try:
+            if "base" in info:
+                # the page rolled the base tip and picked the dish; the perks are worked out here
+                amount = state.tip_for({"deck": info.get("deck"), "kind": kind}, base=int(info["base"]), dish_bonus=int(info.get("dishBonus", 0)))
+            else:
+                amount = int(info.get("amount", 0))
+        except (TypeError, ValueError):
+            amount = 0
+        state.pay(amount, info.get("deck"), kind)
+        snap = state.snapshot()
+        snap["tip"] = max(0, min(amount, 100))
+        return snap
     if cmd == "buy":
         level = restaurant_progress()["level"]
         result = state.buy(arg, level)
@@ -892,7 +979,16 @@ def _answers_between(start: float, end: float) -> List[int]:
         return [0, 0, 0]
 
 
-def _pomo_stats(today: datetime.date) -> Dict[str, Any]:
+def _valid_sessions(log: Dict[str, Any]) -> List[List[Any]]:
+    return [f for f in log["focus"] if isinstance(f, list) and len(f) >= 4]
+
+
+def _session_answers(focus: List[List[Any]]) -> List[List[int]]:
+    """Anki's answers during each logged session (a query per session: run it off the UI thread)."""
+    return [_answers_between(f[0] - f[1], f[0]) for f in focus]
+
+
+def _pomo_stats(today: datetime.date, answers: Optional[List[List[int]]] = None) -> Dict[str, Any]:
     """The raw session and break log (the page works out every range itself)."""
     log = state._log()
     try:
@@ -900,14 +996,15 @@ def _pomo_stats(today: datetime.date) -> Dict[str, Any]:
     except Exception:
         cutoff = None
     sessions = []
-    for f in log["focus"]:
-        if not (isinstance(f, list) and len(f) >= 4):
-            continue
+    focus = _valid_sessions(log)
+    if answers is None or len(answers) != len(focus):
+        answers = _session_answers(focus)
+    for f, ans in zip(focus, answers):
         ts, secs, cards, how = f[:4]
         mid = ts - secs / 2  # the middle of the session
         moment = datetime.datetime.fromtimestamp(mid)
         day = _anki_day(mid, today, cutoff)
-        sessions.append([day.isoformat(), moment.hour, day.weekday(), int(secs), int(cards), how, *_answers_between(ts - secs, ts)])
+        sessions.append([day.isoformat(), moment.hour, day.weekday(), int(secs), int(cards), how, *ans])
     breaks = []
     for b in log["breaks"]:
         if isinstance(b, list) and len(b) >= 4:
@@ -975,18 +1072,33 @@ def _kitchen_stats() -> Dict[str, Any]:
     }
 
 
-def stats_payload() -> Dict[str, Any]:
+def stats_heavy(today: datetime.date, focus: List[List[Any]]) -> Dict[str, Any]:
+    """The slow, database-only part of the Stats numbers. It reads nothing from the
+    kitchen's own state, so it can run in the background while the window opens."""
+    return {"reviews": rstats.review_stats(today), "answers": _session_answers(focus)}
+
+
+def stats_payload(heavy: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     state.roll_day()
     today = datetime.date.fromisoformat(anki_today())
+    heavy = heavy or stats_heavy(today, _valid_sessions(state._log()))
+    try:
+        fsrs = bool(mw.col.get_config("fsrs", False))
+    except Exception:
+        fsrs = False
     return {
         "today": today.isoformat(),
-        "pomo": _pomo_stats(today),
-        "reviews": rstats.review_stats(today),
+        "pomo": _pomo_stats(today, heavy["answers"]),
+        "reviews": heavy["reviews"],
         "kitchen": _kitchen_stats(),
         "studyToday": study_today(),
         "themeMode": conf().get("theme_mode", "anki"),
+        "fsrs": fsrs,  # (ease factors mean nothing under FSRS)
         "version": VERSION,
     }
+
+
+_LOADING_HTML = "<body style='font:15px system-ui;text-align:center;padding-top:30vh;opacity:.7'>統計 Loading your numbers…</body>"
 
 
 class StatsDialog(QDialog):
@@ -999,6 +1111,7 @@ class StatsDialog(QDialog):
         self.setMinimumSize(640, 480)
         self.resize(980, 760)
         restoreGeom(self, "onigiriKitchenStats")
+        self._gone = False
         self.web = AnkiWebView(self)
         shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Close), self)
         shortcut.activated.connect(self.close)
@@ -1006,18 +1119,35 @@ class StatsDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.web)
         self.setLayout(layout)
+        self.web.stdHtml(_LOADING_HTML, context=self)
+        # the heavy reads (the whole review history) run in the background, so Anki stays responsive
+        state.roll_day()
+        today = datetime.date.fromisoformat(anki_today())
+        focus = [list(f) for f in _valid_sessions(state._log())]
+        mw.taskman.run_in_background(lambda: stats_heavy(today, focus), self._loaded)
+
+    def _loaded(self, future: Any) -> None:
+        if self._gone:
+            return
+        try:
+            payload = stats_payload(future.result())
+        except Exception as e:
+            diag.error("couldn't open Stats", e)
+            self.web.stdHtml("<body style='font:15px system-ui;text-align:center;padding-top:30vh'>Couldn't read your numbers. Details are in debug_log.txt.</body>", context=self)
+            return
         base = f"/_addons/{PACKAGE}/web"
-        head = onigiri_link.theme_css() + (
-            "<script>window.OKS = "
-            + json.dumps(stats_payload(), ensure_ascii=False).replace("</", "<\\/")
-            + ";</script>"
-        )
+        head = onigiri_link.theme_css() + "<script>window.OKS = " + _script_json(payload) + ";</script>"
         self.web.stdHtml(_read_web("stats.html"), css=[f"{base}/stats.css"], js=[f"{base}/stats.js"], head=head, context=self)
 
     def closeEvent(self, event: Any) -> None:
         global _stats_dialog
+        self._gone = True
         saveGeom(self, "onigiriKitchenStats")
         _stats_dialog = None
+        try:
+            self.web.cleanup()
+        except Exception:
+            pass
         super().closeEvent(event)
 
 
@@ -1185,7 +1315,7 @@ def kitchen_widget(deck_browser: Any, content: Any) -> None:
     if plain and not conf().get("show_home_widget_without_onigiri", True):
         return
     try:
-        data = json.dumps(widget_payload(), ensure_ascii=False).replace("</", "<\\/")
+        data = _script_json(widget_payload())
     except Exception as e:
         diag.error("widget failed", e)
         return
@@ -1203,12 +1333,18 @@ kitchen_widget.__module__ = "Onigiri Kitchen · おにぎり食堂.widget"
 
 
 # ------------------------------------------------------ main-screen injection
+_web_cache: Dict[str, str] = {}
+
+
 def _read_web(name: str) -> str:
-    try:
-        with open(os.path.join(ADDON_DIR, "web", name), encoding="utf-8") as f:
-            return f.read()
-    except OSError:
-        return ""
+    """A file from web/, read once (the main screens inline several of them on every page load)."""
+    if name not in _web_cache:
+        try:
+            with open(os.path.join(ADDON_DIR, "web", name), encoding="utf-8") as f:
+                _web_cache[name] = f.read()
+        except OSError:
+            return ""
+    return _web_cache[name]
 
 
 def on_webview_content(web_content: Any, context: Any) -> None:
@@ -1410,6 +1546,10 @@ def on_profile_open() -> None:
     onigiri_link.hide_progress_popups(lambda: bool(conf().get("onigiri_progress_popups", False)))
     state.load()
     state.menu_bonus = menu_bonus
+    try:
+        diag.log(f"Onigiri Kitchen {VERSION}; Onigiri: {onigiri_link.health()}")  # (so a bug report shows what could be read)
+    except Exception:
+        pass
 
 
 def on_profile_close() -> None:
@@ -1443,6 +1583,13 @@ def setup() -> None:
     gui_hooks.webview_will_set_content.append(on_webview_content)
     gui_hooks.webview_did_receive_js_message.append(on_js_message)
     gui_hooks.main_window_did_init.append(_add_menu)
+    for name in ("sync_did_finish",):
+        if hasattr(gui_hooks, name):
+            getattr(gui_hooks, name).append(on_sync_finished)
+    # Working in the editor, the browser or Add counts as studying for the focus timer's idle pause.
+    for name in ("editor_did_load_note", "editor_did_fire_typing_timer", "browser_did_change_row", "add_cards_did_add_note"):
+        if hasattr(gui_hooks, name):
+            getattr(gui_hooks, name).append(lambda *a, **k: pomo.touch())
     gui_hooks.state_will_change.append(on_state_will_change)
     if hasattr(gui_hooks, "state_did_undo"):
         gui_hooks.state_did_undo.append(on_undo)

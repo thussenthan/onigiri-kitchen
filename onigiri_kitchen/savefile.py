@@ -66,14 +66,14 @@ def rotate_backup(path: str, today: Optional[datetime.date] = None, keep: int = 
     """Copy the save as it stands (once a day), then drop all but the newest few.
     Only a save that reads properly is copied, so a bad file never pushes out a good backup."""
     today = today or datetime.date.today()
-    status, data = read(path)
-    if status != "ok" or not looks_like_a_save(data):
-        return None
     stem = os.path.splitext(os.path.basename(path))[0]
     dest = os.path.join(backup_folder(path), f"{stem}_{today:%Y%m%d}.json")
     made = None
     try:
-        if not os.path.exists(dest):
+        if not os.path.exists(dest):  # (only read the save when there's a backup to make)
+            status, data = read(path)
+            if status != "ok" or not looks_like_a_save(data):
+                return None
             os.makedirs(backup_folder(path), exist_ok=True)
             shutil.copy2(path, dest)
             made = dest

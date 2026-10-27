@@ -15,3 +15,6 @@ onigiri_kitchen/user_files/debug_log.txt
 dev/preview_data.js
 dev/stats_order.html
 .pytest_cache/
+node_modules/
+package.json
+package-lock.json

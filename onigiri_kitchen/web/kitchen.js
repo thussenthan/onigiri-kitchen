@@ -3624,8 +3624,12 @@
     const r = Math.random() * 100;
     return r < 35 ? 2 : r < 80 ? 3 : r < 95 ? 4 : 8;
   }
-  function tipFor(c) {
-    let amt = baseTip(c.guest.kind);
+  // The page rolls the base tip and picks the dish; Python (state.tip_for) adds the
+  // perks and pays what's really credited. The amount worked out here is what the
+  // coin shows until Python's answer comes back (and in the browser preview).
+  function tipParts(c) {
+    const base = baseTip(c.guest.kind);
+    let amt = base;
     c.generous = c.guest.kind !== 'golden' && c.guest.kind !== 'leech' && amt === 8;
     if (c.guest.kind === 'golden' && has('tanuki')) amt *= 2;
     if (c.guest.kind === 'leech' && has('kitsune')) amt *= 2;
@@ -3633,20 +3637,26 @@
     if (has('shiba')) amt += 1;
     if (petHappy()) amt += 1;
     // rarer specials are worth more
-    if (c.dish && c.dish.from !== 'house') amt += (RARITY[c.dish.rarity] || RARITY.common).bonus;
-    if (c.dish && c.dish.from === 'today' && todayDone()) amt += TODAY_DONE_BONUS;
-    return amt;
+    let dish = 0;
+    if (c.dish && c.dish.from !== 'house') dish += (RARITY[c.dish.rarity] || RARITY.common).bonus;
+    if (c.dish && c.dish.from === 'today' && todayDone()) dish += TODAY_DONE_BONUS;
+    return { base, dish, amt: amt + dish };
   }
+  function tipFor(c) { return tipParts(c).amt; }
+  const payArg = (c, t) => JSON.stringify({ base: t.base, dishBonus: t.dish, deck: c.guest.deck || null, kind: c.guest.kind });
 
   function payFor(c) {
-    const amount = tipFor(c);
-    coins.push({ x: c.x + 5, y: 143, amount, t: 0, fly: null, big: !!c.generous });
+    const t = tipParts(c);
+    const amount = t.amt;
+    const coin = { x: c.x + 5, y: 143, amount, t: 0, fly: null, big: !!c.generous };
+    coins.push(coin);
     if (c.generous) {
       toast(`心付け! A generous guest left ${amount} mon`);
       OKSound.coin();
       for (let i = 0; i < 8; i++) particles.push({ x: c.x + 5 + rand(-4, 4), y: 140 + rand(-3, 3), vx: rand(-10, 10), vy: -rand(8, 18), life: 0.9, c: '#fff1a8', type: 'spark' });
     }
-    send('pay', JSON.stringify({ amount, deck: c.guest.deck || null, kind: c.guest.kind }), (snap) => {
+    send('pay', payArg(c, t), (snap) => {
+      if (snap && typeof snap.tip === 'number' && !coin.done) coin.amount = snap.tip; // (what was really credited)
       if (snap && typeof snap.mon === 'number') {
         S = Object.assign(S, snap);
         updateStatus();
@@ -4293,7 +4303,8 @@
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     acc += dt;
-    if (acc >= 1 / 30) {
+    // a window you're not looking at (behind Anki, say) only needs to tick over slowly
+    if (acc >= (document.hasFocus() ? 1 / 30 : 1 / 10)) {
       update(acc);
       acc = 0;
       render();
@@ -4605,8 +4616,9 @@
     const decks = {};
     for (const c of customers) {
       if (c.state === 'happy' || c.state === 'leave') continue;
-      const amount = tipFor(c);
-      send('pay', JSON.stringify({ amount, deck: c.guest.deck || null, kind: c.guest.kind }), (snap) => {
+      const t = tipParts(c);
+      const amount = t.amt;
+      send('pay', payArg(c, t), (snap) => {
         if (snap && typeof snap.mon === 'number') { S = Object.assign(S, snap); updateStatus(); }
       });
       count++;

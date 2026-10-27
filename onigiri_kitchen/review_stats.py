@@ -94,36 +94,24 @@ def _iso_days(today: datetime.date, idx: List[int]) -> List[str]:
     return [(today - datetime.timedelta(days=99999 - d)).isoformat() for d in idx]
 
 
-_records_cache: Dict[str, Any] = {}
+_SESSION_GAP_MS = 300000  # answers further apart than this are different study sessions
 
 
-def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
-    """What the Records page is worked out from: for each day, answers by kind
-    (learning, review, relearning, filtered), review Agains, new cards and the
-    longest run of answers that weren't Again; and every study session (answers
-    less than 5 minutes apart) with its length and card count."""
-    days: Dict[int, List[Any]] = {}
-    sessions: List[List[Any]] = []
-    try:
-        # the log only ever grows, so its size and newest answer say whether the last result still holds
-        stamp = (tuple(mw.col.db.first("select count(), coalesce(max(id), 0) from revlog where type in (0, 1, 2, 3)") or ()), cutoff, today.isoformat())
-        if _records_cache.get("stamp") == stamp:
-            return _records_cache["value"]
-        rows = mw.col.db.all("select id, cid, type, ease, time from revlog where type in (0, 1, 2, 3) order by id")
-    except Exception as e:
-        diag.error("couldn't read review log for records", e)
-        return {"days": [], "sessions": []}
-    run = 0
-    prev = None
-    start = 0
-    first_id = 0
-    count = 0
+def _new_scan(cutoff: int) -> Dict[str, Any]:
+    return {"cutoff": cutoff, "n": 0, "last_id": 0, "days": {}, "sessions": [],
+            "run": 0, "prev": None, "start": 0, "first_id": 0, "count": 0}
+
+
+def _scan_rows(scan: Dict[str, Any], rows: List[Any]) -> None:
+    """Fold more of the log (in id order) into a scan. The log only ever grows at
+    its end, so Records are worked out once and then only the new answers are read."""
+    cutoff = scan["cutoff"]
+    days = scan["days"]
     day_of = lambda ms: int((ms / 1000 - cutoff) / 86400.0 + 100000)
 
     def close_session() -> None:
-        if count >= 5 and prev is not None:
-            d = (today - datetime.timedelta(days=99999 - day_of(first_id))).isoformat()
-            sessions.append([d, round((prev - start) / 60000, 1), count])
+        if scan["count"] >= 5 and scan["prev"] is not None:
+            scan["sessions"].append([day_of(scan["first_id"]), round((scan["prev"] - scan["start"]) / 60000, 1), scan["count"]])
 
     for rid, cid, t, ease, ms in rows:
         d = day_of(rid)
@@ -133,18 +121,48 @@ def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
             row[4] += 1
         if t == 0:
             row[5].add(cid)
-        run = 0 if ease == 1 else run + 1
-        row[6] = max(row[6], run)
-        if prev is None or rid - prev > 300000:
+        scan["run"] = 0 if ease == 1 else scan["run"] + 1
+        row[6] = max(row[6], scan["run"])
+        if scan["prev"] is None or rid - scan["prev"] > _SESSION_GAP_MS:
             close_session()
-            start, first_id, count = rid - (ms or 0), rid, 0
-        prev = rid
-        count += 1
-    close_session()
-    out = [[(today - datetime.timedelta(days=99999 - d)).isoformat(), r[0], r[1], r[2], r[3], r[4], len(r[5]), r[6]] for d, r in sorted(days.items())]
-    value = {"days": out, "sessions": sessions}
-    _records_cache.update(stamp=stamp, value=value)
-    return value
+            scan["start"], scan["first_id"], scan["count"] = rid - (ms or 0), rid, 0
+        scan["prev"] = rid
+        scan["count"] += 1
+        scan["last_id"] = rid
+    scan["n"] += len(rows)
+
+
+_scan: Dict[str, Any] = {}
+
+
+def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
+    """What the Records page is worked out from: for each day, answers by kind
+    (learning, review, relearning, filtered), review Agains, new cards and the
+    longest run of answers that weren't Again; and every study session (answers
+    less than 5 minutes apart) with its length and card count. Only answers new
+    since the last call are read (a fresh pass when the day, or the log's past, changed)."""
+    global _scan
+    try:
+        total, newest = mw.col.db.first("select count(), coalesce(max(id), 0) from revlog where type in (0, 1, 2, 3)") or (0, 0)
+        scan = _scan
+        if scan.get("cutoff") != cutoff or newest < scan.get("last_id", 0) or total < scan.get("n", 0):
+            scan = _new_scan(cutoff)  # (a new day, or reviews were undone or the log was replaced)
+        rows = mw.col.db.all("select id, cid, type, ease, time from revlog where type in (0, 1, 2, 3) and id > ? order by id", scan["last_id"])
+        if scan["n"] + len(rows) != total:
+            scan = _new_scan(cutoff)  # (something in the middle changed: start over)
+            rows = mw.col.db.all("select id, cid, type, ease, time from revlog where type in (0, 1, 2, 3) order by id")
+        _scan_rows(scan, rows)
+        _scan = scan
+    except Exception as e:
+        diag.error("couldn't read review log for records", e)
+        _scan = {}
+        return {"days": [], "sessions": []}
+    date_of = lambda d: (today - datetime.timedelta(days=99999 - d)).isoformat()
+    sessions = [[date_of(d), m, c] for d, m, c in scan["sessions"]]
+    if scan["count"] >= 5 and scan["prev"] is not None:  # (the session still open at the end of the log)
+        sessions.append([date_of(int((scan["first_id"] / 1000 - cutoff) / 86400.0 + 100000)), round((scan["prev"] - scan["start"]) / 60000, 1), scan["count"]])
+    out = [[date_of(d), r[0], r[1], r[2], r[3], r[4], len(r[5]), r[6]] for d, r in sorted(scan["days"].items())]
+    return {"days": out, "sessions": sessions}
 
 
 def review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:

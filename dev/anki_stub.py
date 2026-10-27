@@ -60,6 +60,8 @@ HOOKS = [
     "profile_did_open", "profile_will_close", "reviewer_did_answer_card", "webview_will_set_content",
     "webview_did_receive_js_message", "main_window_did_init", "deck_browser_will_render_content",
     "state_will_change", "reviewer_did_show_question", "reviewer_did_show_answer", "state_did_undo",
+    "sync_did_finish", "editor_did_load_note", "editor_did_fire_typing_timer", "browser_did_change_row",
+    "add_cards_did_add_note",
 ]
 
 
@@ -122,9 +124,10 @@ def setup(profile="Test"):
 
     mw = types.SimpleNamespace(
         addonManager=AM(), pm=types.SimpleNamespace(name=profile), state="deckBrowser",
-        col=types.SimpleNamespace(sched=Sched(), get_config=lambda k, d=None: d,
+        taskman=types.SimpleNamespace(run_in_background=lambda task, on_done=None: on_done and on_done(types.SimpleNamespace(result=task))),
+        col=types.SimpleNamespace(sched=Sched(), get_config=lambda k, d=None: d, set_config=lambda k, v: None,
                                   decks=types.SimpleNamespace(name=lambda did: "Deck", current=lambda: {"name": "Deck"}),
-                                  db=types.SimpleNamespace(all=lambda *a: [])),
+                                  db=types.SimpleNamespace(all=lambda *a: [], first=lambda *a: None, scalar=lambda *a: 0)),
         form=types.SimpleNamespace(menuTools=types.SimpleNamespace(addAction=lambda a: None)),
     )
     aqt = types.ModuleType("aqt")

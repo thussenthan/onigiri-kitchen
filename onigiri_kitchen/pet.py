@@ -166,6 +166,15 @@ def defaults() -> Dict[str, Any]:
     }
 
 
+def _calendar_today() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+# Which day it is for the daily petting cap. The kitchen points this at Anki's own
+# day (which rolls over at the hour you set), so it matches guests and reviews.
+today_fn = _calendar_today
+
+
 def _clamp(v: float) -> float:
     return max(0.0, min(100.0, v))
 
@@ -273,7 +282,7 @@ class Pet:
         if kind == "pet":
             self._add("love", 5)
             self.d["times_petted"] = int(self.d.get("times_petted", 0)) + 1
-            today = datetime.now().strftime("%Y-%m-%d")
+            today = today_fn()
             pt = self.d.setdefault("pets_today", {"date": "", "count": 0})
             if pt.get("date") != today:
                 pt.update(date=today, count=0)
@@ -410,7 +419,7 @@ class Pet:
             "happy": self.happy(),
             "petPoints": int(self.d.get("pet_points", 0)),
             "petsToday": int((self.d.get("pets_today") or {}).get("count", 0))
-            if (self.d.get("pets_today") or {}).get("date") == datetime.now().strftime("%Y-%m-%d") else 0,
+            if (self.d.get("pets_today") or {}).get("date") == today_fn() else 0,
             "fishFed": int(self.d.get("fish_fed", 0)),
             "unlocks": self.unlocks(),
             "style": dict(self.d.get("style") or {}),

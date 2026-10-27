@@ -47,6 +47,7 @@ class Pomodoro:
         self.banked = 0.0
         self.seg_start: Optional[float] = None
         self.blocks_done = 0
+        self._last_tick = time.time()
         self._timer = QTimer(mw)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
@@ -107,6 +108,7 @@ class Pomodoro:
         self.endless = True
         self.banked = 0.0
         self.seg_start = time.time()
+        self._last_tick = self.seg_start
         self.blocks_done = 0
         self.total = self._block()
         self.ends_at = None
@@ -114,7 +116,7 @@ class Pomodoro:
         self.focus_cards = 0
         self.last_activity = time.time()
         self.idle_paused = False
-        self._timer.start()
+        self._start_timer()
         self._emit()
 
     def set_endless(self, on: bool) -> None:
@@ -133,7 +135,7 @@ class Pomodoro:
             self.total = self._block()
             self.ends_at = None
             self.paused_remaining = None
-            self._timer.start()
+            self._start_timer()
         else:
             block = self._block()
             left = max(60.0, block - (self.elapsed(now) % block))
@@ -145,7 +147,7 @@ class Pomodoro:
             if running:
                 self.ends_at = now + left
                 self.paused_remaining = None
-                self._timer.start()
+                self._start_timer()
             else:
                 self.ends_at = None
                 self.paused_remaining = left
@@ -187,13 +189,13 @@ class Pomodoro:
         if self.endless and self.phase == FOCUS:
             if self.seg_start is None:
                 self.seg_start = time.time()
-                self._timer.start()
+                self._start_timer()
                 self._emit()
             return
         if self.paused_remaining is not None:
             self.ends_at = time.time() + self.paused_remaining
             self.paused_remaining = None
-            self._timer.start()
+            self._start_timer()
             self._emit()
 
     def skip(self) -> None:
@@ -247,13 +249,32 @@ class Pomodoro:
 
     # ----------------------------------------------------------- internals
     def _begin(self, phase: str, seconds: float) -> None:
+        self._last_tick = time.time()
         self.phase = phase
         self.total = seconds
         self.ends_at = time.time() + seconds
         self.paused_remaining = None
+        self._start_timer()
+
+    def _start_timer(self) -> None:
+        self._last_tick = time.time()  # (a paused timer's old tick isn't a sleep)
         self._timer.start()
 
+    def _slept(self, now: float) -> float:
+        """Seconds the computer was asleep (or Anki frozen) since the last tick,
+        when the idle pause is off and wouldn't have caught it: that time was not
+        studying, so it isn't counted."""
+        gap = now - self._last_tick
+        self._last_tick = now
+        return gap - 1 if gap > 30 and not self._idle_limit() else 0.0
+
     def _tick(self) -> None:
+        asleep = self._slept(time.time())
+        if asleep and self.phase == FOCUS:
+            if self.endless and self.seg_start is not None:
+                self.seg_start += asleep
+            elif self.ends_at is not None:
+                self.ends_at += asleep
         if self.endless and self.phase == FOCUS:
             self._tick_endless()
             return

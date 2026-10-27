@@ -4,5 +4,6 @@
     "mod": 1792182241,
     "conflicts": [],
     "min_point_version": 231000,
-    "homepage": "https://github.com/thussenthan/onigiri-kitchen"
+    "homepage": "https://github.com/thussenthan/onigiri-kitchen",
+    "human_version": "1.11.0"
 }
