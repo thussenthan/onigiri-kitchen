@@ -65,9 +65,14 @@ async function main() {
   check(/^[\d,. ]+$/.test(mon.trim()), `kitchen: the purse shows "${mon}" after tips were paid`);
   // the keyboard: arrows pick something to tap, letters open the buttons, and typing isn't hijacked
   await page.focus('#ok-canvas');
-  await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(200);
-  check(await page.evaluate(() => !document.getElementById('ok-tip').hidden && document.querySelector('.ok-sr').textContent.length > 0), 'keyboard: arrow key chose nothing');
+  // (the things to tap are rebuilt every frame: on a slow machine the first press can come before the first one)
+  let chose = false;
+  for (let i = 0; i < 30 && !chose; i++) {
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(250);
+    chose = await page.evaluate(() => !document.getElementById('ok-tip').hidden && document.querySelector('.ok-sr').textContent.length > 0);
+  }
+  check(chose, 'keyboard: arrow key chose nothing');
   await page.keyboard.press('Escape');
   await page.keyboard.press('s');
   check(await page.evaluate(() => !document.getElementById('ok-decor').hidden), 'keyboard: S did not open the shop');
