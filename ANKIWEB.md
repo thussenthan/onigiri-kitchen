@@ -42,6 +42,7 @@ You study, guests arrive. You take a break, you get to enjoy them.
 - **Home-screen widget** with the share of the last 30 days you studied, your daily average, 30-day retention and how long what's still due will take at your pace (big 2×2 widgets add a scene with all your pets (they nap while you focus), and progress to the next guest): add it to your Onigiri main menu from Onigiri's layout editor (or see it under your decks without Onigiri).
 - **Several pets, your pick.** Adopt more than one and flip between them on the Pets card: each has its own care, keepsakes and food dish. A hungry pet shows a thought bubble with the food it wants; tap it to feed. You're told when something unlocks by itself (Specials Book rewards, pet accessories, new shop items). **Collect all** is on the home-screen widget too, and unsaved settings ask before they're lost.
 - **Your kitchen is safe.** It's backed up every day, a save that can't be read is never overwritten, and ⚙ has Back up and Restore buttons for moving it to another computer.
+- **A postcard of your restaurant:** the envelope button makes a picture of the kitchen as it is right now, with your level, guests served and pets, to save or copy. Nothing is uploaded.
 - **A guided tour** the first time you open it, and a **目安箱 suggestion box** for ideas and bug reports.
 - **Matches your Onigiri theme:** your colours, font and dark mode, or light by day and dark at night by your clock.
 

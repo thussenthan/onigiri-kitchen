@@ -1315,3 +1315,7 @@ button.ok-grid-head.closed .ok-caret { transform: rotate(-90deg); }
 
 /* keyboard focus is always visible */
 button:focus-visible, [role="button"]:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--shu); outline-offset: 2px; }
+
+/* the postcard preview */
+.ok-postcard { display: block; width: 100%; height: auto; border-radius: 6px; margin: 4px 0 2px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }
+.ok-modal .ok-card:has(.ok-postcard) { width: min(560px, calc(100vw - 40px)); }

@@ -4941,6 +4941,91 @@
     return true;
   }
 
+  // ---------------------------------------------------------- 絵葉書 postcard
+  // A picture of the restaurant as it is right now, on a card with a few of your
+  // numbers, to save as a PNG or copy (nothing is uploaded anywhere).
+  function makePostcard() {
+    const cs = getComputedStyle(document.documentElement);
+    const css = (name, fallback) => (cs.getPropertyValue(name) || '').trim() || fallback;
+    const paper = css('--paper', '#f4ecdd');
+    const ink = css('--ink', '#2b2622');
+    const ink2 = css('--ink-2', '#5d5046');
+    const shu = css('--shu', onigiri.themeColor || '#c8412f');
+    const PW = 1200;
+    const M = 40;
+    const IW = PW - 2 * M;
+    const IH = Math.round((IW * H) / W);
+    const BAND = 170;
+    const c = document.createElement('canvas');
+    c.width = PW;
+    c.height = M + IH + BAND;
+    const x = c.getContext('2d');
+    x.fillStyle = paper;
+    x.fillRect(0, 0, c.width, c.height);
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(view, M, M, IW, IH);
+    x.strokeStyle = ink;
+    x.lineWidth = 3;
+    x.strokeRect(M - 1.5, M - 1.5, IW + 3, IH + 3);
+    const mincho = '"Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Songti SC", serif';
+    const sans = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", Roboto, sans-serif';
+    const top = M + IH;
+    x.textBaseline = 'alphabetic';
+    x.fillStyle = ink;
+    x.font = `700 40px ${mincho}`;
+    x.fillText(onigiri.name || 'Onigiri Kitchen', M, top + 62);
+    const names = Object.values(PETS || {}).map((p0) => p0 && p0.name).filter(Boolean);
+    const days = S.firstSeen ? Math.max(1, Math.round((Date.now() - new Date(S.firstSeen + 'T12:00:00').getTime()) / 86400000) + 1) : null;
+    const facts = [
+      onigiri.level ? `Level ${onigiri.level}` : '',
+      S.servedTotal ? `${S.servedTotal.toLocaleString()} guests served` : '',
+      INIT.reviewsTotal ? `${INIT.reviewsTotal.toLocaleString()} reviews` : '',
+      days ? `open ${days.toLocaleString()} day${days === 1 ? '' : 's'}` : '',
+    ].filter(Boolean).join('  ·  ');
+    x.fillStyle = ink2;
+    x.font = `600 24px ${sans}`;
+    x.fillText(facts, M, top + 102);
+    x.font = `500 20px ${sans}`;
+    const when = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    x.fillText(names.length ? `${when}  ·  with ${names.join(' & ')}` : when, M, top + 138);
+    // a red hanko stamp, like a postmark
+    const cx = PW - M - 64;
+    const cy = top + BAND / 2 + 4;
+    x.save();
+    x.translate(cx, cy);
+    x.rotate(-0.12);
+    x.strokeStyle = shu;
+    x.fillStyle = shu;
+    x.lineWidth = 5;
+    x.beginPath();
+    x.arc(0, 0, 52, 0, Math.PI * 2);
+    x.stroke();
+    x.lineWidth = 2;
+    x.beginPath();
+    x.arc(0, 0, 44, 0, Math.PI * 2);
+    x.stroke();
+    x.textAlign = 'center';
+    x.font = `700 34px ${mincho}`;
+    x.fillText('食堂', 0, 4);
+    x.font = `700 12px ${sans}`;
+    x.fillText('POST CARD', 0, 26);
+    x.restore();
+    return c.toDataURL('image/png');
+  }
+  setTip($('ok-b-card'), 'Make a postcard of your restaurant');
+  $('ok-b-card').addEventListener('click', () => {
+    OKSound.pluck(4);
+    let url = '';
+    try { url = makePostcard(); } catch (e) { toast('Couldn\'t make the postcard'); return; }
+    const b64 = url.split(',')[1] || '';
+    modal('絵葉書', 'Your postcard',
+      `<img class="ok-postcard" alt="A postcard of your restaurant" src="${url}">`,
+      [['保存<small>Save</small>', 'ok-hanko', () => send('postcard', b64)],
+        ['コピー<small>Copy</small>', 'ok-hanko', () => send('postcardcopy', b64)],
+        ['閉じる<small>Close</small>', 'ok-ghost', null]]);
+  });
+
   $('ok-b-sound').addEventListener('click', () => {
     conf.sound = !conf.sound;
     OKSound.configure({ sound: conf.sound });

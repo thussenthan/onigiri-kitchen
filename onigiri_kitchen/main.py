@@ -25,10 +25,11 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.10.9"
+VERSION = "1.10.10"
 
 # what's new, shown once (as a note when the kitchen opens) after updating to that version
 WHATS_NEW = {
+    "1.10.10": ["New: the envelope button next to the sound button makes a postcard of your restaurant to save or copy."],
     "1.10.9": ["Your kitchen is now backed up every day, and never overwritten if it can't be read.",
                "⚙ has Back up and Restore buttons, for moving your kitchen to another computer.",
                "Stats text is easier to read, and keyboard focus is clearer."],
@@ -577,6 +578,51 @@ def export_progress() -> None:
         tooltip("Couldn't write that file.")
 
 
+def _postcard_bytes(b64: str) -> Optional[bytes]:
+    import base64
+
+    try:
+        data = base64.b64decode(b64, validate=True)
+    except (ValueError, TypeError):
+        return None
+    return data if data.startswith(b"\x89PNG") else None  # (only ever a PNG that the kitchen drew)
+
+
+def save_postcard(b64: str) -> None:
+    """Write the postcard the kitchen drew to a PNG you choose."""
+    from aqt.qt import QFileDialog
+
+    data = _postcard_bytes(b64)
+    if data is None:
+        tooltip("Couldn't make the postcard.")
+        return
+    pictures = os.path.join(os.path.expanduser("~"), "Pictures")
+    start = os.path.join(pictures if os.path.isdir(pictures) else os.path.expanduser("~"), f"onigiri-kitchen-{datetime.date.today():%Y%m%d}.png")
+    path, _ = QFileDialog.getSaveFileName(mw, "Save your postcard", start, "PNG image (*.png)")
+    if not path:
+        return
+    try:
+        with open(path, "wb") as f:
+            f.write(data)
+        tooltip(f"Postcard saved to {os.path.basename(path)}")
+    except OSError as e:
+        diag.error("could not save the postcard", e)
+        tooltip("Couldn't write that file.")
+
+
+def copy_postcard(b64: str) -> None:
+    """Put the postcard on the clipboard, ready to paste into a message."""
+    from aqt.qt import QApplication, QImage
+
+    data = _postcard_bytes(b64)
+    image = QImage.fromData(data) if data else QImage()
+    if image.isNull():
+        tooltip("Couldn't copy the postcard.")
+        return
+    QApplication.clipboard().setImage(image)
+    tooltip("Postcard copied")
+
+
 def import_progress() -> None:
     """Replace the kitchen with a backup (the current one is kept beside it first)."""
     from aqt.qt import QFileDialog
@@ -728,6 +774,12 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
         return None
     if cmd == "idea":
         openLink(feedback_url("idea"))
+        return None
+    if cmd == "postcard":
+        QTimer.singleShot(0, lambda: save_postcard(arg))
+        return None
+    if cmd == "postcardcopy":
+        QTimer.singleShot(0, lambda: copy_postcard(arg))
         return None
     if cmd == "export":
         export_progress()
