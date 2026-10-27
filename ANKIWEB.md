@@ -21,7 +21,7 @@ Anki names AnkiWeb installs after the download's file name, which AnkiWeb makes 
 
 You study, guests arrive. You take a break, you get to enjoy them.
 
-![The restaurant, in motion](https://raw.githubusercontent.com/thussenthan/onigiri-kitchen/main/docs/kitchen.gif)
+![The restaurant, in motion](https://raw.githubusercontent.com/thussenthan/onigiri-kitchen/main/docs/kitchen-scene.gif)
 
 ### Features
 - **A living pixel restaurant.** Click Onigiri's restaurant widget to open it. Lanterns, a noren curtain in your theme colour, and a window onto Mt. Fuji that follows your real clock and the seasons.

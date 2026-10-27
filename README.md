@@ -7,7 +7,7 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 
 **You study, guests arrive. You take a break, you get to enjoy them.**
 
-![The restaurant, in motion](docs/kitchen.gif)
+![The restaurant, in motion](docs/kitchen-scene.gif)
 
 **In 30 seconds:** every 10 reviews a guest walks in and, when you take a break, tips you in 文 (mon). Spend mon
 on decor and pets; a pomodoro timer is built in; Stats shows your numbers. Nothing ever punishes you: no streak to
