@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from aqt import mw
 from aqt.qt import QTimer
 
+from . import diag, savefile
 from . import pet as petmod
 
 # There's no cap on waiting guests: people can study in one big batch and
@@ -216,6 +217,7 @@ class KitchenState:
         self.addon_dir = addon_dir
         self.data: Dict[str, Any] = _defaults()
         self.path: Optional[str] = None
+        self.protect = False  # a save that couldn't be read is never written over
         self.pet = petmod.Pet(self.data["pet"])
         self.extra: Dict[str, "petmod.Pet"] = {}  # the other pets you've adopted, by species
         self._save_timer: Optional[QTimer] = None
@@ -235,22 +237,35 @@ class KitchenState:
         self.path = os.path.join(folder, f"kitchen_{safe}.json")
 
         data = _defaults()
-        try:
-            with open(self.path, encoding="utf-8") as f:
-                stored = json.load(f)
-            if isinstance(stored, dict):
-                if isinstance(stored.get("pet"), dict) and "species" not in stored["pet"]:
-                    # Saves from before the starter choice already have Tama.
-                    stored["pet"]["species"] = "cat"
-                for key, value in stored.items():
-                    if key in data and isinstance(data[key], dict) and isinstance(value, dict):
-                        data[key].update(value)
-                    else:
-                        data[key] = value
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            print(f"Onigiri Kitchen: could not read save file, starting fresh: {e}")
+        self.protect = False
+        status, stored = savefile.read(self.path)
+        if status == "corrupt":
+            # not a kitchen save: keep it aside, and carry on from the newest backup (or fresh)
+            kept = savefile.set_aside(self.path)
+            diag.log(f"save file was damaged, kept as {os.path.basename(kept)}")
+            found = savefile.newest_good_backup(self.path)
+            if found:
+                diag.log(f"restored from {os.path.basename(found[0])}")
+                status, stored = "ok", found[1]
+        elif status == "unreadable":
+            # locked or unreachable right now: say nothing about what's in it, and don't overwrite it
+            self.protect = True
+            diag.log("save file couldn't be opened; not saving this session so it isn't overwritten")
+            try:
+                from aqt.utils import tooltip
+
+                tooltip("Onigiri Kitchen couldn't open its save file, so it won't save this session. Your progress is untouched.", period=6000)
+            except Exception:
+                pass
+        if status == "ok" and isinstance(stored, dict):
+            if isinstance(stored.get("pet"), dict) and "species" not in stored["pet"]:
+                # Saves from before the starter choice already have Tama.
+                stored["pet"]["species"] = "cat"
+            for key, value in stored.items():
+                if key in data and isinstance(data[key], dict) and isinstance(value, dict):
+                    data[key].update(value)
+                else:
+                    data[key] = value
         self.data = data
         self.pet = petmod.Pet(self.data["pet"])
         # (colour lists from older or hand-edited saves: keep only colours that exist)
@@ -266,15 +281,16 @@ class KitchenState:
         self.roll_day()
 
     def save(self) -> None:
-        if not self.path:
+        if not self.path or self.protect:
             return
         tmp = self.path + ".tmp"
         try:
+            savefile.rotate_backup(self.path)  # (the save as of the last session, once a day)
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, ensure_ascii=False, indent=1)
             os.replace(tmp, self.path)
         except Exception as e:
-            print(f"Onigiri Kitchen: could not save: {e}")
+            diag.error("could not save", e)
 
     def save_soon(self) -> None:
         """Debounced save so reviewing quickly doesn't write on every card."""

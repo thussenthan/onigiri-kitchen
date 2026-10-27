@@ -143,6 +143,8 @@ own expand view), click the shop-front icon next to Onigiri's buttons, click the
   font. Your XP and Taiyaki coins are untouched.
 - Kitchen progress (mon, decor, guests, Tama) is saved per profile in the add-on's `user_files` folder,
   which Anki keeps across updates.
+- The save is backed up once a day (the last five are kept in `user_files/backups`), a save that can't be read is
+  never overwritten, and **⚙ → Back up / Restore** copies your kitchen to a file, for example to move it to another computer.
 - Nothing is sent anywhere. The bug-report button only opens a pre-filled GitHub issue in your browser.
 
 ## Development
@@ -154,9 +156,13 @@ onigiri_kitchen/      the add-on (what gets installed)
   pet.py              the pet: species, needs, growth, gifts
   pomodoro.py         wall-clock pomodoro timer
   onigiri_link.py     read-only access to Onigiri's data & theme
+  review_stats.py     what Stats and the widget read from Anki's review log (records, missed days)
+  savefile.py         reading, backing up and protecting the save file
+  diag.py             the small rolling debug log
   web/                kitchen.js (pixel engine), chip.js (timer + widget hook), sound.js, css
 dev/                  browser previews with mock data
 build.sh              builds dist/*.ankiaddon and the AnkiWeb zip
+tests/                Python tests (pytest) and a Stats page smoke test (node); run by GitHub Actions on every push
 ```
 
 Preview the kitchen in a browser (Anki loads scripts in `<head>`, and the preview reproduces that):

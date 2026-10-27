@@ -6,7 +6,7 @@
   --card: var(--oni-canvas-inset, #fbf6ec);
   --ink: var(--oni-fg, #2b2622);
   --ink-2: var(--oni-fg-subtle, #5d5046);
-  --ink-3: color-mix(in srgb, var(--oni-fg-subtle, #8b7b69) 80%, var(--paper));
+  --ink-3: color-mix(in srgb, var(--oni-fg-subtle, #8b7b69) 90%, var(--paper));
   --line: var(--oni-border, #dccbad);
   --shu: var(--oni-accent-color, #c8412f);
   --shu-dk: color-mix(in srgb, var(--shu) 78%, #000);
@@ -29,7 +29,7 @@
   --card: var(--oni-canvas-inset, #2c2622);
   --ink: var(--oni-fg, #efe6d6);
   --ink-2: var(--oni-fg-subtle, #cdbfab);
-  --ink-3: color-mix(in srgb, var(--oni-fg-subtle, #9d8e7b) 78%, var(--paper));
+  --ink-3: color-mix(in srgb, var(--oni-fg-subtle, #9d8e7b) 88%, var(--paper));
   --line: var(--oni-border, #463b31);
   --shu: var(--oni-accent-color, #e0604b);
   --stage-bg: var(--oni-canvas-inset, #140e0a);
@@ -93,7 +93,7 @@ body .oks-nav button.oks-today-tab.on .jp { color: #fff; }
 .oks-tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
 .oks-tile small { display: block; color: var(--ink-2); font-size: 11.5px; font-weight: 600; }
 .oks-tile b { display: block; font-size: 18px; font-weight: 800; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.oks-tile em { display: block; font-style: normal; color: var(--ink-3); font-size: 11px; margin-top: 1px; }
+.oks-tile em { display: block; font-style: normal; color: var(--ink-3); font-size: 12px; margin-top: 1px; }
 .oks-hero .oks-tile { padding: 14px 16px; }
 .oks-hero .oks-tile b { font-size: 28px; }
 
@@ -109,14 +109,14 @@ body .oks-nav button.oks-today-tab.on .jp { color: #fff; }
 /* column chart: a hairline grid, thin columns grown from one baseline */
 .oks-cols { position: relative; height: 150px; margin-left: 34px; }
 .oks-gridline { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); }
-.oks-gridline i { position: absolute; right: calc(100% + 6px); top: -7px; font-style: normal; font-size: 10.5px; color: var(--ink-3); }
+.oks-gridline i { position: absolute; right: calc(100% + 6px); top: -7px; font-style: normal; font-size: 11.5px; color: var(--ink-3); }
 .oks-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; }
 .oks-bar { flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; min-width: 0; cursor: default; }
 .oks-bar span { display: block; width: 100%; max-width: 24px; background: var(--shu); border-radius: 4px 4px 0 0; min-height: 0; }
 .oks-bar:hover span { filter: brightness(1.12); }
 .oks-bar.zero span { background: transparent; }
 .oks-axis { display: flex; gap: 2px; margin: 4px 0 0 34px; }
-.oks-axis i { flex: 1 1 0; display: flex; justify-content: center; font-style: normal; font-size: 10.5px; color: var(--ink-3); white-space: nowrap; min-width: 0; overflow: visible; }
+.oks-axis i { flex: 1 1 0; display: flex; justify-content: center; font-style: normal; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; min-width: 0; overflow: visible; }
 
 /* horizontal bars (ledger) */
 .oks-rows { display: grid; gap: 7px; }
@@ -134,7 +134,7 @@ body .oks-nav button.oks-today-tab.on .jp { color: #fff; }
 .oks-c[data-l="3"] { background: color-mix(in srgb, var(--shu) 74%, var(--card)); }
 .oks-c[data-l="4"] { background: var(--shu); }
 .oks-c.pad { background: transparent; }
-.oks-legend { display: flex; align-items: center; gap: 3px; justify-content: flex-end; font-size: 10.5px; color: var(--ink-3); margin-top: 6px; }
+.oks-legend { display: flex; align-items: center; gap: 3px; justify-content: flex-end; font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
 
 /* tooltip */
 #oks-tip {
@@ -203,13 +203,13 @@ body .oks-range button.on, body .oks-range button.on:hover { background: var(--s
 /* weekday × hour grid */
 .oks-punch { display: grid; grid-template-columns: 32px repeat(24, minmax(10px, 1fr)); gap: 3px; align-items: center; }
 .oks-punch .oks-c { width: auto; height: auto; aspect-ratio: 1; max-height: 22px; }
-.oks-punch-h { font-size: 10px; font-weight: 600; color: var(--ink-3); text-align: left; white-space: nowrap; }
-.oks-punch-d { font-size: 10.5px; font-weight: 700; color: var(--ink-2); }
+.oks-punch-h { font-size: 10.5px; font-weight: 600; color: var(--ink-3); text-align: left; white-space: nowrap; }
+.oks-punch-d { font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
 
 /* the year heatmap's month labels */
 .oks-heat-wrap { overflow-x: auto; padding-bottom: 4px; }
 .oks-heat-wrap .oks-heat { overflow: visible; padding-bottom: 0; }
-.oks-heat-months { display: grid; gap: 3px; height: 14px; margin-bottom: 4px; font-size: 10.5px; color: var(--ink-3); }
+.oks-heat-months { display: grid; gap: 3px; height: 14px; margin-bottom: 4px; font-size: 11.5px; color: var(--ink-3); }
 .oks-heat-months span { white-space: nowrap; }
 
 /* the card-type table */
@@ -256,7 +256,7 @@ body .oks-range button.on, body .oks-range button.on:hover { background: var(--s
 .oks-rec tbody tr:last-child th, .oks-rec tbody tr:last-child td { border-bottom: 0; }
 .oks-rec td { text-align: right; width: 26%; }
 .oks-rec td b { font-size: 15px; font-weight: 800; }
-.oks-rec td em { display: block; font-style: normal; color: var(--ink-3); font-size: 11px; font-weight: 500; }
+.oks-rec td em { display: block; font-style: normal; color: var(--ink-3); font-size: 12px; font-weight: 500; }
 .oks-rec thead th { text-align: right; }
 .oks-rec thead th:first-child { text-align: left; }
 .oks-new {
@@ -272,3 +272,5 @@ body .oks-range button.on, body .oks-range button.on:hover { background: var(--s
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+button:focus-visible, summary:focus-visible { outline: 2px solid var(--shu); outline-offset: 2px; border-radius: 6px; }

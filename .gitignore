@@ -3,7 +3,9 @@ __pycache__/
 *.pyc
 .DS_Store
 # per-user save data
-onigiri_kitchen/user_files/kitchen_*.json
+onigiri_kitchen/user_files/kitchen_*
+onigiri_kitchen/user_files/backups/
+onigiri_kitchen/user_files/debug_log.txt
 onigiri_kitchen/user_files/*.tmp
 onigiri_kitchen/meta.json
 .claude/
@@ -12,3 +14,4 @@ dev/assets/
 onigiri_kitchen/user_files/debug_log.txt
 dev/preview_data.js
 dev/stats_order.html
+.pytest_cache/

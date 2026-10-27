@@ -42,7 +42,7 @@
       </svg>
       <b id="ok-mon">0</b><span class="ok-unit">文</span>
     </div>
-    <div class="ok-status" id="ok-status"></div>
+    <div class="ok-status" id="ok-status" role="status" aria-live="polite"></div>
     <div class="ok-foot-btns">
       <button class="ok-foot-btn ok-rush" id="ok-b-rush" hidden><span class="jp">急</span> Serve faster</button>
       <button class="ok-foot-btn" id="ok-b-pet"><span class="jp" id="ok-pet-jp">猫</span> <span id="ok-pet-label">Pet</span></button>
@@ -141,6 +141,13 @@
           <button type="button" class="ok-foot-btn" id="ok-idea" title="Suggest a feature">💡 Suggest</button>
           <button type="button" class="ok-foot-btn" id="ok-report" title="Report a bug">🐞 Report a bug</button>
           <button type="button" class="ok-foot-btn" id="ok-tour-replay" title="Replay the tutorial">▶ Tutorial</button>
+        </div>
+      </div>
+      <div class="ok-report">
+        <div class="ok-report-head"><b class="jp">保存</b> Your kitchen <em>stays on this computer</em></div>
+        <div class="ok-report-btns">
+          <button type="button" class="ok-foot-btn" id="ok-backup" title="Save a copy of your kitchen (mon, decor, pets) to a file">💾 Back up</button>
+          <button type="button" class="ok-foot-btn" id="ok-restore" title="Replace your kitchen with a backup file, for example on another computer">♻ Restore</button>
         </div>
       </div>
       <div class="ok-credit">Made by <a href="#" id="ok-author" title="github.com/thussenthan">Thussenthan Walter-Angelo</a></div>

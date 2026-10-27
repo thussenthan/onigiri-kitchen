@@ -16,6 +16,8 @@ from typing import Any, Callable, Dict, Optional
 from aqt import mw
 from aqt.qt import QTimer
 
+from . import diag
+
 IDLE, FOCUS, BREAK = "idle", "focus", "break"
 
 
@@ -337,7 +339,7 @@ class Pomodoro:
         try:
             self._on_change()
         except Exception as e:
-            print(f"Onigiri Kitchen: timer update failed: {e}")
+            diag.error("timer update failed", e)
 
     def snapshot(self) -> Dict[str, Any]:
         if self.ends_at is not None:

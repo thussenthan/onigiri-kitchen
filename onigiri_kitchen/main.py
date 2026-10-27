@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import shutil
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from aqt import gui_hooks, mw
@@ -15,7 +16,8 @@ from aqt.reviewer import Reviewer
 from aqt.utils import openLink, restoreGeom, saveGeom, tooltip
 from aqt.webview import AnkiWebView
 
-from . import onigiri_link
+from . import diag, onigiri_link, savefile
+from . import review_stats as rstats
 from . import pet as petmod
 from .pomodoro import Pomodoro
 from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_today, earned_rewards, PUFFLE_COLOR_PRICE, PUFFLE_COLORS, PUFFLE_COLORS_BY_ID, KitchenState
@@ -23,7 +25,14 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.10.8"
+VERSION = "1.10.9"
+
+# what's new, shown once (as a note when the kitchen opens) after updating to that version
+WHATS_NEW = {
+    "1.10.9": ["Your kitchen is now backed up every day, and never overwritten if it can't be read.",
+               "⚙ has Back up and Restore buttons, for moving your kitchen to another computer.",
+               "Stats text is easier to read, and keyboard focus is clearer."],
+}
 REPO_URL = "https://github.com/thussenthan/onigiri-kitchen"
 AUTHOR_NAME = "Thussenthan Walter-Angelo"
 AUTHOR_URL = "https://github.com/thussenthan"
@@ -120,7 +129,7 @@ def _flush_notes() -> None:
             if still_relevant is None or still_relevant():
                 show()
         except Exception as e:
-            print(f"Onigiri Kitchen: notification failed: {e}")
+            diag.error("notification failed", e)
 
 
 # --------------------------------------------------------------------- timer
@@ -297,7 +306,7 @@ def todays_reviews_by_deck() -> Optional[Dict[str, int]]:
             start,
         )
     except Exception as e:
-        print(f"Onigiri Kitchen: couldn't read today's reviews: {e}")
+        diag.error("couldn't read today's reviews", e)
         return None
     out: Dict[str, int] = {}
     for did, count in rows:
@@ -348,6 +357,9 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
     state.data["menu_seen"] = names
     special_cheer = _special_cheer(specials)
     progress = restaurant_progress()
+    last_version = state.data.get("last_version")
+    state.data["last_version"] = VERSION
+    whats_new = {"version": VERSION, "notes": WHATS_NEW[VERSION]} if last_version and last_version != VERSION and VERSION in WHATS_NEW else None
     last_level = state.data.get("last_level")
     state.data["last_level"] = int(progress.get("level", 0))
     level_up = {"from": int(last_level), "to": int(progress["level"])} if last_level is not None and progress.get("level", 0) > last_level else None
@@ -378,6 +390,7 @@ def init_payload(reason: str = "") -> Dict[str, Any]:
         "onigiri": progress,
         "specials": specials,
         "levelUp": level_up,
+        "whatsNew": whats_new,
         "newDishes": new_dishes,
         "specialCheer": special_cheer,
         "newRewards": new_rewards,
@@ -540,9 +553,60 @@ def feedback_url(kind: str) -> str:
             "**What happened?**\n\n\n"
             "**What did you expect?**\n\n\n"
             "**Steps to reproduce**\n1. \n2. \n\n"
+            "_If you can, attach `user_files/debug_log.txt` from the add-on's folder (look it over first: it can contain file paths)._\n\n"
             "---\n" + _version_info()
         )
     return f"{REPO_URL}/issues/new?labels={label}&title={quote(title)}&body={quote(body)}"
+
+
+def export_progress() -> None:
+    """Save the whole kitchen (mon, decor, pets, logs) to a file you choose."""
+    from aqt.qt import QFileDialog
+
+    state.save()
+    start = os.path.join(os.path.expanduser("~"), f"onigiri-kitchen-{datetime.date.today():%Y%m%d}.json")
+    path, _ = QFileDialog.getSaveFileName(mw, "Back up your kitchen", start, "Onigiri Kitchen save (*.json)")
+    if not path:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(state.data, f, ensure_ascii=False, indent=1)
+        tooltip(f"Kitchen saved to {os.path.basename(path)}")
+    except OSError as e:
+        diag.error("could not back up", e)
+        tooltip("Couldn't write that file.")
+
+
+def import_progress() -> None:
+    """Replace the kitchen with a backup (the current one is kept beside it first)."""
+    from aqt.qt import QFileDialog
+    from aqt.utils import askUser
+
+    path, _ = QFileDialog.getOpenFileName(mw, "Restore your kitchen", os.path.expanduser("~"), "Onigiri Kitchen save (*.json)")
+    if not path:
+        return
+    status, data = savefile.read(path)
+    if status != "ok" or not savefile.looks_like_a_save(data):
+        tooltip("That doesn't look like an Onigiri Kitchen save.")
+        return
+    if not askUser("Replace your kitchen with this backup?\n\nYour current kitchen is kept next to it, so you can go back.", parent=mw):
+        return
+    try:
+        if state.path and os.path.exists(state.path):
+            shutil.copy2(state.path, f"{state.path}.before-restore-{datetime.datetime.now():%Y%m%d-%H%M%S}")
+        tmp = f"{state.path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, state.path)
+        state.load()
+    except Exception as e:
+        diag.error("could not restore", e)
+        tooltip("Couldn't restore that backup. Your kitchen is unchanged.")
+        return
+    tooltip("Kitchen restored")
+    if _dialog is not None:
+        _dialog.close_soon(force=True)
+    QTimer.singleShot(600, open_kitchen)
 
 
 def open_kitchen(reason: str = "") -> None:
@@ -665,6 +729,12 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
     if cmd == "idea":
         openLink(feedback_url("idea"))
         return None
+    if cmd == "export":
+        export_progress()
+        return None
+    if cmd == "import":
+        QTimer.singleShot(0, import_progress)  # (not from inside the page's own callback)
+        return None
     if cmd == "serveall":
         result = state.serve_all()
         result["state"] = state.snapshot()
@@ -694,7 +764,6 @@ def handle_kitchen_cmd(cmd: str, arg: str, dialog: Optional[KitchenDialog]) -> A
 
 # --------------------------------------------------- Onigiri home-screen widget
 _stats_cache: Dict[str, Any] = {"key": None, "value": None}
-_overdue_cache: Dict[str, Any] = {"key": None, "value": None}
 
 
 def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
@@ -716,7 +785,7 @@ def lifetime_stats(today_total: int) -> Optional[Dict[str, Any]]:
             cutoff,
         )
     except Exception as e:
-        print(f"Onigiri Kitchen: couldn't read review history: {e}")
+        diag.error("couldn't read review history", e)
         return None
     total = sum(int(c) for _, c in rows)
     days = len(rows)
@@ -800,226 +869,6 @@ def _pomo_stats(today: datetime.date) -> Dict[str, Any]:
     }
 
 
-def _new_per_day() -> int:
-    """New cards a day your decks let you see: the new-card limits of the
-    top-level decks that still have new cards waiting (today's limits, as the
-    log doesn't keep past ones). 0 when it can't be worked out."""
-    try:
-        total = 0
-        for entry in mw.col.decks.all_names_and_ids(skip_empty_default=True):
-            if "::" in entry.name:
-                continue
-            ids = list(mw.col.decks.deck_and_child_ids(entry.id))
-            marks = ",".join(str(int(i)) for i in ids)
-            waiting = mw.col.db.scalar(f"select count() from cards where queue = 0 and (did in ({marks}) or odid in ({marks}))")
-            if not waiting:
-                continue
-            conf = mw.col.decks.config_dict_for_deck_id(entry.id)
-            total += int((conf.get("new") or {}).get("perDay", 0))
-        return total
-    except Exception:
-        return 0
-
-
-def _overdue_days(cutoff: int, today_n: int) -> Dict[str, List[int]]:
-    """Day indexes (99999 is today) that you left something undone.
-    "reviews": a review card was due but not answered by the day's end.
-    "all": that, or a card in its learning steps came round again and wasn't
-    answered, or fewer new cards were started than your decks' daily limit.
-    Anki keeps no daily due counts, so it is rebuilt from the log: an answer's
-    interval says when the card came due, and the days between then and the
-    next answer were missed. Cards still overdue now count from their due day
-    up to yesterday. The new-card part uses today's limits and assumes there
-    were new cards left, so it's approximate. Cached until the day or the log changes."""
-    key = (cutoff, today_n)
-    if _overdue_cache["key"] == key:
-        return _overdue_cache["value"]
-    reviews: set = set()
-    learning: set = set()
-    new_by_day: Dict[int, int] = {}
-    try:
-        db = mw.col.db
-        rows = db.all(
-            "select cid, id, cast((id / 1000 - ?) / 86400.0 + 100000 as integer), type, ivl from revlog "
-            "where type in (0, 1, 2, 4, 5) order by cid, id", cutoff)
-        day = lambda ts: int((ts - cutoff) // 86400) + 100000
-        cid_prev = None
-        due = None  # the day a review is due
-        step = None  # the day a learning step comes round
-        for cid, rid, d, t, ivl in rows:
-            if cid != cid_prev:
-                cid_prev, due, step = cid, None, None
-                if t == 0:
-                    new_by_day[d] = new_by_day.get(d, 0) + 1
-            if t == 1 and due is not None and due < d:
-                reviews.update(range(due, d))
-            if t in (0, 1, 2) and step is not None and step < d:
-                learning.update(range(step, d))
-            # a positive interval is days until the next review; a negative one is
-            # seconds until the next learning step; a reset leaves neither
-            due = d + ivl if t in (0, 1, 2) and ivl > 0 else None
-            step = day(rid / 1000 - ivl) if t in (0, 1, 2) and ivl < 0 else None
-        sched_today = int(mw.col.sched.today)
-        oldest = db.scalar("select min(due) from cards where queue = 2 and due < ?", sched_today)
-        if oldest is not None:
-            reviews.update(range(99999 - (sched_today - int(oldest)), 99999))
-        stuck = db.scalar("select min(due) from cards where queue = 1 and due < ?", cutoff - 86400)
-        if stuck is not None:
-            learning.update(range(day(int(stuck)), 99999))
-    except Exception as e:
-        print(f"Onigiri Kitchen: couldn't work out overdue days: {e}")
-        return {"reviews": [], "all": []}
-    short: set = set()
-    limit = _new_per_day()
-    if limit and new_by_day:
-        short = {d for d in range(min(new_by_day), 99999) if new_by_day.get(d, 0) < limit}
-    value = {"reviews": sorted(reviews), "all": sorted(reviews | learning | short)}
-    _overdue_cache.update(key=key, value=value)
-    return value
-
-
-def _iso_days(today: datetime.date, idx: List[int]) -> List[str]:
-    return [(today - datetime.timedelta(days=99999 - d)).isoformat() for d in idx]
-
-
-_records_cache: Dict[str, Any] = {}
-
-
-def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
-    """What the Records page is worked out from: for each day, answers by kind
-    (learning, review, relearning, filtered), review Agains, new cards and the
-    longest run of answers that weren't Again; and every study session (answers
-    less than 5 minutes apart) with its length and card count."""
-    days: Dict[int, List[Any]] = {}
-    sessions: List[List[Any]] = []
-    try:
-        # the log only ever grows, so its size and newest answer say whether the last result still holds
-        stamp = (tuple(mw.col.db.first("select count(), coalesce(max(id), 0) from revlog where type in (0, 1, 2, 3)") or ()), cutoff, today.isoformat())
-        if _records_cache.get("stamp") == stamp:
-            return _records_cache["value"]
-        rows = mw.col.db.all("select id, cid, type, ease, time from revlog where type in (0, 1, 2, 3) order by id")
-    except Exception as e:
-        print(f"Onigiri Kitchen: couldn't read review log for records: {e}")
-        return {"days": [], "sessions": []}
-    run = 0
-    prev = None
-    start = 0
-    first_id = 0
-    count = 0
-    day_of = lambda ms: int((ms / 1000 - cutoff) / 86400.0 + 100000)
-
-    def close_session() -> None:
-        if count >= 5 and prev is not None:
-            d = (today - datetime.timedelta(days=99999 - day_of(first_id))).isoformat()
-            sessions.append([d, round((prev - start) / 60000, 1), count])
-
-    for rid, cid, t, ease, ms in rows:
-        d = day_of(rid)
-        row = days.setdefault(d, [0, 0, 0, 0, 0, set(), 0])  # t0, t1, t2, t3, review Agains, new cids, best run
-        row[t] += 1
-        if t == 1 and ease == 1:
-            row[4] += 1
-        if t == 0:
-            row[5].add(cid)
-        run = 0 if ease == 1 else run + 1
-        row[6] = max(row[6], run)
-        if prev is None or rid - prev > 300000:
-            close_session()
-            start, first_id, count = rid - (ms or 0), rid, 0
-        prev = rid
-        count += 1
-    close_session()
-    out = [[(today - datetime.timedelta(days=99999 - d)).isoformat(), r[0], r[1], r[2], r[3], r[4], len(r[5]), r[6]] for d, r in sorted(days.items())]
-    value = {"days": out, "sessions": sessions}
-    _records_cache.update(stamp=stamp, value=value)
-    return value
-
-
-def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
-    """Anki's review history: every day's count, and for each range (7 and 30
-    days, a year, all time) the answer buttons, retention, time and a
-    weekday × hour grid."""
-    try:
-        cutoff = int(mw.col.sched.day_cutoff)
-        db = mw.col.db
-        rows = db.all(
-            "select cast((id / 1000 - ?) / 86400.0 + 100000 as integer) as d, count(), coalesce(sum(time), 0) "
-            "from revlog where type in (0, 1, 2, 3) group by d order by d",
-            cutoff,
-        )
-        ranges: Dict[str, Any] = {}
-        for key, days in (("7", 7), ("30", 30), ("365", 365), ("all", None)):
-            since = (cutoff - days * 86400) * 1000 if days else 0
-            where = "type in (0, 1, 2, 3) and id > ?"
-            buttons = {int(e): int(c) for e, c in db.all(f"select ease, count() from revlog where {where} group by ease", since) if e}
-            mature = db.first("select count(), sum(case when ease = 1 then 1 else 0 end) from revlog where type = 1 and id > ?", since) or (0, 0)
-            ms = db.scalar(f"select coalesce(sum(time), 0) from revlog where {where}", since) or 0
-            new = db.scalar("select count(distinct cid) from revlog where type = 0 and id > ?", since) or 0
-            # answers and time by kind: 0 learning (new cards), 1 review, 2 relearning, 3 filtered deck
-            by_type = {int(t): [int(c), int(m or 0), int(f or 0)] for t, c, m, f in db.all(
-                f"select type, count(), sum(time), sum(case when ease = 1 then 1 else 0 end) from revlog where {where} group by type", since)}
-            grid = [0] * 168
-            for wd, h, c in db.all(
-                "select cast(strftime('%w', id / 1000, 'unixepoch', 'localtime') as integer), "
-                "cast(strftime('%H', id / 1000, 'unixepoch', 'localtime') as integer), count() "
-                f"from revlog where {where} group by 1, 2",
-                since,
-            ):
-                if wd is not None and h is not None:
-                    grid[((int(wd) + 6) % 7) * 24 + int(h)] = int(c)  # rows Monday first
-            ranges[key] = {
-                "buttons": [buttons.get(i, 0) for i in (1, 2, 3, 4)],
-                "reviewAnswers": int(mature[0] or 0),
-                "fails": int(mature[1] or 0),
-                "ms": int(ms),
-                "newCards": int(new),
-                "byType": [by_type.get(t, [0, 0, 0]) for t in (0, 1, 2, 3)],  # [answers, ms, Again presses]
-                "grid": grid,
-            }
-        cards = db.first(
-            "select count(), sum(case when type = 0 then 1 else 0 end), "
-            "sum(case when type = 2 and ivl >= 21 then 1 else 0 end), "
-            "sum(case when type = 2 and ivl < 21 then 1 else 0 end), "
-            "sum(case when type in (1, 3) then 1 else 0 end), "
-            "sum(case when queue = -1 then 1 else 0 end), "
-            "avg(case when type = 2 then ivl end), avg(case when type = 2 and factor > 0 then factor end) from cards"
-        ) or (0,) * 8
-        notes = db.scalar("select count() from notes") or 0
-        try:
-            decks = len(mw.col.decks.all_names_and_ids())
-        except Exception:
-            decks = None
-    except Exception as e:
-        print(f"Onigiri Kitchen: couldn't read review history for stats: {e}")
-        return None
-    # day index 99999 is today (Anki's day, with its own rollover hour)
-    overdue = _overdue_days(cutoff, sum(int(c) for _, c, _ in rows))
-    daily = [[(today - datetime.timedelta(days=99999 - int(d))).isoformat(), int(c), int(ms)] for d, c, ms in rows]
-    return {
-        "daily": daily,  # [date, reviews, answer ms], every day you reviewed
-        # days something was left undone (so every other day since your first review was cleared):
-        # "missed" is review cards only, "missedAll" adds learning and new cards
-        "missed": _iso_days(today, overdue["reviews"]),
-        "missedAll": _iso_days(today, overdue["all"]),
-        "ranges": ranges,
-        # per day [date, learning, review, relearning, filtered answers, review Agains, new cards, best run of non-Agains]
-        # and sessions [date, minutes, cards]: what the Records page works from
-        "records": _review_records(cutoff, today),
-        "collection": {
-            "cards": int(cards[0] or 0),
-            "new": int(cards[1] or 0),
-            "mature": int(cards[2] or 0),
-            "young": int(cards[3] or 0),
-            "learning": int(cards[4] or 0),
-            "suspended": int(cards[5] or 0),
-            "avgInterval": round(float(cards[6]), 1) if cards[6] else None,
-            "avgEase": round(float(cards[7]) / 10) if cards[7] else None,
-            "notes": int(notes),
-            "decks": decks,
-        },
-    }
-
-
 def _kitchen_stats() -> Dict[str, Any]:
     d = state.data
     log = state._log()
@@ -1080,7 +929,7 @@ def stats_payload() -> Dict[str, Any]:
     return {
         "today": today.isoformat(),
         "pomo": _pomo_stats(today),
-        "reviews": _review_stats(today),
+        "reviews": rstats.review_stats(today),
         "kitchen": _kitchen_stats(),
         "studyToday": study_today(),
         "themeMode": conf().get("theme_mode", "anki"),
@@ -1222,7 +1071,7 @@ def study_today() -> Optional[Dict[str, Any]]:
         tree = mw.col.sched.deck_due_tree()
         due_new, due_learn, due_review = int(tree.new_count), int(tree.learn_count), int(tree.review_count)
     except Exception as e:
-        print(f"Onigiri Kitchen: couldn't estimate today's time: {e}")
+        diag.error("couldn't estimate today's time", e)
         return None
     # new cards take a few learning answers each; cards already in learning
     # still need about one more (they have steps left, or come round again);
@@ -1286,7 +1135,7 @@ def kitchen_widget(deck_browser: Any, content: Any) -> None:
     try:
         data = json.dumps(widget_payload(), ensure_ascii=False).replace("</", "<\\/")
     except Exception as e:
-        print(f"Onigiri Kitchen: widget failed: {e}")
+        diag.error("widget failed", e)
         return
     content.stats += (
         f'<div class="okw{" okw-plain" if plain else ""}" role="button" tabindex="0" aria-label="Open Onigiri Kitchen">'
@@ -1373,20 +1222,7 @@ CELEBRATION_WINDOW = 4.0
 
 
 def debug_log(msg: str) -> None:
-    """Small rolling log in user_files/debug_log.txt to diagnose issues."""
-    import datetime as _dt
-
-    path = os.path.join(ADDON_DIR, "user_files", "debug_log.txt")
-    try:
-        lines = []
-        if os.path.exists(path):
-            with open(path, encoding="utf-8") as f:
-                lines = f.read().splitlines()[-199:]
-        lines.append(f"{_dt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
-    except Exception:
-        pass
+    diag.log(msg)
 
 
 def on_state_will_change(new_state: str, old_state: str) -> None:

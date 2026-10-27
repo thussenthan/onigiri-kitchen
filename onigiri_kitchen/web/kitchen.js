@@ -14,6 +14,7 @@
   // ------------------------------------------------------------ utilities
   const $ = (id) => document.getElementById(id);
   const rand = (a, b) => a + Math.random() * (b - a);
+  const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); // (no fireworks bursts)
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -3885,6 +3886,7 @@
   }
 
   function firework() {
+    if (REDUCED_MOTION) return;
     const ix = WIN.x + 2;
     const iy = WIN.y + 2;
     const x = ix + rand(10, WIN.w - 14);
@@ -4774,6 +4776,8 @@
   $('ok-t-set').addEventListener('click', () => togglePanel('ok-settings'));
   $('ok-report').addEventListener('click', () => send('report'));
   $('ok-idea').addEventListener('click', () => send('idea'));
+  $('ok-backup').addEventListener('click', () => send('export'));
+  $('ok-restore').addEventListener('click', () => send('import'));
   setTip($('ok-b-stats'), 'You in numbers');
   $('ok-b-stats').addEventListener('click', () => { OKSound.pluck(4); send('stats'); });
   $('ok-tour-replay').addEventListener('click', () => guardSettings(() => { $('ok-settings').hidden = true; startTour(); }));
@@ -5780,6 +5784,7 @@
     // good news on arrival, one after another
     const news = [];
     if (INIT.levelUp) news.push(() => levelUpCheer(INIT.levelUp));
+    if (INIT.whatsNew) news.push(() => bigToast('新', `New in ${esc(INIT.whatsNew.version)}`, INIT.whatsNew.notes.map(esc).join('<br>')));
     if ((INIT.newDishes || []).length) news.push(() => newDishCheer(INIT.newDishes));
     if (INIT.specialCheer) news.push(specialCheer);
     (INIT.newRewards || []).forEach((id) => news.push(() => rewardCheer(id)));
