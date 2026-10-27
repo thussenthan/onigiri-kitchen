@@ -21,7 +21,7 @@ Anki names AnkiWeb installs after the download's file name, which AnkiWeb makes 
 
 You study, guests arrive. You take a break, you get to enjoy them.
 
-![Daytime in the restaurant](https://raw.githubusercontent.com/thussenthan/onigiri-kitchen/main/docs/day.png)
+![The restaurant, in motion](https://raw.githubusercontent.com/thussenthan/onigiri-kitchen/main/docs/kitchen.gif)
 
 ### Features
 - **A living pixel restaurant.** Click Onigiri's restaurant widget to open it. Lanterns, a noren curtain in your theme colour, and a window onto Mt. Fuji that follows your real clock and the seasons.
@@ -43,6 +43,7 @@ You study, guests arrive. You take a break, you get to enjoy them.
 - **Several pets, your pick.** Adopt more than one and flip between them on the Pets card: each has its own care, keepsakes and food dish. A hungry pet shows a thought bubble with the food it wants; tap it to feed. You're told when something unlocks by itself (Specials Book rewards, pet accessories, new shop items). **Collect all** is on the home-screen widget too, and unsaved settings ask before they're lost.
 - **Your kitchen is safe.** It's backed up every day, a save that can't be read is never overwritten, and ⚙ has Back up and Restore buttons for moving it to another computer.
 - **A postcard of your restaurant:** the envelope button makes a picture of the kitchen as it is right now, with your level, guests served and pets, to save or copy. Nothing is uploaded.
+- **Keyboard friendly:** Tab to the picture, arrow keys choose, Enter taps; plain letters open the shop (S), pets (P), stats (T) and the focus timer (F), and ? lists them. Anki's own shortcuts are never taken.
 - **A guided tour** the first time you open it, and a **目安箱 suggestion box** for ideas and bug reports.
 - **Matches your Onigiri theme:** your colours, font and dark mode, or light by day and dark at night by your clock.
 

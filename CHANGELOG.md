@@ -2,6 +2,11 @@
 
 What changed in each release. Newest first. (The last release's short note is also shown inside the kitchen, once, after you update.)
 
+## 1.11.1
+
+- Keyboard: Tab to the restaurant picture, then the arrow keys step through everything you can tap, Enter or Space taps it and Esc lets go (it is read out to screen readers too). Plain letters open the buttons: **S** shop, **P** pets, **T** stats, **F** focus timer, **,** timer settings, **M** mute, **C** postcard, **?** the list. Nothing with Ctrl, Cmd or Alt is used, and none work while you're typing or in a pop-up.
+- An animated demo (`docs/kitchen.gif`) at the top of the README.
+
 ## 1.11.0
 
 **Fixes**

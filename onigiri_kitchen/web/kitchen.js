@@ -4370,6 +4370,88 @@
     if (r && r.click) r.click();
   });
 
+  // ------------------------------------------------------------ keyboard
+  // The restaurant can be used without a mouse. Tab to the picture, then the arrow keys
+  // step through everything you can tap (the chef, the pets, the candles...), Enter or
+  // Space taps it, Esc lets go. Plain letters open the buttons below it. None of them
+  // use Ctrl, Cmd or Alt, so Anki's and the system's own shortcuts are never taken, and
+  // none fire while you're typing, in a pop-up or in the tour.
+  view.tabIndex = 0;
+  view.setAttribute('role', 'application');
+  view.setAttribute('aria-label', 'Your pixel restaurant. Arrow keys choose something, Enter taps it, question mark lists the keys.');
+  view.setAttribute('aria-keyshortcuts', '?');
+  const live = document.createElement('div');
+  live.className = 'ok-sr';
+  live.setAttribute('role', 'status');
+  live.setAttribute('aria-live', 'polite');
+  $('ok-stage').appendChild(live);
+  let kbKey = null; // which thing the arrow keys are on: its label and place
+  const plain = (html) => String(html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const tappable = () => regions.filter((r) => r.click && r.label).sort((a, b) => (a.y + a.h / 2 > b.y + b.h / 2 + 12 ? 1 : a.y + a.h / 2 < b.y + b.h / 2 - 12 ? -1 : a.x - b.x));
+  function kbSelect(r) {
+    hover = r;
+    kbKey = r ? `${r.label}|${Math.round(r.x)}|${Math.round(r.y)}` : null;
+    const tip = $('ok-tip');
+    if (!r) { tip.hidden = true; live.textContent = ''; return; }
+    tip.innerHTML = r.label;
+    tip.hidden = false;
+    const box = view.getBoundingClientRect();
+    const stage = $('ok-stage').getBoundingClientRect();
+    const cx = box.left + ((r.x + r.w / 2) / W) * box.width - stage.left;
+    const cy = box.top + ((r.y + r.h) / H) * box.height - stage.top;
+    tip.style.left = clamp(cx - tip.offsetWidth / 2, 6, Math.max(6, stage.width - tip.offsetWidth - 6)) + 'px';
+    tip.style.top = clamp(cy + 10, 6, Math.max(6, stage.height - tip.offsetHeight - 6)) + 'px';
+    live.textContent = plain(r.label);
+  }
+  view.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const list = tappable();
+    const at = list.findIndex((r) => `${r.label}|${Math.round(r.x)}|${Math.round(r.y)}` === kbKey);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      if (!list.length) return;
+      const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
+      kbSelect(list[at < 0 ? (step > 0 ? 0 : list.length - 1) : (at + step + list.length) % list.length]);
+      e.preventDefault();
+    } else if ((e.key === 'Enter' || e.key === ' ') && at >= 0) {
+      list[at].click();
+      OKSound.pop();
+      e.preventDefault();
+    } else if (e.key === 'Escape' && kbKey) {
+      kbSelect(null);
+      view.blur();
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+  view.addEventListener('blur', () => { if (kbKey) kbSelect(null); });
+
+  const SHORTCUTS = [
+    ['s', 'ok-b-decor', 'Shop'], ['p', 'ok-b-pet', 'Pets'], ['t', 'ok-b-stats', 'Stats (統計)'],
+    ['f', 'ok-t-main', 'Start, pause or resume the focus timer'], [',', 'ok-t-set', 'Timer settings'],
+    ['m', 'ok-b-sound', 'Mute or unmute'], ['c', 'ok-b-card', 'Postcard of your restaurant'],
+  ];
+  for (const [key, id, name] of SHORTCUTS) {
+    const el = $(id);
+    el.setAttribute('aria-keyshortcuts', key);
+    const hint = ` (${key.toUpperCase()})`;
+    const base = el.getAttribute('title');
+    el.setAttribute('title', base ? `${base}${hint}` : `${name}${hint}`);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (tourIdx >= 0 || !$('ok-starter').hidden || document.querySelector('.ok-modal:not([hidden])')) return;
+    if (e.key === '?') {
+      bigToast('鍵', 'Keyboard', `${SHORTCUTS.map(([k, , n]) => `<b>${k.toUpperCase()}</b> ${n}`).join('<br>')}<br><b>Tab</b> to the picture, then <b>arrows</b> choose, <b>Enter</b> taps, <b>Esc</b> lets go`);
+      e.preventDefault();
+      return;
+    }
+    const hit = SHORTCUTS.find(([k]) => k === e.key.toLowerCase());
+    const btn = hit && $(hit[1]);
+    if (btn && !btn.hidden && !btn.disabled) { btn.click(); e.preventDefault(); }
+  });
+
   // --------------------------------------------------------- speech bubble
   // Pop-ups go away on a swipe up (or a flick of the trackpad, or a click):
   // they follow the finger, fade, and are gone.

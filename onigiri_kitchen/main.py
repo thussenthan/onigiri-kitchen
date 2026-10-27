@@ -25,10 +25,11 @@ from .state import BIRD_COLORS, CATALOG, PET_FOR_SPECIES, CATALOG_BY_ID, anki_to
 ADDON_DIR = os.path.dirname(__file__)
 PACKAGE = mw.addonManager.addonFromModule(__name__)
 CMD_PREFIX = "okitchen:"
-VERSION = "1.11.0"
+VERSION = "1.11.1"
 
 # what's new, shown once (as a note when the kitchen opens) after updating to that version
 WHATS_NEW = {
+    "1.11.1": ["The restaurant works from the keyboard: Tab to the picture, arrow keys choose, Enter taps. Press ? for the letter shortcuts (S shop, P pets, T stats, F focus timer, M mute)."],
     "1.11.0": ["Guests who are mid-meal when you close the kitchen no longer lose their tip.",
                "Renaming a deck can't bring a second round of guests any more.",
                "Reviews you do on your phone and sync the next morning still bring takeout guests.",

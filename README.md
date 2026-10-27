@@ -7,7 +7,7 @@ built as a companion to the [Onigiri](https://ankiweb.net/shared/info/1011095603
 
 **You study, guests arrive. You take a break, you get to enjoy them.**
 
-![Daytime in the restaurant](docs/day.png)
+![The restaurant, in motion](docs/kitchen.gif)
 
 **In 30 seconds:** every 10 reviews a guest walks in and, when you take a break, tips you in 文 (mon). Spend mon
 on decor and pets; a pomodoro timer is built in; Stats shows your numbers. Nothing ever punishes you: no streak to
@@ -89,6 +89,9 @@ break, nothing that gets sick or dies.
 - **目安箱 suggestion box** on the wall (and in ⚙) for feature ideas and bug reports.
 - **Matches your Onigiri theme.** It uses your Onigiri colours, font and dark mode automatically. In ⚙ you can
   also have light and dark follow your clock (light by day, dark at night) or stay one way.
+- **Keyboard friendly.** Tab to the restaurant picture, then the arrow keys step through everything you can tap, Enter taps
+  it and Esc lets go. Plain letters open the buttons: **S** shop, **P** pets, **T** stats, **F** focus timer, **,** timer
+  settings, **M** mute, **C** postcard, **?** lists them. Nothing uses Ctrl, Cmd or Alt, so Anki's own shortcuts are never taken.
 - Mostly idle and fully optional: the chef, your pets, the menu tags (they play koto notes), the window, the
   lanterns, the bed and most decor all do something when clicked.
 

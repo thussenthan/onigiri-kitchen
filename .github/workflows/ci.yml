@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        aqt: ['aqt==23.10.1', 'aqt']
+        aqt: ['aqt[qt6]==23.10.1', 'aqt[qt6]']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

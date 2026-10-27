@@ -15,7 +15,10 @@ source = (ROOT / "onigiri_kitchen" / "main.py").read_text(encoding="utf-8")
 
 import anki.lang  # noqa: E402
 
-anki.lang.set_lang("en")  # (Anki's own screens translate their text when they're defined)
+try:
+    anki.lang.set_lang("en")  # (newer Anki screens translate their text when they're defined)
+except Exception:
+    pass
 
 from aqt import gui_hooks  # noqa: E402
 from aqt.deckbrowser import DeckBrowser  # noqa: E402

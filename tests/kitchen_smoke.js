@@ -63,6 +63,22 @@ async function main() {
   }
   const mon = await page.evaluate(() => document.getElementById('ok-mon').textContent);
   check(/^[\d,. ]+$/.test(mon.trim()), `kitchen: the purse shows "${mon}" after tips were paid`);
+  // the keyboard: arrows pick something to tap, letters open the buttons, and typing isn't hijacked
+  await page.focus('#ok-canvas');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(200);
+  check(await page.evaluate(() => !document.getElementById('ok-tip').hidden && document.querySelector('.ok-sr').textContent.length > 0), 'keyboard: arrow key chose nothing');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('s');
+  check(await page.evaluate(() => !document.getElementById('ok-decor').hidden), 'keyboard: S did not open the shop');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+s');
+  check(await page.evaluate(() => document.getElementById('ok-decor').hidden), 'keyboard: Ctrl+S must be left alone');
+  await page.click('#ok-t-set');
+  await page.focus('#ok-form input');
+  await page.keyboard.press('p');
+  check(await page.evaluate(() => document.getElementById('ok-pet').hidden), 'keyboard: a letter typed in a field opened a panel');
+  await page.keyboard.press('Escape');
   for (const id of ['ok-b-decor', 'ok-b-pet', 'ok-t-set']) {
     await page.click(`#${id}`);
     await page.waitForTimeout(300);
