@@ -246,7 +246,7 @@ body .oks-range button.on, body .oks-range button.on:hover { background: var(--s
 .oks-group > summary:hover { color: var(--shu); }
 .oks-group > .oks-grid, .oks-group > .oks-table { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 .oks-group > .oks-grid { gap: 0; margin: 0; overflow: hidden; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.oks-group .oks-grid .oks-tile { background: transparent; border: 0; border-radius: 0; box-shadow: inset -1px -1px 0 var(--line); padding: 11px 14px; }
+.oks-group .oks-grid .oks-tile { background: transparent; border: 0; border-radius: 0; box-shadow: 1px 1px 0 var(--line); padding: 11px 14px; } /* (dividers fall just outside the frame at its edges, where it clips them) */
 
 /* records */
 .oks-recs { display: block; }
