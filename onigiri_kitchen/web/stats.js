@@ -48,7 +48,7 @@
   const hourName = (h) => hourLabel(h).replace('a', ' am').replace('p', ' pm');
 
   // the page being shown (the window always opens on Today)
-  const PAGES = ['today', 'rev', 'pomo', 'kitchen'];
+  const PAGES = ['today', 'rev', 'pomo', 'kitchen', 'rec'];
   let page = 'today';
   try {
     const savedPage = new URLSearchParams(location.search).get('page'); // (always opens on Today)
@@ -106,7 +106,7 @@
   // up to yesterday that wasn't left undone (today counts once nothing is due).
   // `all` adds learning and new cards to the reviews. Returns the current and
   // best runs, and the share of the days in the range (the whole history for All time).
-  function cleared(r, first, all, days) {
+  function cleared(r, first, all, days, since) {
     if (!first) return null;
     const missed = new Set((all ? r.missedAll : r.missed) || []);
     const t = (OKS.studyToday || {}).due;
@@ -119,6 +119,7 @@
     let d = first;
     for (let i = between(first, TODAY); i >= 0; i--, d = addDays(d, 1)) {
       const isToday = d === TODAY;
+      if (since && d < since) continue; // (records for a range: only count its days)
       if (isToday ? todayDone : !missed.has(d)) { run++; best = Math.max(best, run); if (between(d, TODAY) < span) n++; } else if (!isToday) run = 0;
     }
     return { current: run, best, pct: Math.round((n / span) * 100) };
@@ -138,6 +139,13 @@
     return `<div class="oks-tile ${cls || ''}"${tip ? ` data-tip="${esc(tip)}"` : ''}><small>${label}</small><b>${value}</b>${note ? `<em>${note}</em>` : ''}</div>`;
   }
   const hero = (label, value, note, tip) => tile(label, value, note, tip, 'oks-hero-tile');
+  // a titled, foldable set of small stats on a hairline grid (the fold is remembered)
+  function fold(title, key, body) {
+    let open = true;
+    try { open = localStorage.getItem('oks-fold-' + key) !== '1'; } catch (e) {}
+    return `<details class="oks-group" data-fold="${key}"${open ? ' open' : ''}><summary>${title}</summary>${body}</details>`;
+  }
+  const group = (title, html, key) => (html ? fold(title, key, `<div class="oks-grid">${html}</div>`) : '');
   function card(title, sub, body, cls) {
     return `<div class="oks-chart ${cls || ''}"><h4>${title}${sub ? `<span>${sub}</span>` : ''}</h4>${body}</div>`;
   }
@@ -291,13 +299,13 @@
       hero('Pace', t.pace ? `${t.pace}s` : '–', 'per card today') +
       hero('Time left', due.total ? `~${dur(t.estimateSeconds / 60)}` : 'All done', due.total ? `${num(due.total)} cards due, at your pace` : 'nothing due right now',
         'Your cards still due today, times your own average seconds per answer (last 30 days), counting the answers a new card usually takes') +
-      '</div><div class="oks-grid">' +
-      tile('Retention today', pct(t.retention), 'review cards remembered') +
-      tile('Focus today', dur(focusMin), `${num(sessions.length)} session${sessions.length === 1 ? '' : 's'}`) +
-      tile('Guests today', num(kday[1]), `${num(kday[2])} 文 earned`) +
-      todayRows(D.reviews || {}) +
-      tile('Finish around', due.total ? new Date(Date.now() + t.estimateSeconds * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '–', due.total ? 'if you start now' : '') +
-      '</div><div class="oks-charts">' +
+      '</div>' +
+      group('Today', tile('Retention today', pct(t.retention), 'review cards remembered') +
+        tile('Focus today', dur(focusMin), `${num(sessions.length)} session${sessions.length === 1 ? '' : 's'}`) +
+        tile('Guests today', num(kday[1]), `${num(kday[2])} 文 earned`) +
+        tile('Finish around', due.total ? new Date(Date.now() + t.estimateSeconds * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '–', due.total ? 'if you start now' : ''), 'today') +
+      group('Streaks and the last 30 days', todayRows(D.reviews || {}), 'today30') +
+      '<div class="oks-charts">' +
       card('Due today', `${num(due.total)} cards · about ${dur(t.estimateSeconds / 60)}`, stack([
         { slot: 1, label: 'New', value: due.new || 0, note: `About ${pc.answersPerNew || '–'} answers each, ${pc.learning || '–'}s an answer` },
         { slot: 2, label: 'Learning', value: due.learn || 0, note: `${pc.relearning || '–'}s an answer` },
@@ -347,24 +355,23 @@
       hero('Focus streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one focus session') +
       hero('Completion rate', timed ? pct(Math.round(((full + goal) / timed) * 100)) : '–', 'timed sessions finished', 'Timed sessions that ran their full length or reached your card goal, out of all timed sessions (endless ones aren\'t timed)') +
       hero('Pace', cards ? `${round1((minutes * 60) / cards)}s` : '–', cards ? `a card · ${num(cards)} cards in focus` : 'seconds per card while focusing', 'Focus time divided by the cards you reviewed in it') +
-      '</div><div class="oks-grid">' +
-      tile('Average session', dur(n ? minutes / n : null)) +
+      '</div>' +
+      group('Sessions', tile('Average session', dur(n ? minutes / n : null)) +
       tile('Longest session', dur(n ? Math.max(...S.map((s) => s.min)) : null)) +
       tile('Cards per session', n ? round1(cards / n) : '–', `${num(cards)} cards in focus`) +
-      tile('Fastest session', fastest ? `${round1(fastest.min * 60 / fastest.cards)}s` : '–', fastest ? `a card · ${fmtDay(fastest.date, 'year')}` : 'needs 10+ cards') +
-      tile('Focus per day', dur(minutes / spanDays), `over ${num(spanDays)} day${spanDays === 1 ? '' : 's'}`) +
+      tile('Fastest session', fastest ? `${round1(fastest.min * 60 / fastest.cards)}s` : '–', fastest ? `a card · ${fmtDay(fastest.date, 'year')}` : 'needs 10+ cards'), 'p-sessions') +
+      group('Days', tile('Focus per day', dur(minutes / spanDays), `over ${num(spanDays)} day${spanDays === 1 ? '' : 's'}`) +
       tile('Active days', num(dayList.length), `${Math.round((dayList.length / spanDays) * 100)}% of days`) +
       tile('Per active day', dur(dayList.length ? minutes / dayList.length : null), dayList.length ? `${round1(n / dayList.length)} sessions` : '') +
-      tile('Best day', best ? dur(best[1].min) : '–', best ? `${fmtDay(best[0], 'year')} · ${best[1].n} sessions` : '') +
-      tile('Breaks taken', num(Bk.length), `${dur(Bk.reduce((a, b) => a + b[1], 0) / 60)} of rest`) +
+      tile('Best day', best ? dur(best[1].min) : '–', best ? `${fmtDay(best[0], 'year')} · ${best[1].n} sessions` : ''), 'p-days') +
+      group('Breaks', tile('Breaks taken', num(Bk.length), `${dur(Bk.reduce((a, b) => a + b[1], 0) / 60)} of rest`) +
       tile('Short breaks', num(Bk.filter((b) => !b[2]).length), 'between sessions') +
       tile('Long breaks', num(Bk.filter((b) => b[2]).length), 'after a full cycle') +
       tile('Breaks skipped', num(Bk.filter((b) => b[3]).length)) +
-      tile('Endless share', n ? pct(Math.round((endless / n) * 100)) : '–', '∞ mode sessions') +
+      tile('Idle pauses', num(p.idlePauses), `all time · ${num(p.resets)} resets`), 'p-breaks') +
+      group('While focusing', tile('Endless share', n ? pct(Math.round((endless / n) * 100)) : '–', '∞ mode sessions') +
       tile('Retention in focus', (() => { const rv = S.reduce((a, s) => a + s.rev, 0); const f = S.reduce((a, s) => a + s.fails, 0); return rv ? pct(round1((1 - f / rv) * 100)) : '–'; })(), 'review cards remembered while focusing') +
-      tile('Answer time in focus', cards ? `${round1(S.reduce((a, s) => a + s.ms, 0) / 1000 / cards)}s` : '–', 'per card, as timed by Anki') +
-      tile('Idle pauses', num(p.idlePauses), `all time · ${num(p.resets)} resets`) +
-      '</div>';
+      tile('Answer time in focus', cards ? `${round1(S.reduce((a, s) => a + s.ms, 0) / 1000 / cards)}s` : '–', 'per card, as timed by Anki'), 'p-quality');
 
     const b = buckets(start);
     S.forEach((s) => fill(b, s.date, s.min, 1));
@@ -449,26 +456,25 @@
       hero('Per day', num(Math.round(total / spanDays)), `${num(inRange.length ? Math.round(total / inRange.length) : 0)} per study day`) +
       hero('Retention', pct(retention), 'review cards remembered', 'Share of answers on review cards that weren\'t Again') +
       hero('Review streak', `${num(st.current)} day${st.current === 1 ? '' : 's'}`, `best ever ${num(st.best)}`, 'Days in a row with at least one review') +
-      '</div><div class="oks-grid">' +
-      tile('Days studied', num(inRange.length), `${Math.round((inRange.length / spanDays) * 100)}% of days`) +
-      tile('Busiest day', busiest ? num(busiest[1]) : '–', busiest ? fmtDay(busiest[0], 'year') : '') +
-      tile('Time reviewing', dur((rg.ms || 0) / 60000), 'as timed by Anki') +
-      tile('Per card', total ? `${round1((rg.ms || 0) / 1000 / total)}s` : '–', 'average answer time') +
-      clearTiles(r, first, range === 'all' ? null : parseInt(range, 10), `of ${rangeName()}`) +
-      tile('Cards learned', num(rg.newCards), 'first seen as new') +
-      tile('Focus time', dur(fMin), `${num(fs.length)} session${fs.length === 1 ? '' : 's'} · ${rangeName()}`) +
-      tile('Focus days', num(fDays), `${Math.round((fDays / spanDays) * 100)}% of days`) +
-      tile('Focus completion', timed.length ? pct(Math.round((finished / timed.length) * 100)) : '–', 'timed sessions finished') +
-      tile('Guests served', num(kd.reduce((a, x) => a + x[1], 0)), rangeName()) +
-      tile('Mon earned', `${num(kd.reduce((a, x) => a + x[2], 0))} 文`, rangeName()) +
-      tile('Again rate', presses ? pct(round1((btn[0] / presses) * 100)) : '–', `${num(btn[0])} presses`) +
-      (range === 'all' || (first && first >= start) ? '' : // (when the range already covers everything, these would just repeat it)
+      '</div>' +
+      group('Habits', tile('Days studied', num(inRange.length), `${Math.round((inRange.length / spanDays) * 100)}% of days`) +
+        tile('Busiest day', busiest ? num(busiest[1]) : '–', busiest ? fmtDay(busiest[0], 'year') : '') +
+        clearTiles(r, first, range === 'all' ? null : parseInt(range, 10), `of ${rangeName()}`), 'r-habits') +
+      group('Time and cards', tile('Time reviewing', dur((rg.ms || 0) / 60000), 'as timed by Anki') +
+        tile('Per card', total ? `${round1((rg.ms || 0) / 1000 / total)}s` : '–', 'average answer time') +
+        tile('Cards learned', num(rg.newCards), 'first seen as new') +
+        tile('Again rate', presses ? pct(round1((btn[0] / presses) * 100)) : '–', `${num(btn[0])} presses`), 'r-time') +
+      group('Focus and kitchen', tile('Focus time', dur(fMin), `${num(fs.length)} session${fs.length === 1 ? '' : 's'} · ${rangeName()}`) +
+        tile('Focus days', num(fDays), `${Math.round((fDays / spanDays) * 100)}% of days`) +
+        tile('Focus completion', timed.length ? pct(Math.round((finished / timed.length) * 100)) : '–', 'timed sessions finished') +
+        tile('Guests served', num(kd.reduce((a, x) => a + x[1], 0)), rangeName()) +
+        tile('Mon earned', `${num(kd.reduce((a, x) => a + x[2], 0))} 文`, rangeName()), 'r-kitchen') +
+      group('All time', range === 'all' || (first && first >= start) ? '' : // (when the range already covers everything, these would just repeat it)
         tile('All-time reviews', num(allTotal), first ? `since ${fmtDay(first, 'year')}` : '') +
         tile('All-time days', num(daily.length), 'studied, ever') +
         tile('All-time study time', dur((((r.ranges || {}).all || {}).ms || 0) / 60000), 'every answer, as timed by Anki') +
         tile('All-time pace', allTotal ? `${round1((((r.ranges || {}).all || {}).ms || 0) / 1000 / allTotal)}s` : '–', 'per card') +
-        tile('All-time retention', (() => { const a = (r.ranges || {}).all || {}; return a.reviewAnswers ? pct(round1((1 - a.fails / a.reviewAnswers) * 100)) : '–'; })(), 'review cards remembered')) +
-      '</div>';
+        tile('All-time retention', (() => { const a = (r.ranges || {}).all || {}; return a.reviewAnswers ? pct(round1((1 - a.fails / a.reviewAnswers) * 100)) : '–'; })(), 'review cards remembered'), 'r-all');
 
     const b = buckets(start);
     inRange.forEach(([d, cnt]) => fill(b, d, cnt));
@@ -527,18 +533,17 @@
       hero('Mon earned', `${num(earned)} 文`, `in ${rangeName()}`, 'Mon (文) your guests and pets brought in') +
       hero('Mon spent', `${num(spent)} 文`, `in ${rangeName()} · ${num(k.mon)} 文 now`) +
       hero('Restaurant', `Lv ${num(k.level)}`, k.levelFrom === 'study' ? 'from your study days' : 'from Onigiri') +
-      '</div><div class="oks-grid">' +
-      tile(pet.count > 1 ? 'Your pets' : 'Your pet', esc(pet.name || '–'), `${esc(pet.stage || '')} · ${num(pet.studyDays)} study days`) +
-      tile('Times petted', num(pet.petted)) +
-      tile('Keepsakes found', `${num(pet.gifts)} / ${num(pet.giftsTotal)}`) +
-      tile('Fish fed', num(k.fishFed)) +
-      tile('Onigiri made ahead', num(k.onigiriMade), 'for the tray') +
-      tile('Decor owned', `${num(k.items)} / ${num(k.catalog)}`) +
-      tile('Companions', `${num(k.animals)} / ${num(k.animalTotal)}`, 'animals moved in') +
-      tile('Rewards earned', num(k.rewards), 'from Onigiri specials') +
-      tile('Specials on the menu', num(k.specials), 'in your Specials Book') +
-      tile('Days open', num(k.daysOpen), k.firstSeen ? `since ${fmtDay(k.firstSeen, 'year')}` : '') +
-      '</div>';
+      '</div>' +
+      group('Your pet', tile(pet.count > 1 ? 'Your pets' : 'Your pet', esc(pet.name || '–'), `${esc(pet.stage || '')} · ${num(pet.studyDays)} study days`) +
+        tile('Times petted', num(pet.petted)) +
+        tile('Keepsakes found', `${num(pet.gifts)} / ${num(pet.giftsTotal)}`) +
+        tile('Fish fed', num(k.fishFed)) +
+        tile('Onigiri made ahead', num(k.onigiriMade), 'for the tray'), 'k-pet') +
+      group('Your restaurant', tile('Decor owned', `${num(k.items)} / ${num(k.catalog)}`) +
+        tile('Companions', `${num(k.animals)} / ${num(k.animalTotal)}`, 'animals moved in') +
+        tile('Rewards earned', num(k.rewards), 'from Onigiri specials') +
+        tile('Specials on the menu', num(k.specials), 'in your Specials Book') +
+        tile('Days open', num(k.daysOpen), k.firstSeen ? `since ${fmtDay(k.firstSeen, 'year')}` : ''), 'k-rest');
     const bg = buckets(start);
     const bm = buckets(start);
     inRange.forEach(([d, g, m]) => { fill(bg, d, g); fill(bm, d, m); });
@@ -554,6 +559,129 @@
       card('Where mon came from', 'since stats began', rows(SOURCES.map(([id, label]) => ({ label, value: src[id] || 0, shown: `${num(src[id] || 0)} 文` })))) +
       '</div>';
     section($('oks-kitchen'), '食堂', 'Kitchen', k.since ? `Recorded since ${fmtDay(k.since, 'year')}` : '', html);
+  }
+
+  // ----------------------------------------------------------- 記録 records
+  // Personal bests, for the chosen range and for all time. Each record says
+  // what it is, the value, and the day it happened.
+  const longestRun = (dates) => { // longest stretch of consecutive days, and the day it ended
+    const days = Array.from(new Set(dates)).sort();
+    let best = null;
+    let run = 0;
+    let prev = null;
+    for (const d of days) {
+      run = prev && between(prev, d) === 1 ? run + 1 : 1;
+      if (!best || run > best.v) best = { v: run, date: d };
+      prev = d;
+    }
+    return best;
+  };
+  function pick(list, low) { // the biggest (or smallest) {v, date} in a list
+    let best = null;
+    for (const x of list) if (x && x.v != null && (!best || (low ? x.v < best.v : x.v > best.v))) best = x;
+    return best;
+  }
+  // sums per week (Monday) or month, for the days given
+  function sumBy(rowsIn, unit, val) {
+    const m = {};
+    rowsIn.forEach((x) => {
+      const d = x[0];
+      const k = unit === 'month' ? d.slice(0, 7) : addDays(d, -((toDate(d).getDay() + 6) % 7));
+      m[k] = (m[k] || 0) + val(x);
+    });
+    return Object.entries(m).map(([k, v]) => ({ v, date: unit === 'month' ? `${k}-01` : k, unit }));
+  }
+
+  function renderRecords() {
+    const r = D.reviews;
+    const rec = (r && r.records) || { days: [], sessions: [] };
+    if (!r || !rec.days.length) { section($('oks-rec'), '記録', 'Records', '', '<div class="oks-note">No review history to find records in yet.</div>'); return; }
+    const daily = r.daily || [];
+    const first = daily.length ? daily[0][0] : null;
+    const pomo = (D.pomo || {}).sessions || [];
+    const kit = (D.kitchen || {}).days || [];
+    const start = rangeStart(first);
+    const allTime = range === 'all' || (first && first >= start);
+    const total = (x) => x[1] + x[2] + x[3] + x[4];
+    const msOf = {};
+    daily.forEach(([d, c, ms]) => { msOf[d] = ms || 0; });
+    const ofDay = (x, v) => ({ v, date: x[0] });
+
+    // [label, tip, format, work out the record for the days since `since`, low = smaller is better]
+    const GROUPS = [
+      ['Most in a day', [
+        ['Cards answered', 'Answers of every kind in one day', num, (S) => pick(rec.days.filter((x) => x[0] >= S).map((x) => ofDay(x, total(x))))],
+        ['New cards learned', 'Cards first seen as new in one day', num, (S) => pick(rec.days.filter((x) => x[0] >= S).map((x) => ofDay(x, x[6])))],
+        ['Learning answers', 'Answers on new cards in their learning steps', num, (S) => pick(rec.days.filter((x) => x[0] >= S).map((x) => ofDay(x, x[1])))],
+        ['Review answers', 'Answers on cards coming back for review', num, (S) => pick(rec.days.filter((x) => x[0] >= S).map((x) => ofDay(x, x[2])))],
+        ['Relearning answers', 'Answers on cards you forgot, back in their steps', num, (S) => pick(rec.days.filter((x) => x[0] >= S).map((x) => ofDay(x, x[3])))],
+        ['Time reviewing', 'Answer time added up over one day, as timed by Anki', (v) => dur(v / 60000), (S) => pick(daily.filter(([d]) => d >= S).map(([d, , ms]) => ({ v: ms || 0, date: d })))],
+      ]],
+      ['Weeks and months', [
+        ['Cards in a week', 'Monday to Sunday', num, (S) => pick(sumBy(rec.days.filter((x) => x[0] >= S), 'week', total))],
+        ['Cards in a month', 'A calendar month', num, (S) => pick(sumBy(rec.days.filter((x) => x[0] >= S), 'month', total))],
+        ['Days studied in a month', 'Calendar months', num, (S) => pick(sumBy(rec.days.filter((x) => x[0] >= S), 'month', () => 1))],
+      ]],
+      ['Sessions', [
+        ['Longest session', 'Answers less than 5 minutes apart make one session', dur, (S) => pick(rec.sessions.filter((x) => x[0] >= S).map((x) => ({ v: x[1], date: x[0], note: `${num(x[2])} cards` })))],
+        ['Most cards in a session', 'Answers less than 5 minutes apart make one session', num, (S) => pick(rec.sessions.filter((x) => x[0] >= S).map((x) => ({ v: x[2], date: x[0], note: dur(x[1]) })))],
+        ['Fastest pace in a day', 'Seconds per card, on days with 50+ cards (lower is faster)', (v) => `${round1(v)}s`, (S) => pick(daily.filter(([d, c]) => d >= S && c >= 50).map(([d, c, ms]) => ({ v: ms / 1000 / c, date: d, note: `${num(c)} cards` })), true)],
+      ]],
+      ['Consistency', [
+        ['Review streak', 'Days in a row with at least one review (the day it ended)', (v) => `${num(v)} day${v === 1 ? '' : 's'}`, (S) => longestRun(daily.filter(([d]) => d >= S).map(([d]) => d))],
+        ['Cleared streak · reviews', 'Days in a row you finished every review that was due', (v) => `${num(v)} day${v === 1 ? '' : 's'}`, (S) => { const c = cleared(r, first, false, null, S); return c && c.best ? { v: c.best } : null; }],
+        ['Cleared streak · all cards', 'Days in a row you finished reviews, learning and new cards', (v) => `${num(v)} day${v === 1 ? '' : 's'}`, (S) => { const c = cleared(r, first, true, null, S); return c && c.best ? { v: c.best } : null; }],
+        ['Longest break', 'Days off between two days you studied (the day you came back)', (v) => `${num(v)} day${v === 1 ? '' : 's'}`, (S) => {
+          const ds = daily.filter(([d]) => d >= S).map(([d]) => d);
+          return pick(ds.slice(1).map((d, i) => ({ v: between(ds[i], d) - 1, date: d })).filter((x) => x.v > 0));
+        }],
+      ]],
+      ['Quality', [
+        ['Best retention in a day', 'Review cards remembered, on days with 50+ review answers', (v) => pct(round1(v)), (S) => pick(rec.days.filter((x) => x[0] >= S && x[2] >= 50).map((x) => ofDay(x, (1 - x[5] / x[2]) * 100)))],
+        ['Best retention in a month', 'Review cards remembered, in months with 200+ review answers', (v) => pct(round1(v)), (S) => {
+          const m = {};
+          rec.days.filter((x) => x[0] >= S).forEach((x) => { const k = x[0].slice(0, 7); const a = (m[k] = m[k] || [0, 0]); a[0] += x[2]; a[1] += x[5]; });
+          return pick(Object.entries(m).filter(([, a]) => a[0] >= 200).map(([k, a]) => ({ v: (1 - a[1] / a[0]) * 100, date: `${k}-01`, unit: 'month' })));
+        }],
+        ['Answers in a row without Again', 'The longest run of answers that weren\'t Again', num, (S) => pick(rec.days.filter((x) => x[0] >= S).map((x) => ofDay(x, x[7])))],
+      ]],
+      ['Focus and kitchen', [
+        ['Focus time in a day', 'Focus sessions added up over one day', (v) => dur(v / 60), (S) => { const m = {}; pomo.filter((x) => x[0] >= S).forEach((x) => { m[x[0]] = (m[x[0]] || 0) + x[3]; }); return pick(Object.entries(m).map(([d, v]) => ({ v, date: d }))); }],
+        ['Focus sessions in a day', 'Sessions started in one day', num, (S) => { const m = {}; pomo.filter((x) => x[0] >= S).forEach((x) => { m[x[0]] = (m[x[0]] || 0) + 1; }); return pick(Object.entries(m).map(([d, v]) => ({ v, date: d }))); }],
+        ['Longest focus session', 'One session, from start to finish', dur, (S) => pick(pomo.filter((x) => x[0] >= S).map((x) => ({ v: x[3] / 60, date: x[0] })))],
+        ['Focus streak', 'Days in a row with at least one focus session (the day it ended)', (v) => `${num(v)} day${v === 1 ? '' : 's'}`, (S) => longestRun(pomo.filter((x) => x[0] >= S).map((x) => x[0]))],
+        ['Finished sessions in a row', 'Timed sessions that ran their length or reached your card goal, with none cut short', num, (S) => {
+          let run = 0;
+          let best = null;
+          pomo.filter((x) => x[0] >= S && x[5] !== 'e').forEach((x) => { run = x[5] === 'f' || x[5] === 'g' ? run + 1 : 0; if (run && (!best || run > best.v)) best = { v: run, date: x[0] }; });
+          return best;
+        }],
+        ['Guests in a day', 'Guests served in one day', num, (S) => pick(kit.filter((x) => x[0] >= S).map((x) => ({ v: x[1], date: x[0] })))],
+        ['Mon earned in a day', 'Mon (文) from guests and pets in one day', (v) => `${num(v)} 文`, (S) => pick(kit.filter((x) => x[0] >= S).map((x) => ({ v: x[2], date: x[0] })))],
+      ]],
+    ];
+
+    const fresh = addDays(TODAY, -6);
+    const dateNote = (x) => (x.date ? `${x.unit === 'month' ? fmtDay(x.date, 'month') : x.unit === 'week' ? `week of ${fmtDay(x.date, 'year')}` : fmtDay(x.date, 'year')}${x.note ? ` · ${x.note}` : ''}` : (x.note || ''));
+    const recent = (x) => x && x.date && x.date >= (x.unit === 'month' ? fresh.slice(0, 7) + '-01' : fresh) && x.date <= TODAY;
+    let newCount = 0;
+    const cell = (fmt, x) => (x ? `<td><b>${fmt(x.v)}</b>${recent(x) ? '<i class="oks-new">new</i>' : ''}<em>${dateNote(x)}</em></td>` : '<td><b>–</b></td>');
+    const sections = GROUPS.map(([title, list], gi) => {
+      const body = list.map(([label, tipText, fmt, calc]) => {
+        const a = calc('');
+        const x = allTime ? a : calc(start);
+        if (recent(a)) newCount++;
+        return `<tr data-tip="${esc(`<b>${label}</b>\n${tipText}`)}"><th>${label}</th>${cell(fmt, x)}${allTime ? '' : cell(fmt, a)}</tr>`;
+      }).join('');
+      return fold(title, `rec-${gi}`, `<table class="oks-table oks-rec"><thead><tr><th></th><th>${allTime ? 'All time' : rangeName()}</th>${allTime ? '' : '<th>All time</th>'}</tr></thead><tbody>${body}</tbody></table>`);
+    }).join('');
+
+    const g = (gi, li) => { const f = GROUPS[gi][1][li]; const x = f[3](allTime ? '' : start); return x ? [f[2](x.v), dateNote(x)] : ['–', '']; };
+    const hr = (label, gi, li) => { const v = g(gi, li); return hero(label, v[0], v[1]); };
+    const html = '<div class="oks-hero">' + hr('Cards in a day', 0, 0) + hr('Review streak', 3, 0) + hr('Longest session', 2, 0) + hr('Best retention day', 4, 0) + '</div>' +
+      (newCount ? `<div class="oks-note oks-note-new">${newCount} all-time record${newCount === 1 ? '' : 's'} set in the last 7 days.</div>` : '') +
+      `<div class="oks-recs">${sections}</div>`;
+    section($('oks-rec'), '記録', 'Records', allTime ? 'Your personal bests, all time' : `Your personal bests · ${rangeName()} and all time`, html);
   }
 
   // ------------------------------------------------- pages and the range bar
@@ -585,6 +713,13 @@
       window.scrollTo(0, 0);
     }
   });
+
+  // remember which groups you folded
+  document.addEventListener('toggle', (e) => {
+    const t = e.target;
+    if (!t || !t.dataset || !t.dataset.fold) return;
+    try { localStorage.setItem('oks-fold-' + t.dataset.fold, t.open ? '0' : '1'); } catch (err) {}
+  }, true);
 
   // --------------------------------------------------------------- tooltip
   const tip = $('oks-tip');
@@ -623,6 +758,7 @@
     renderPomo();
     renderReviews();
     renderKitchen();
+    renderRecords();
     $('oks-foot').textContent = `Onigiri Kitchen${D.version ? ' v' + D.version : ''} · Reviews come from your whole Anki history.`;
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);

@@ -42,6 +42,13 @@
       days.push([d, guests, mon, rnd() < 0.08 ? Math.round(50 + rnd() * 250) : 0]);
     }
   }
+  // records: per day [date, learning, review, relearning, filtered, review Agains, new cards, best run] and sessions [date, minutes, cards]
+  const recDays = daily.map(([d, c]) => {
+    const t0 = Math.round(c * 0.2); const t2 = Math.round(c * 0.06); const t1 = c - t0 - t2;
+    return [d, t0, t1, t2, 0, Math.round(t1 * (0.07 + rnd() * 0.08)), Math.round(t0 / 3.2), Math.round(8 + rnd() * 60)];
+  });
+  const recSessions = [];
+  daily.forEach(([d, c]) => { const n = 1 + Math.floor(c / 150); for (let k = 0; k < n; k++) { const cards = Math.round(c / n * (0.8 + rnd() * 0.4)); recSessions.push([d, Math.round(cards * (0.12 + rnd() * 0.08) * 10) / 10, cards]); } });
   const rangeOf = (n) => {
     const start = n ? back(n - 1) : '0000';
     const rows = daily.filter(([d]) => d >= start);
@@ -64,6 +71,7 @@
       missedAll: [1, 2, 3, 4, 6, 9, 10, 11, 12, 15, 17, 21, 24, 25].concat(Array.from({ length: 70 }, (_, k) => 30 + k * 6 + (k % 4))).map(back),
       missed: [3, 4, 9, 10, 11, 17, 24, 25].concat(Array.from({ length: 40 }, (_, k) => 30 + k * 10 + (k % 3))).map(back),
       ranges: { 7: rangeOf(7), 30: rangeOf(30), 365: rangeOf(365), all: rangeOf(0) },
+      records: { days: recDays, sessions: recSessions },
       collection: { cards: 9840, new: 3120, mature: 4210, young: 2140, learning: 180, suspended: 190, avgInterval: 38.5, avgEase: 247, notes: 7210, decks: 14 },
     },
     kitchen: {

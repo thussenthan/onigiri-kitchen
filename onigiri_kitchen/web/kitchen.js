@@ -4572,7 +4572,7 @@
     } else if (inside > 0) {
       el.innerHTML = `<span class="jp">営業中</span>${inside} guest${inside === 1 ? '' : 's'} dining · every ${per} reviews brings another`;
     } else {
-      el.innerHTML = `<span class="jp">静か</span>A quiet moment. Every ${per} reviews in a deck brings a guest here.`;
+      el.innerHTML = '';
     }
   }
 

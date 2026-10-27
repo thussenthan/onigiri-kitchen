@@ -882,6 +882,49 @@ def _iso_days(today: datetime.date, idx: List[int]) -> List[str]:
     return [(today - datetime.timedelta(days=99999 - d)).isoformat() for d in idx]
 
 
+def _review_records(cutoff: int, today: datetime.date) -> Dict[str, Any]:
+    """What the Records page is worked out from: for each day, answers by kind
+    (learning, review, relearning, filtered), review Agains, new cards and the
+    longest run of answers that weren't Again; and every study session (answers
+    less than 5 minutes apart) with its length and card count."""
+    days: Dict[int, List[Any]] = {}
+    sessions: List[List[Any]] = []
+    try:
+        rows = mw.col.db.all("select id, cid, type, ease, time from revlog where type in (0, 1, 2, 3) order by id")
+    except Exception as e:
+        print(f"Onigiri Kitchen: couldn't read review log for records: {e}")
+        return {"days": [], "sessions": []}
+    run = 0
+    prev = None
+    start = 0
+    count = 0
+    day_of = lambda ms: int((ms / 1000 - cutoff) / 86400.0 + 100000)
+
+    def close_session() -> None:
+        if count >= 5 and prev is not None:
+            d = (today - datetime.timedelta(days=99999 - day_of(start))).isoformat()
+            sessions.append([d, round((prev - start) / 60000, 1), count])
+
+    for rid, cid, t, ease, ms in rows:
+        d = day_of(rid)
+        row = days.setdefault(d, [0, 0, 0, 0, 0, set(), 0])  # t0, t1, t2, t3, review Agains, new cids, best run
+        row[t] += 1
+        if t == 1 and ease == 1:
+            row[4] += 1
+        if t == 0:
+            row[5].add(cid)
+        run = 0 if ease == 1 else run + 1
+        row[6] = max(row[6], run)
+        if prev is None or rid - prev > 300000:
+            close_session()
+            start, count = rid - (ms or 0), 0
+        prev = rid
+        count += 1
+    close_session()
+    out = [[(today - datetime.timedelta(days=99999 - d)).isoformat(), r[0], r[1], r[2], r[3], r[4], len(r[5]), r[6]] for d, r in sorted(days.items())]
+    return {"days": out, "sessions": sessions}
+
+
 def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
     """Anki's review history: every day's count, and for each range (7 and 30
     days, a year, all time) the answer buttons, retention, time and a
@@ -949,6 +992,9 @@ def _review_stats(today: datetime.date) -> Optional[Dict[str, Any]]:
         "missed": _iso_days(today, overdue["reviews"]),
         "missedAll": _iso_days(today, overdue["all"]),
         "ranges": ranges,
+        # per day [date, learning, review, relearning, filtered answers, review Agains, new cards, best run of non-Agains]
+        # and sessions [date, minutes, cards]: what the Records page works from
+        "records": _review_records(cutoff, today),
         "collection": {
             "cards": int(cards[0] or 0),
             "new": int(cards[1] or 0),
